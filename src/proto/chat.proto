@@ -1,0 +1,45 @@
+syntax = "proto3";
+package chatpb;
+
+message Envelope {
+    string type     = 1;
+    string room_id  = 2;
+    string from     = 3;
+    string to       = 4;
+    bytes  payload  = 5;
+    int64  ts       = 6;
+    string id       = 7;
+}
+
+// 🛠️ NEW: Define the nested reply object
+message ReplyInfo {
+    string id = 1;
+    string sender_id = 2;
+    string content = 3;
+}
+
+message ChatMessage {
+    string text        = 1;
+    string media_url   = 2;
+    string media_type  = 3;
+    string reply_to_id = 4; // 🛠️ Use this when SENDING to the backend
+    ReplyInfo reply_to = 5; // 🛠️ Use this when RECEIVING from the backend
+}
+
+message TypingEvent {
+    string user_id = 1;
+    string room_id = 2;
+}
+
+message Receipt {
+    string message_id = 1;
+    string user_id    = 2;
+    string room_id    = 3;
+    string status     = 4;
+    int64  ts         = 5;
+}
+
+message SystemEvent {
+    string code    = 1;
+    string message = 2;
+}
