@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import {
   MOCK_CREATORS,
   MOCK_STREAMS,
-  type Stream,
-  type Creator,
 } from '../../constants/streamMockData';
 
 interface LiveDiscoveryPageProps {

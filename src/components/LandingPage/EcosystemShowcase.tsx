@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, type CSSProperties, type MouseEvent } from 'react';
+import { useEffect, useRef, type CSSProperties, type MouseEvent } from 'react';
 import { Radio, Video, Shuffle, type LucideIcon } from 'lucide-react';
 
 interface EcosystemSection {

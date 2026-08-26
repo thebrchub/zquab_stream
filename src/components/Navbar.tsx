@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Loader2, LogIn, MessageSquare, User, Menu, X, Search, Bell } from 'lucide-react';
+import { Loader2, MessageSquare, User, Menu, X, Search, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRooms } from '../context/RoomsContext';
 import NotificationsDropdown from './NotificationsDropdown';
