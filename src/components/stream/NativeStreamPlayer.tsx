@@ -40,6 +40,7 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
   const [showFullscreenChat, setShowFullscreenChat] = useState(true);
 
   const [isBuffering, setIsBuffering] = useState(true);
+  const [isAtLiveEdge, setIsAtLiveEdge] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -146,6 +147,22 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
   // HLS will now ONLY initialize once when the streamUrl loads, preventing latency build-up from UI toggles.
   }, [streamUrl]);
 
+  const seekToLive = () => {
+    const video = videoRef.current;
+    if (video && video.seekable && video.seekable.length > 0) {
+      // Find the absolute newest second of video available
+      const liveEdge = video.seekable.end(video.seekable.length - 1);
+      
+      // Jump to exactly 8 seconds behind the newest frame to maintain our smooth buffer
+      video.currentTime = liveEdge - 8;
+      
+      if (video.paused) {
+        video.play().catch(e => console.error("Play failed:", e));
+      }
+      setIsAtLiveEdge(true);
+    }
+  };
+
   const togglePlay = () => {
     if (videoRef.current) {
       if (isPlaying) {
@@ -213,6 +230,18 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
           //  THE NATIVE SPINNER TRIGGERS
           onWaiting={() => setIsBuffering(true)}   // Spinner ON when downloading/stuttering
           onPlaying={() => setIsBuffering(false)}  // Spinner OFF the exact millisecond
+
+          // Grey out the "LIVE" icon if the viewer falls too far behind the live edge
+          onTimeUpdate={() => {
+            const video = videoRef.current;
+            if (video && video.seekable.length > 0) {
+              const liveEdge = video.seekable.end(video.seekable.length - 1);
+              const latency = liveEdge - video.currentTime;
+              
+              // If they fall more than 30 seconds behind, turn the icon grey
+              setIsAtLiveEdge(latency < 30);
+            }
+          }}
         />
 
         {isBuffering && (
@@ -263,10 +292,26 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
             <button onClick={toggleMute} className="text-white/80 hover:text-white transition-colors drop-shadow-md">
               {isMuted ? <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" /> : <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />}
             </button>
-            <div className="flex items-center gap-2 drop-shadow-md ml-2">
+            {/* <div className="flex items-center gap-2 drop-shadow-md ml-2">
               <span className="text-xs font-bold text-white/90">LIVE</span>
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-            </div>
+            </div> */}
+            <button 
+              onClick={!isAtLiveEdge ? seekToLive : undefined}
+              className={`flex items-center gap-2 drop-shadow-md ml-2 transition-all duration-300 ${
+                isAtLiveEdge ? 'cursor-default' : 'cursor-pointer hover:opacity-80'
+              }`}
+              title={isAtLiveEdge ? "You are at the live edge" : "Click to catch up to live"}
+            >
+              <span className={`text-xs font-bold transition-colors ${
+                isAtLiveEdge ? 'text-white/90' : 'text-gray-400'
+              }`}>
+                LIVE
+              </span>
+              <span className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                isAtLiveEdge ? 'bg-red-500 animate-pulse' : 'bg-gray-500'
+              }`}></span>
+            </button>
           </div>
 
           <div className="flex items-center gap-4 pointer-events-auto">
