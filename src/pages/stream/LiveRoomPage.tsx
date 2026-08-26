@@ -25,7 +25,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
 
   // 🚀 PASTE YOUR COPIED .m3u8 LINK RIGHT HERE
   // It will look something like this depending on your server:
-  const RAW_STREAM_URL = "https://aarpaar-stream.brchub.tech/benki-stream/index.m3u8"; 
+  const RAW_STREAM_URL = "https://aarpaar-stream.brchub.tech/stream/index.m3u8"; 
 
   return (
     <div className="flex flex-col lg:flex-row h-screen w-full bg-[#090b0e] text-white overflow-hidden">

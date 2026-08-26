@@ -35,9 +35,11 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
   
   // Custom Player States
   const [isPlaying, setIsPlaying] = useState(true);
-  const [isMuted, setIsMuted] = useState(false); 
+  const [isMuted, setIsMuted] = useState(true); // MUST START TRUE FOR AUTOPLAY
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFullscreenChat, setShowFullscreenChat] = useState(true);
+
+  const [isBuffering, setIsBuffering] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -49,31 +51,67 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
     let hls: Hls;
 
     if (Hls.isSupported()) {
+      // hls = new Hls({
+      //   enableWorker: true,
+      //   // 🚀 LL-HLS AGGRESSIVE TUNING
+      //   lowLatencyMode: true,
+      //   liveSyncDurationCount: 3, // Target 3 part-segments from the live edge
+      //   maxLiveSyncPlaybackRate: 1.2, // Play at 1.2x speed to catch up if it falls behind
+      //   maxBufferLength: 8, // Stop buffering 30 seconds of video (keeps memory low)
+      //   maxMaxBufferLength: 15,
+      // });
+
       hls = new Hls({
         enableWorker: true,
-        // 🚀 LL-HLS AGGRESSIVE TUNING
-        lowLatencyMode: true,
-        liveSyncDurationCount: 3, // Target 3 part-segments from the live edge
-        maxLiveSyncPlaybackRate: 1.2, // Play at 1.2x speed to catch up if it falls behind
-        maxBufferLength: 8, // Stop buffering 30 seconds of video (keeps memory low)
-        maxMaxBufferLength: 15,
+        
+        // 🚀 STANDARD HLS TUNING FOR MASSIVE SCALE & CDNS
+        lowLatencyMode: false, // MUST BE FALSE: We are using standard 4s CDN chunks now
+        
+        // 📥 BACKGROUND DOWNLOADING (The Buffer Magic)
+        maxBufferLength: 30, // Forces the player to download up to 30 seconds of video in the background
+        maxMaxBufferLength: 60, // Maximum memory allowance (matches your 60-second MediaMTX playlist)
+        
+        // 📺 LIVE SYNC & STABILITY
+        liveSyncDurationCount: 3, // Wait until 3 chunks (12s) are downloaded before starting, ensuring zero stutter
+        // liveMaxLatencyDurationCount: 10, // If a viewer's bad internet drops them 40s behind, jump forward
       });
 
       hls.loadSource(streamUrl);
       hls.attachMedia(video);
       
+      // hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      //   // Autoplay directly on load
+      //   video.play().catch((e) => console.log("Autoplay prevented:", e));
+      // });
+
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        // Autoplay directly on load
-        video.play().catch((e) => console.log("Autoplay prevented:", e));
+        console.log("Playlist loaded. Building initial buffer...");
       });
 
-      // 🎧 Fix for demuxed audio tracks
-      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, data) => {
-        if (data.audioTracks && data.audioTracks.length > 0) {
-          // Force select the first available audio track ID
-          hls.audioTrack = data.audioTracks[0].id; 
+      let chunksDownloaded = 0;
+      let hasStartedPlaying = false;
+
+      // 📥 Listen to every time a new chunk finishes downloading
+      hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        chunksDownloaded++; // Add 1 to our chunk counter
+        
+        // 🚀 START PLAYING ONLY AFTER 2 CHUNKS (8 SECONDS) ARE IN THE BANK
+        if (chunksDownloaded >= 2 && !hasStartedPlaying) {
+          console.log("Buffer healthy! Starting playback.");
+          hasStartedPlaying = true; // Lock it so the pause button works later
+          video.play().catch((e) => console.log("Autoplay prevented:", e));
         }
       });
+
+
+      // 🎧 Fix for demuxed audio tracks
+      // Now Backend uses mpegts hence this code is not needed.
+      // hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, data) => {
+      //   if (data.audioTracks && data.audioTracks.length > 0) {
+      //     // Force select the first available audio track ID
+      //     hls.audioTrack = data.audioTracks[0].id; 
+      //   }
+      // });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
@@ -171,7 +209,17 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
           muted={isMuted}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
+
+          //  THE NATIVE SPINNER TRIGGERS
+          onWaiting={() => setIsBuffering(true)}   // Spinner ON when downloading/stuttering
+          onPlaying={() => setIsBuffering(false)}  // Spinner OFF the exact millisecond
         />
+
+        {isBuffering && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="w-12 h-12 border-4 border-white/20 border-t-indigo-500 rounded-full animate-spin"></div>
+          </div>
+        )}
 
         {isFullscreen && (
           <div 
