@@ -12,6 +12,8 @@ export const useStreamEntry = (streamId: string | undefined) => {
     // For development purposes, we are using a hardcoded playback URL.
     setPlaybackUrl('https://aarpaar-stream.brchub.tech/stream/index.m3u8');
     setIsLoading(false);
+    setError(null);
+    setIsPaywall(false);
 
     // if (!streamId) return;
     
