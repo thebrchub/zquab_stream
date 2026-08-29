@@ -7,7 +7,7 @@ import { useWallet } from '../../context/WalletContext';
 import { NativeStreamPlayer } from '../../components/stream/NativeStreamPlayer';
 import { 
   Loader2, AlertCircle, ArrowLeft, 
-  Users, Heart, Share2,  Activity, StopCircle, BadgeCheck,
+  Eye, Heart, Share2,  Activity, StopCircle, BadgeCheck,
   Play, Pause, Volume2, VolumeX, Settings, Maximize, Minimize, MessageSquare
 } from 'lucide-react';
 
@@ -110,7 +110,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
       >
         <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
           <img 
-            src="/logo.svg" 
+            src="/logo.webp" 
             alt="Brand Watermark" 
             className="absolute top-20 right-4 lg:top-24 lg:right-6 w-8 h-8 lg:w-10 lg:h-10 object-contain opacity-25 drop-shadow-md z-10 pointer-events-none"
           />
@@ -245,8 +245,8 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               </button>
 
               <span className="flex items-center gap-1 text-[10px] lg:text-xs font-semibold text-gray-200 ml-1 lg:ml-2">
-                <Users className="w-3.5 h-3.5 lg:w-4 lg:h-4" /> {viewerCount > 0 ? viewerCount.toLocaleString() : '1,204'}
-              </span>
+  <Eye className="w-3.5 h-3.5 lg:w-4 lg:h-4" /> {viewerCount > 0 ? viewerCount.toLocaleString() : '1,204'}
+</span>
             </div>
             <div className="flex items-center gap-1 lg:gap-2">
               <button className="p-1 hover:bg-white/20 rounded transition-colors text-white"><Settings className="w-4 h-4 lg:w-5 lg:h-5" /></button>

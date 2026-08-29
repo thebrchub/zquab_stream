@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, PanelRightClose, Pin } from 'lucide-react';
+import { Eye, PanelRightClose, Pin } from 'lucide-react';
 import { LiveChat } from './LiveChat';
 
 interface StreamChatSidebarProps {
@@ -35,7 +35,7 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
           <h2 className="text-[11px] font-bold text-zinc-200 uppercase tracking-widest">Stream Chat</h2>
         </div>
         <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
-          <Users className="w-3.5 h-3.5" />
+          <Eye className="w-3.5 h-3.5" />
           {viewerCount > 0 ? viewerCount.toLocaleString() : '1,204'}
         </div>
       </div>
