@@ -1,21 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  type ChatMessage,
-  GIFT_TIERS,
-  type GiftTier,
-  MOCK_CHAT_MESSAGES,
-} from '../../constants/streamMockData';
+import { type ChatMessage, MOCK_CHAT_MESSAGES } from '../../constants/streamMockData';
+import { useWallet } from '../../context/WalletContext';
+import { type GiftItem } from '../../types/wallet';
+import { Send, Gift, X, Trash2, Ban } from 'lucide-react';
 
 interface LiveChatProps {
   userBalance: number;
-  onSpendCoins: (amount: number) => void;
+  onSpendCoins: (amount: number, giftId?: number, message?: string) => void;
   onTopUpClick?: () => void;
+  role: 'viewer' | 'creator';
 }
 
 export const LiveChat: React.FC<LiveChatProps> = ({
   userBalance,
   onSpendCoins,
   onTopUpClick,
+  role,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES);
   const [inputText, setInputText] = useState<string>('');
@@ -23,8 +23,8 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   const [insufficientFundsGift, setInsufficientFundsGift] = useState<string | null>(null);
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const { gifts } = useWallet();
 
-  // Auto-scroll chat to bottom on new messages
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -46,172 +46,160 @@ export const LiveChat: React.FC<LiveChatProps> = ({
     setInputText('');
   };
 
-  const handleSendGift = (gift: GiftTier) => {
-    if (userBalance < gift.coins) {
+  const handleSendGift = (gift: GiftItem) => {
+    if (userBalance < gift.cost_coins) {
       setInsufficientFundsGift(gift.name);
       setTimeout(() => setInsufficientFundsGift(null), 3000);
       return;
     }
 
-    // Deduct coins
-    onSpendCoins(gift.coins);
+    const attachedMessage = inputText.trim();
+    onSpendCoins(gift.cost_coins, gift.id, attachedMessage);
 
-    // Append gift message to chat
     const giftMessage: ChatMessage = {
       id: `chat-gift-${Date.now()}`,
       userId: 'current-user',
       userName: 'You',
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
-      gift: {
-        name: gift.name,
-        icon: gift.icon,
-        coins: gift.coins,
-      },
+      message: attachedMessage || undefined,
+      gift: { name: gift.name, icon: gift.icon, coins: gift.cost_coins },
       timestamp: 'Just now',
     };
 
     setMessages((prev) => [...prev, giftMessage]);
+    setInputText('');
     setShowGiftDrawer(false);
   };
 
+  const deleteMessage = (id: string) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== id));
+  };
+
   return (
-    <div className="flex flex-col h-full bg-[#0d0f12] text-white">
-      {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-gray-800">
+    <div className="flex flex-col h-full bg-[#09090b] relative">
+      
+      {/* --- Chat Scroll Area --- */}
+      <div className="flex-1 overflow-y-auto pt-2 pb-24 space-y-1.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         {messages.map((item) => (
-          <div key={item.id} className="text-xs leading-relaxed break-words">
-            {/* Gift Announcement Layout */}
-            {item.gift ? (
-              <div className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-transparent border border-amber-500/20 flex items-center justify-between gap-2 shadow-sm my-1">
-                <div className="flex items-center gap-2">
-                  <img
-                    src={item.avatar}
-                    alt={item.userName}
-                    className="w-6 h-6 rounded-full object-cover border border-amber-400/40"
-                  />
-                  <div>
-                    <span className="font-semibold text-amber-300">
-                      {item.userName}
-                    </span>{' '}
-                    <span className="text-gray-300">sent a</span>{' '}
-                    <span className="font-semibold text-white">
-                      {item.gift.name}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-lg border border-amber-500/20">
-                  <span className="text-lg leading-none">{item.gift.icon}</span>
-                  <span className="text-[11px] font-bold text-amber-400">
-                    {item.gift.coins}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              /* Regular Text Message Layout */
-              <div className="flex items-start gap-2.5">
-                <img
-                  src={item.avatar}
-                  alt={item.userName}
-                  className="w-5 h-5 rounded-full object-cover mt-0.5"
-                />
-                <div>
-                  <span className="font-semibold text-gray-400 mr-2">
-                    {item.userName}:
-                  </span>
-                  <span className="text-gray-100">{item.message}</span>
-                </div>
+          <div key={item.id} className="relative group px-4 py-1 hover:bg-white/[0.02] transition-colors">
+            
+            {/* Creator Mod Tools */}
+            {role === 'creator' && (
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-[#09090b]/90 backdrop-blur-sm p-1 rounded-md border border-white/5 shadow-lg z-10">
+                <button onClick={() => deleteMessage(item.id)} className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors rounded hover:bg-white/5" title="Delete">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <button className="p-1.5 text-zinc-500 hover:text-orange-400 transition-colors rounded hover:bg-white/5" title="Timeout">
+                  <Ban className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
+
+            {/* Layout Grid */}
+            <div className="grid grid-cols-[24px_1fr] gap-3 items-start">
+              <img src={item.avatar} alt={item.userName} className="w-6 h-6 rounded-full object-cover mt-0.5 opacity-90 border border-zinc-800" />
+              
+              <div className="min-w-0">
+                {item.gift ? (
+                  /* 🚀 Bespoke, High-End Gift Card (Replaces the AI-ish gradient block) */
+                  <div className="relative bg-[#0c0c0e] border border-zinc-800/80 rounded-lg p-2.5 mt-0.5 shadow-sm ring-1 ring-amber-500/10 overflow-hidden">
+                    {/* Minimalist Top Edge Highlight */}
+                    <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-amber-500/0 via-amber-500/40 to-amber-500/0" />
+                    
+                    <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-1.5">
+                      <span className="text-[13px] font-extrabold text-amber-500 drop-shadow-sm">{item.userName}</span>
+                      <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Sent</span>
+                      <span className="text-[13px] font-bold text-zinc-200">{item.gift.name}</span>
+                      <div className="ml-auto flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md">
+                        <span className="text-sm leading-none drop-shadow-md">{item.gift.icon}</span>
+                        <span className="text-[11px] font-black text-amber-400">{item.gift.coins}</span>
+                      </div>
+                    </div>
+                    {item.message && (
+                      <p className="text-[13px] text-zinc-300 font-medium break-words break-all whitespace-pre-wrap leading-snug">
+                        {item.message}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  /* Standard Text Layout */
+                  <div className="leading-snug mt-1">
+                    <span className="text-[13px] font-bold text-zinc-400 mr-2.5 align-baseline">{item.userName}</span>
+                    <span className="text-[13px] text-zinc-200 break-words break-all whitespace-pre-wrap align-baseline">{item.message}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         ))}
-        <div ref={chatBottomRef} />
+        <div ref={chatBottomRef} className="h-4" />
       </div>
 
-      {/* Insufficient Coins Warning Overlay */}
-      {insufficientFundsGift && (
-        <div className="mx-3 mb-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-between text-xs">
-          <span className="text-red-300">
-            Need more coins for <strong>{insufficientFundsGift}</strong>
-          </span>
-          <button
-            onClick={onTopUpClick}
-            className="text-[11px] font-bold text-red-200 bg-red-600/60 hover:bg-red-600 px-2.5 py-1 rounded-md transition-colors"
-          >
-            Buy Coins
-          </button>
-        </div>
-      )}
-
-      {/* Gift Selection Tray */}
-      {showGiftDrawer && (
-        <div className="p-3 bg-[#13161c] border-t border-gray-800/80">
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-xs font-semibold text-gray-300">
-              Send a Gift to Creator
-            </span>
-            <button
-              onClick={() => setShowGiftDrawer(false)}
-              className="text-xs text-gray-400 hover:text-white"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="grid grid-cols-5 gap-2">
-            {GIFT_TIERS.map((gift) => (
-              <button
-                key={gift.id}
-                onClick={() => handleSendGift(gift)}
-                className="flex flex-col items-center justify-center p-2 rounded-xl bg-[#1a1f29] hover:bg-[#232a38] border border-gray-800 hover:border-gray-600 transition-all duration-150 group"
-              >
-                <span className="text-2xl group-hover:scale-110 transition-transform">
-                  {gift.icon}
-                </span>
-                <span className="text-[10px] text-gray-400 mt-1 font-medium">
-                  {gift.name}
-                </span>
-                <span className="text-[10px] text-amber-400 font-bold">
-                  {gift.coins} 🪙
-                </span>
+      {/* --- Unified Input Action Bar --- */}
+      <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#09090b] via-[#09090b] to-transparent pt-8 pb-4 px-4 z-30">
+        
+        {showGiftDrawer && (
+          <div className="mb-3 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-3 animate-in slide-in-from-bottom-2 fade-in duration-200">
+            <div className="flex items-center justify-between mb-3 px-1">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Select Gift</span>
+              <button onClick={() => setShowGiftDrawer(false)} className="text-zinc-500 hover:text-white transition-colors">
+                <X className="w-4 h-4" />
               </button>
-            ))}
+            </div>
+            
+            {insufficientFundsGift && (
+              <div className="mb-3 p-2 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-between">
+                <span className="text-xs text-red-400 font-medium">Need coins for {insufficientFundsGift}</span>
+                <button onClick={onTopUpClick} className="text-[10px] font-bold uppercase tracking-wider text-white bg-red-600 hover:bg-red-500 px-2 py-1 rounded">Top Up</button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+              {gifts.map((gift) => (
+                <button
+                  key={gift.id}
+                  onClick={() => handleSendGift(gift)}
+                  className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] transition-colors group"
+                >
+                  <span className="text-2xl mb-1 group-hover:scale-110 transition-transform">{gift.icon}</span>
+                  <span className="text-[10px] text-zinc-400 font-medium truncate w-full text-center">{gift.name}</span>
+                  <span className="text-[10px] text-amber-400 font-bold mt-0.5">{gift.cost_coins}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Bottom Input Action Bar */}
-      <form
-        onSubmit={handleSendMessage}
-        className="p-3 bg-[#12151a] border-t border-gray-800/60 flex items-center gap-2"
-      >
-        <button
-          type="button"
-          onClick={() => setShowGiftDrawer((prev) => !prev)}
-          className={`p-2 rounded-xl border transition-all ${
-            showGiftDrawer
-              ? 'bg-amber-500/20 border-amber-500 text-amber-400'
-              : 'bg-[#1a1f29] border-gray-800 text-gray-400 hover:text-amber-400'
-          }`}
-          title="Send Gift"
-        >
-          🎁
-        </button>
+        {role === 'viewer' && (
+          <form onSubmit={handleSendMessage} className="flex items-center gap-2 p-1.5 bg-white/[0.03] border border-white/10 hover:border-white/20 focus-within:border-indigo-500/50 focus-within:bg-white/[0.05] rounded-2xl transition-all shadow-lg">
+            <button
+              type="button"
+              onClick={() => setShowGiftDrawer((prev) => !prev)}
+              className={`p-2 rounded-xl transition-all shrink-0 ${
+                showGiftDrawer ? 'bg-amber-500/20 text-amber-400' : 'text-zinc-400 hover:text-amber-400 hover:bg-white/5'
+              }`}
+            >
+              <Gift className="w-4 h-4" />
+            </button>
 
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          placeholder="Send a message..."
-          className="flex-1 bg-[#1a1f29] border border-gray-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
-        />
-
-        <button
-          type="submit"
-          disabled={!inputText.trim()}
-          className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors"
-        >
-          Send
-        </button>
-      </form>
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Send a message..."
+              className="flex-1 bg-transparent py-1.5 px-1 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none"
+            />
+            
+            <button
+              type="submit"
+              disabled={!inputText.trim()}
+              className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-transparent disabled:text-zinc-600 text-white transition-colors shrink-0"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 };

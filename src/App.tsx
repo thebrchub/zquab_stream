@@ -3,6 +3,7 @@ import { Suspense, lazy, useEffect } from 'react';
 import { ThemeProvider } from './hooks/useTheme';
 import RootLayout from './layout/RootLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { WalletProvider } from './context/WalletContext';
 import { WebSocketProvider } from './context/WebSocketContext';
 import { RoomsProvider } from './context/RoomsContext';
 import { Loader2 } from 'lucide-react';
@@ -167,6 +168,7 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
+        <WalletProvider>
         <WebSocketProvider>
           <RoomsProvider>
           <BrowserRouter>
@@ -224,6 +226,7 @@ function App() {
           </BrowserRouter>
           </RoomsProvider>
         </WebSocketProvider>
+        </WalletProvider>
       </AuthProvider>
     </ThemeProvider>
   );

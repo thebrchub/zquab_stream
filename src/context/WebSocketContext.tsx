@@ -24,7 +24,11 @@ const PhotoResponseProto = safeLookup('eventspb.PhotoResponse', 'PhotoResponse')
 const PhotoReadyProto = safeLookup('eventspb.PhotoReady', 'PhotoReady');
 const UnfriendedProto = safeLookup('eventspb.Unfriended', 'Unfriended');
 
-// 🛠️ THE FIX: Wrap the delete call in curly braces so it returns void!
+// 🚀 NEW: Stream & Creator Event Protos
+const GiftSentProto = safeLookup('eventspb.GiftSent', 'GiftSent');
+const ViewerCountProto = safeLookup('eventspb.ViewerCountUpdated', 'ViewerCountUpdated');
+const StreamEndedProto = safeLookup('eventspb.StreamEnded', 'StreamEnded');
+
 type WSListener = (message: any) => void;
 class WSEmitter {
   private listeners = new Set<WSListener>();
@@ -32,7 +36,7 @@ class WSEmitter {
   subscribe(listener: WSListener) {
     this.listeners.add(listener);
     return () => {
-      this.listeners.delete(listener); // Now it returns nothing (void)
+      this.listeners.delete(listener); 
     };
   }
   
@@ -95,13 +99,12 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           try {
             const t: string = envelope.type || '';
 
+            // Chat & System Events
             if (t === 'message_delivered' || t === 'message_sent_confirm' || t === 'chat_message') {
               decodedPayload = ChatMessageProto.decode(envelope.payload);
-              
               if (decodedPayload.mediaUrl) decodedPayload.media_url = decodedPayload.mediaUrl;
               if (decodedPayload.mediaType) decodedPayload.media_type = decodedPayload.mediaType;
               if (decodedPayload.replyTo) decodedPayload.reply_to = decodedPayload.replyTo;
-              
             } else if (t === 'photo_request' && PhotoRequestProto) {
               decodedPayload = PhotoRequestProto.decode(envelope.payload);
             } else if (t === 'photo_response' && PhotoResponseProto) {
@@ -120,11 +123,31 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
                   decodedPayload = envelope.payload;
                 }
               }
-            } else {
+            } 
+            
+            // 🚀 NEW: Stream Event Decoders
+            else if (t === 'gift_sent' && GiftSentProto) {
+              decodedPayload = GiftSentProto.decode(envelope.payload);
+            } else if (t === 'viewer_count_updated' && ViewerCountProto) {
+              decodedPayload = ViewerCountProto.decode(envelope.payload);
+            } else if (t === 'stream_ended' && StreamEndedProto) {
+              decodedPayload = StreamEndedProto.decode(envelope.payload);
+            } 
+            
+            // Fallbacks
+            else {
               try {
+                // First try standard chat message
                 decodedPayload = ChatMessageProto.decode(envelope.payload);
               } catch (e) {
-                decodedPayload = envelope.payload;
+                try {
+                  // 🚀 NEW: JSON Fallback! 
+                  // If backend sends temporary JSON strings before updating protos
+                  const text = new TextDecoder().decode(envelope.payload);
+                  decodedPayload = JSON.parse(text);
+                } catch (jsonErr) {
+                  decodedPayload = envelope.payload;
+                }
               }
             }
           } catch (e) {
@@ -138,10 +161,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           payload: decodedPayload,
         };
 
-        // 🛠️ THE FIX: Broadcast instantly bypassing React's render cycle
         wsEvents.emit(finalMessage);
-        
-        // Keep legacy state alive for older components
         setLastMessage(finalMessage);
 
       } catch (err) {
@@ -191,6 +211,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           replyTo: payload.reply_to || payload.replyTo || ''
         });
         payloadBytes = ChatMessageProto.encode(chatMsg).finish();
+      } 
+      // Handle raw JSON payloads sent from the client just in case
+      else if (payload && typeof payload === 'object') {
+        const jsonString = JSON.stringify(payload);
+        payloadBytes = new TextEncoder().encode(jsonString);
       }
 
       const msgId = id || globalThis.crypto?.randomUUID?.() || `${Date.now()}`;

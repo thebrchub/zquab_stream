@@ -5,6 +5,7 @@ export interface Creator {
   avatar: string;
   bio: string;
   followersCount: number;
+  verified?: boolean;
   isLive: boolean;
   oneOnOne: {
     enabled: boolean;
