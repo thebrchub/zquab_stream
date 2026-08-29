@@ -1,16 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { streamService, ApiError } from '../services/streamService';
-import { useWallet } from '../context/WalletContext';
 
 export const useStreamEntry = (streamId: string | undefined) => {
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPaywall, setIsPaywall] = useState<boolean>(false);
-  
-  const { openPurchaseModal } = useWallet();
+  const [isPaywall, setIsPaywall] = useState(false);
 
-  const enterStream = useCallback(async () => {
+  const fetchStreamUrl = useCallback(async () => {
     if (!streamId) return;
     
     setIsLoading(true);
@@ -18,31 +14,46 @@ export const useStreamEntry = (streamId: string | undefined) => {
     setIsPaywall(false);
 
     try {
-      const data = await streamService.enterStream(streamId);
+      // 🚀 The new backend endpoint to get the playback URL
+      const response = await fetch(`/api/v1/streams/${streamId}/enter`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Add your standard Auth/Bearer token here if your fetch doesn't use cookies automatically
+          // 'Authorization': `Bearer ${sessionStorage.getItem('token')}` 
+        },
+      });
+
+      if (response.status === 402) {
+        setIsPaywall(true);
+        setError("Premium stream. Insufficient coins to enter.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error('Stream is offline or unavailable.');
+      }
+
+      const data = await response.json();
       setPlaybackUrl(data.playback_url);
     } catch (err: any) {
-      if (err instanceof ApiError && err.status === 402) {
-        setIsPaywall(true);
-        setError("Insufficient zCoins to enter this premium stream.");
-        // Automatically pop the top-up modal for the user
-        openPurchaseModal();
-      } else {
-        setError(err.message || "Failed to enter stream");
-      }
+      setError(err.message || 'Failed to connect to stream.');
+      setPlaybackUrl(null);
     } finally {
       setIsLoading(false);
     }
-  }, [streamId, openPurchaseModal]);
+  }, [streamId]);
 
   useEffect(() => {
-    enterStream();
-  }, [enterStream]);
+    fetchStreamUrl();
+  }, [fetchStreamUrl]);
 
   return { 
     playbackUrl, 
     isLoading, 
     error, 
     isPaywall, 
-    retryEnter: enterStream 
+    retryEnter: fetchStreamUrl 
   };
 };
