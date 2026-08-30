@@ -210,7 +210,15 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               </div>
               
               {role === 'viewer' && (
-                <button onClick={() => setIsFollowing(!isFollowing)} className={`mt-2 px-5 py-2 lg:px-8 lg:py-2.5 rounded-xl font-bold text-sm lg:text-base transition-all shadow-lg shrink-0 ${isFollowing ? 'bg-white/10 text-white hover:bg-white/20 border border-white/5' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
+                <button 
+                  onClick={() => setIsFollowing(!isFollowing)} 
+                  // 🚀 Added mr-10 lg:mr-12 to push it away from the absolute close button
+                  className={`mt-2 mr-10 lg:mr-12 px-5 py-2 lg:px-8 lg:py-2.5 rounded-xl font-bold text-sm lg:text-base transition-all shadow-lg shrink-0 ${
+                    isFollowing 
+                      ? 'bg-white/10 text-white hover:bg-white/20 border border-white/5' 
+                      : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                  }`}
+                >
                   {isFollowing ? 'Following' : 'Follow'}
                 </button>
               )}
