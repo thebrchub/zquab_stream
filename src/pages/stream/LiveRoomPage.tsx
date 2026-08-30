@@ -7,8 +7,9 @@ import { useWallet } from '../../context/WalletContext';
 import { NativeStreamPlayer } from '../../components/stream/NativeStreamPlayer';
 import { 
   Loader2, AlertCircle, ArrowLeft, 
-  Eye, Heart, Share2,  Activity, StopCircle, BadgeCheck,
-  Play, Pause, Volume2, VolumeX, Settings, Maximize, Minimize, MessageSquare
+  Eye, Heart, Share2, Activity, StopCircle, BadgeCheck,
+  Play, Pause, Volume2, VolumeX, Settings, Maximize, Minimize, MessageSquare,
+  X, Users // 🚀 Added X and Users for the new profile overlay
 } from 'lucide-react';
 
 interface LiveRoomPageProps {
@@ -32,17 +33,18 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   
-  // 🚀 New Refs & State for Live Edge Sync
+  // 🚀 New State for the Bottom Sheet Overlay
+  const [showProfileOverlay, setShowProfileOverlay] = useState(false);
+  
   const [isAtLiveEdge, setIsAtLiveEdge] = useState(true);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // 🚀 Jump to Live Function
   const seekToLive = () => {
     const video = videoRef.current;
     if (video && video.seekable.length > 0) {
       const liveEdge = video.seekable.end(video.seekable.length - 1);
-      video.currentTime = liveEdge - 8; // Safely buffer 8 seconds from absolute edge
+      video.currentTime = liveEdge - 8; 
       if (!isPlaying) setIsPlaying(true);
       setIsAtLiveEdge(true);
     }
@@ -131,8 +133,8 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               streamUrl={activePlaybackUrl} 
               isPlaying={isPlaying} 
               isMuted={isMuted} 
-              videoRef={videoRef}               // 🚀 Pass Ref
-              onLiveEdgeChange={setIsAtLiveEdge} // 🚀 Pass State Updater
+              videoRef={videoRef}               
+              onLiveEdgeChange={setIsAtLiveEdge} 
             />
           )}
           {!activePlaybackUrl && (
@@ -140,7 +142,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           )}
         </div>
 
-        <div className={`relative z-30 p-3 lg:p-4 flex justify-between items-start transition-opacity duration-300 pointer-events-none ${isHoveringPlayer || !isPlaying ? 'opacity-100' : 'opacity-0 lg:opacity-0 opacity-100'}`}>
+        <div className={`relative z-30 p-3 lg:p-4 flex justify-between items-start transition-opacity duration-300 pointer-events-none ${isHoveringPlayer || !isPlaying || showProfileOverlay ? 'opacity-100' : 'opacity-0 lg:opacity-0 opacity-100'}`}>
           <button onClick={onLeaveRoom} className="pointer-events-auto p-2 rounded-md bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors border border-white/10">
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -165,20 +167,83 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           </div>
         </div>
 
+        {/* 🚀 Profile Slide-Up Overlay */}
+        <div className={`absolute inset-x-0 bottom-0 z-40 flex flex-col justify-end pointer-events-none overflow-hidden h-full ${showProfileOverlay ? 'opacity-100' : 'opacity-0 delay-200'}`}>
+          {/* Backdrop Blur */}
+          <div 
+            className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity duration-500 pointer-events-auto ${showProfileOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
+            onClick={(e) => { e.stopPropagation(); setShowProfileOverlay(false); }}
+          />
+          
+          {/* Bottom Sheet UI */}
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className={`relative bg-zinc-950/95 backdrop-blur-xl border-t border-white/10 p-5 lg:p-8 rounded-t-3xl pointer-events-auto transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col gap-4 ${showProfileOverlay ? 'translate-y-0' : 'translate-y-full'}`}
+          >
+            <button onClick={() => setShowProfileOverlay(false)} className="absolute top-4 right-4 lg:top-6 lg:right-6 p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full text-zinc-400 hover:text-white transition-colors">
+              <X className="w-4 h-4 lg:w-5 lg:h-5" />
+            </button>
+            
+            <div className="flex items-start gap-4 lg:gap-6">
+              <img src={creator.avatar} alt={creator.name} className="w-16 h-16 lg:w-24 lg:h-24 rounded-full border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)] object-cover" />
+              <div className="flex-1 mt-1">
+                <h2 className="text-xl lg:text-3xl font-bold text-white flex items-center gap-2">
+                  {creator.name} {creator.verified && <BadgeCheck className="w-5 h-5 lg:w-7 lg:h-7 text-blue-400" />}
+                </h2>
+                <p className="text-xs lg:text-sm text-indigo-400 font-medium mt-0.5 tracking-wide uppercase">{stream.category} Creator</p>
+                
+                <div className="flex items-center gap-4 lg:gap-6 mt-3 lg:mt-4">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] lg:text-xs text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Followers</span>
+                    <div className="flex items-center gap-1.5 text-sm lg:text-base font-semibold text-zinc-200">
+                      <Users className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-zinc-400" /> 125K
+                    </div>
+                  </div>
+                  <div className="w-px h-8 bg-white/10"></div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] lg:text-xs text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Streams</span>
+                    <div className="flex items-center gap-1.5 text-sm lg:text-base font-semibold text-zinc-200">
+                      <Activity className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-emerald-400" /> 42
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {role === 'viewer' && (
+                <button onClick={() => setIsFollowing(!isFollowing)} className={`mt-2 px-5 py-2 lg:px-8 lg:py-2.5 rounded-xl font-bold text-sm lg:text-base transition-all shadow-lg shrink-0 ${isFollowing ? 'bg-white/10 text-white hover:bg-white/20 border border-white/5' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+              )}
+            </div>
+            {/* Added mock description just to make the profile look fuller */}
+            <p className="text-zinc-400 text-xs lg:text-sm leading-relaxed mt-2 max-w-2xl">
+              Professional {stream.category} player. Streaming daily ranked grinds, viewer tournaments, and random challenges. Drop a follow to squad up next game!
+            </p>
+          </div>
+        </div>
+
         <div 
           onClick={(e) => e.stopPropagation()} 
-          className={`relative z-30 w-full pt-20 pb-3 px-4 lg:pt-32 lg:pb-4 lg:px-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent transition-opacity duration-300 pointer-events-none ${isHoveringPlayer || !isPlaying ? 'opacity-100' : 'opacity-0 lg:opacity-0 opacity-100'}`}
+          className={`relative z-30 w-full pt-20 pb-3 px-4 lg:pt-32 lg:pb-4 lg:px-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent transition-opacity duration-300 pointer-events-none ${isHoveringPlayer || !isPlaying || showProfileOverlay ? 'opacity-100' : 'opacity-0 lg:opacity-0 opacity-100'}`}
         >
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-3 lg:mb-4 pointer-events-auto">
             <div className="flex items-center gap-3">
-              <div className="relative shrink-0 hidden lg:block">
+              {/* 🚀 Made Avatar Clickable */}
+              <div 
+                className="relative shrink-0 hidden lg:block cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setShowProfileOverlay(true)}
+              >
                 <img src={creator.avatar} alt={creator.name} className="w-14 h-14 rounded-full object-cover border border-gray-600 shadow-md" />
                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm">Live</div>
               </div>
               <div className="flex flex-col drop-shadow-md">
                 <h1 className="text-base lg:text-xl font-bold text-white leading-tight mb-0.5 line-clamp-1">{stream.title}</h1>
                 <div className="flex items-center gap-1.5 text-xs lg:text-sm text-gray-200 font-medium">
-                  <span className="hover:underline cursor-pointer flex items-center gap-1">
+                  {/* 🚀 Made Name Clickable */}
+                  <span 
+                    className="hover:underline cursor-pointer flex items-center gap-1"
+                    onClick={() => setShowProfileOverlay(true)}
+                  >
                     {creator.name} {creator.verified && <BadgeCheck className="w-3.5 h-3.5 text-blue-400" />}
                   </span>
                   <span className="text-gray-400">•</span>
@@ -214,8 +279,6 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                 {isMuted ? <VolumeX className="w-4 h-4 lg:w-5 lg:h-5" /> : <Volume2 className="w-4 h-4 lg:w-5 lg:h-5" />}
               </button>
               
-              {/* 🚀 Restored LIVE Button Logic */}
-              {/* 🚀 Dynamic LIVE / Go Live Catch-Up Button */}
               <button 
                 onClick={!isAtLiveEdge ? seekToLive : undefined}
                 className={`flex items-center gap-1.5 ml-1 lg:ml-2 transition-all duration-300 ${
@@ -227,7 +290,6 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               >
                 {isAtLiveEdge ? (
                   <>
-                    {/* Active state: No container, just text and pulsing red dot */}
                     <span className="text-[10px] lg:text-xs font-bold text-white uppercase tracking-wider drop-shadow-md">
                       Live
                     </span>
@@ -235,7 +297,6 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                   </>
                 ) : (
                   <>
-                    {/* Catch-up state: Grayed out inside a premium frosted container */}
                     <span className="text-[10px] lg:text-xs font-bold text-zinc-300 whitespace-nowrap">
                       Go Live
                     </span>
@@ -245,8 +306,8 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               </button>
 
               <span className="flex items-center gap-1 text-[10px] lg:text-xs font-semibold text-gray-200 ml-1 lg:ml-2">
-  <Eye className="w-3.5 h-3.5 lg:w-4 lg:h-4" /> {viewerCount > 0 ? viewerCount.toLocaleString() : '1,204'}
-</span>
+                <Eye className="w-3.5 h-3.5 lg:w-4 lg:h-4" /> {viewerCount > 0 ? viewerCount.toLocaleString() : '1,204'}
+              </span>
             </div>
             <div className="flex items-center gap-1 lg:gap-2">
               <button className="p-1 hover:bg-white/20 rounded transition-colors text-white"><Settings className="w-4 h-4 lg:w-5 lg:h-5" /></button>
