@@ -9,7 +9,7 @@ import {
   Loader2, AlertCircle, ArrowLeft, 
   Eye, Heart, Share2, Activity, StopCircle, BadgeCheck,
   Play, Pause, Volume2, VolumeX, Settings, Maximize, Minimize, MessageSquare,
-  X, Users // 🚀 Added X and Users for the new profile overlay
+  X, Users 
 } from 'lucide-react';
 
 interface LiveRoomPageProps {
@@ -33,12 +33,31 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   
-  // 🚀 New State for the Bottom Sheet Overlay
   const [showProfileOverlay, setShowProfileOverlay] = useState(false);
-  
   const [isAtLiveEdge, setIsAtLiveEdge] = useState(true);
+  
+  // 🚀 New Inactivity State
+  const [isUserActive, setIsUserActive] = useState(true);
+  const activityTimeoutRef = useRef<number | null>(null);
+
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // 🚀 Resets the 3-second timer on any interaction
+  const handleInteraction = () => {
+    setIsUserActive(true);
+    if (activityTimeoutRef.current) window.clearTimeout(activityTimeoutRef.current);
+    activityTimeoutRef.current = window.setTimeout(() => {
+      setIsUserActive(false);
+    }, 3000);
+  };
+
+  useEffect(() => {
+    handleInteraction();
+    return () => {
+      if (activityTimeoutRef.current) window.clearTimeout(activityTimeoutRef.current);
+    };
+  }, []);
 
   const seekToLive = () => {
     const video = videoRef.current;
@@ -92,6 +111,11 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const activeIsLoading = streamMode === 'mock' ? false : apiIsLoading;
   const activeError = streamMode === 'mock' ? null : apiError;
 
+  // 🚀 Extracted visibility logic for clean injection
+  const showMobileUI = isChatCollapsed || isUserActive || !isPlaying || showProfileOverlay;
+  const showDesktopUI = isHoveringPlayer || !isPlaying || showProfileOverlay;
+  const uiVisibilityClasses = `transition-opacity duration-300 pointer-events-none ${showMobileUI ? 'opacity-100' : 'opacity-0'} ${showDesktopUI ? 'lg:opacity-100' : 'lg:opacity-0'}`;
+
   return (
     <div className="flex flex-col lg:flex-row h-[100dvh] w-full bg-[#0e0e10] text-gray-100 overflow-hidden font-sans">
       
@@ -106,9 +130,21 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           ${!isFullscreen && isChatCollapsed ? 'h-full' : ''}
           ${!isFullscreen && !isChatCollapsed ? 'h-[40vh] lg:h-auto' : ''}
         `}
-        onMouseEnter={() => setIsHoveringPlayer(true)}
+        onMouseEnter={() => { setIsHoveringPlayer(true); handleInteraction(); }}
         onMouseLeave={() => setIsHoveringPlayer(false)}
-        onClick={() => setIsPlaying(!isPlaying)}
+        onMouseMove={handleInteraction}
+        onTouchStart={handleInteraction} // Hooks into mobile taps
+        onClick={() => {
+          const isMobile = window.innerWidth < 1024;
+          const areControlsHidden = !isChatCollapsed && !isUserActive && isPlaying && !showProfileOverlay;
+          
+          handleInteraction();
+          
+          // 🚀 Prevents accidental pausing on mobile if the user is just tapping to wake up the UI
+          if (isMobile && areControlsHidden) return; 
+          
+          setIsPlaying(!isPlaying);
+        }}
       >
         <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
           <img 
@@ -142,7 +178,8 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           )}
         </div>
 
-        <div className={`relative z-30 p-3 lg:p-4 flex justify-between items-start transition-opacity duration-300 pointer-events-none ${isHoveringPlayer || !isPlaying || showProfileOverlay ? 'opacity-100' : 'opacity-0 lg:opacity-0 opacity-100'}`}>
+        {/* 🚀 Top Nav using dynamic visibility classes */}
+        <div className={`relative z-30 p-3 lg:p-4 flex justify-between items-start ${uiVisibilityClasses}`}>
           <button onClick={onLeaveRoom} className="pointer-events-auto p-2 rounded-md bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors border border-white/10">
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -155,7 +192,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               </button>
             )}
             
-            {isChatCollapsed && !isFullscreen && (
+            {/* {isChatCollapsed && !isFullscreen && (
               <button 
                 onClick={(e) => { e.stopPropagation(); setIsChatCollapsed(false); }} 
                 className="flex items-center justify-center w-9 h-9 rounded-md bg-black/60 hover:bg-blue-600 text-white backdrop-blur-sm border border-white/10 transition-colors shadow-lg group/btn"
@@ -163,19 +200,16 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               >
                 <MessageSquare className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
               </button>
-            )}
+            )} */}
           </div>
         </div>
 
-        {/* 🚀 Profile Slide-Up Overlay */}
         <div className={`absolute inset-x-0 bottom-0 z-40 flex flex-col justify-end pointer-events-none overflow-hidden h-full ${showProfileOverlay ? 'opacity-100' : 'opacity-0 delay-200'}`}>
-          {/* Backdrop Blur */}
           <div 
             className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity duration-500 pointer-events-auto ${showProfileOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
             onClick={(e) => { e.stopPropagation(); setShowProfileOverlay(false); }}
           />
           
-          {/* Bottom Sheet UI */}
           <div 
             onClick={(e) => e.stopPropagation()}
             className={`relative bg-zinc-950/95 backdrop-blur-xl border-t border-white/10 p-5 lg:p-8 rounded-t-3xl pointer-events-auto transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col gap-4 ${showProfileOverlay ? 'translate-y-0' : 'translate-y-full'}`}
@@ -210,33 +244,24 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               </div>
               
               {role === 'viewer' && (
-                <button 
-                  onClick={() => setIsFollowing(!isFollowing)} 
-                  // 🚀 Added mr-10 lg:mr-12 to push it away from the absolute close button
-                  className={`mt-2 mr-10 lg:mr-12 px-5 py-2 lg:px-8 lg:py-2.5 rounded-xl font-bold text-sm lg:text-base transition-all shadow-lg shrink-0 ${
-                    isFollowing 
-                      ? 'bg-white/10 text-white hover:bg-white/20 border border-white/5' 
-                      : 'bg-indigo-600 text-white hover:bg-indigo-500'
-                  }`}
-                >
+                <button onClick={() => setIsFollowing(!isFollowing)} className={`mt-2 mr-10 lg:mr-12 px-5 py-2 lg:px-8 lg:py-2.5 rounded-xl font-bold text-sm lg:text-base transition-all shadow-lg shrink-0 ${isFollowing ? 'bg-white/10 text-white hover:bg-white/20 border border-white/5' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
                   {isFollowing ? 'Following' : 'Follow'}
                 </button>
               )}
             </div>
-            {/* Added mock description just to make the profile look fuller */}
             <p className="text-zinc-400 text-xs lg:text-sm leading-relaxed mt-2 max-w-2xl">
               Professional {stream.category} player. Streaming daily ranked grinds, viewer tournaments, and random challenges. Drop a follow to squad up next game!
             </p>
           </div>
         </div>
 
+        {/* 🚀 Bottom Controls using dynamic visibility classes */}
         <div 
           onClick={(e) => e.stopPropagation()} 
-          className={`relative z-30 w-full pt-20 pb-3 px-4 lg:pt-32 lg:pb-4 lg:px-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent transition-opacity duration-300 pointer-events-none ${isHoveringPlayer || !isPlaying || showProfileOverlay ? 'opacity-100' : 'opacity-0 lg:opacity-0 opacity-100'}`}
+          className={`relative z-30 w-full pt-20 pb-3 px-4 lg:pt-32 lg:pb-4 lg:px-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent ${uiVisibilityClasses}`}
         >
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-3 lg:mb-4 pointer-events-auto">
             <div className="flex items-center gap-3">
-              {/* 🚀 Made Avatar Clickable */}
               <div 
                 className="relative shrink-0 hidden lg:block cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => setShowProfileOverlay(true)}
@@ -247,7 +272,6 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               <div className="flex flex-col drop-shadow-md">
                 <h1 className="text-base lg:text-xl font-bold text-white leading-tight mb-0.5 line-clamp-1">{stream.title}</h1>
                 <div className="flex items-center gap-1.5 text-xs lg:text-sm text-gray-200 font-medium">
-                  {/* 🚀 Made Name Clickable */}
                   <span 
                     className="hover:underline cursor-pointer flex items-center gap-1"
                     onClick={() => setShowProfileOverlay(true)}
@@ -318,6 +342,26 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-1 lg:gap-2">
+              
+              {/* 🚀 UX Fix: Chat toggle moved to the thumb zone */}
+              {isChatCollapsed && (
+                <button 
+                  onClick={async (e) => { 
+                    e.stopPropagation(); 
+                    // Automatically exit full-screen if they want to chat
+                    if (isFullscreen && document.fullscreenElement) {
+                      await document.exitFullscreen().catch(() => {});
+                    }
+                    setIsChatCollapsed(false); 
+                  }} 
+                  className="p-1 hover:bg-white/20 rounded transition-colors text-white relative group"
+                  title="Expand Chat"
+                >
+                  <MessageSquare className="w-4 h-4 lg:w-5 lg:h-5" />
+                  {/* Optional: You can easily add a red unread-notification dot right here later */}
+                </button>
+              )}
+
               <button className="p-1 hover:bg-white/20 rounded transition-colors text-white"><Settings className="w-4 h-4 lg:w-5 lg:h-5" /></button>
               <button onClick={toggleFullscreen} className="p-1 hover:bg-white/20 rounded transition-colors text-white">
                 {isFullscreen ? <Minimize className="w-4 h-4 lg:w-5 lg:h-5" /> : <Maximize className="w-4 h-4 lg:w-5 lg:h-5" />}
