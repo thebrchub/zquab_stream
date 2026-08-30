@@ -8,6 +8,8 @@ interface AuthUser {
   name?: string;
   email?: string;
   avatar_url?: string;
+  is_creator?: boolean;
+  approval_status?: 'none' | 'pending' | 'approved' | 'rejected';
 }
 
 interface AuthContextType {
@@ -37,6 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: userData.username,
         name: userData.name,
         avatar_url: userData.avatar_url,
+      
+        is_creator: userData.is_creator || false,
+        approval_status: userData.approval_status || 'none',
       });
     } catch (error: any) {
       console.log('No active full user session found on load.');

@@ -99,7 +99,7 @@ export default function FriendsHub() {
     <div className="max-w-3xl mx-auto w-full p-4 md:p-6 pb-20 flex flex-col h-[100dvh]">
       <h1 className="text-2xl font-bold text-[var(--text-main)] mb-6">Friends Hub</h1>
 
-      <div className="flex overflow-x-auto custom-scrollbar gap-2 mb-6 pb-2 flex-shrink-0">
+      <div className="flex overflow-x-auto custom-scrollbar gap-4 mb-6 pb-2 flex-shrink-0 px-2">
         {[
           { id: 'friends', icon: Users, label: 'My Friends' },
           { id: 'requests', icon: UserPlus, label: 'Requests' },
@@ -108,10 +108,10 @@ export default function FriendsHub() {
           <button aria-label="Tabs"
             key={tab.id}
             onClick={() => setActiveTab(tab.id as Tab)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm transition-colors whitespace-nowrap ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-[1.25rem] font-bold text-sm transition-all duration-200 whitespace-nowrap ${
               activeTab === tab.id 
-                ? 'bg-[#3B82F6] text-white' 
-                : 'bg-[var(--card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--background)]'
+                ? 'bg-[#4F46E5] text-white shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)]' 
+                : 'bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border-none shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_8px_rgba(255,255,255,0.02),inset_1px_1px_4px_rgba(255,255,255,0.05)] hover:brightness-110'
             }`}
           >
             <tab.icon className="w-4 h-4" />
@@ -121,7 +121,7 @@ export default function FriendsHub() {
       </div>
 
       {activeTab === 'search' && (
-        <div className="mb-4 flex-shrink-0">
+        <div className="mb-6 flex-shrink-0 px-2">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
             <input
@@ -129,18 +129,18 @@ export default function FriendsHub() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by username..."
-              className="w-full bg-[var(--card)] border border-[var(--border-color)] rounded-xl pl-12 pr-4 py-3 text-[var(--text-main)] outline-none focus:border-[#3B82F6] transition-colors"
+              className="w-full bg-[var(--background)] rounded-[1.25rem] pl-12 pr-4 py-4 text-[var(--text-main)] outline-none transition-all border-none shadow-[inset_4px_4px_8px_rgba(0,0,0,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.03)] focus:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.6),inset_-2px_-2px_6px_rgba(255,255,255,0.05),0_0_0_2px_rgba(79,70,229,0.3)]"
             />
           </div>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-2 space-y-4">
         {isDisplayLoading && displayData.length === 0 ? (
-          <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 text-[#3B82F6] animate-spin" /></div>
+          <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 text-[#4F46E5] animate-spin" /></div>
         ) : displayData.length === 0 ? (
-          <div className="text-center py-10 text-[var(--text-muted)] bg-[var(--card)] border border-[var(--border-color)] rounded-2xl">
-            <p>Nothing to show here.</p>
+          <div className="text-center py-10 text-[var(--text-muted)] bg-[var(--background)] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.3),inset_-2px_-2px_6px_rgba(255,255,255,0.02)] rounded-[2rem]">
+            <p className="font-medium">Nothing to show here.</p>
           </div>
         ) : (
           displayData.map((user) => (
@@ -154,16 +154,16 @@ export default function FriendsHub() {
               onClick={() => navigate(`/user/${user.username}`)}
               actionButton={
                 activeTab === 'requests' ? (
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <button aria-label="Accept"
                       onClick={(e) => { e.stopPropagation(); handleAction(() => friendsApi.acceptRequest(user.username), user.username, true); }}
-                      className="p-2 bg-[#3B82F6] text-white rounded-lg hover:bg-blue-600 transition-colors"
+                      className="p-3 bg-[#4F46E5] text-white rounded-xl transition-all duration-200 shadow-[4px_4px_10px_rgba(0,0,0,0.4),-2px_-2px_8px_rgba(255,255,255,0.03),inset_1px_1px_4px_rgba(255,255,255,0.25),inset_-2px_-2px_4px_rgba(0,0,0,0.2)] hover:brightness-110 active:shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4)]"
                     >
                       <Check className="w-5 h-5" />
                     </button>
                     <button aria-label="Cancel"
                       onClick={(e) => { e.stopPropagation(); handleAction(() => friendsApi.rejectRequest(user.username), user.username, true); }}
-                      className="p-2 bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] rounded-lg hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/30 transition-colors"
+                      className="p-3 bg-[var(--card)] text-[var(--text-main)] rounded-xl transition-all duration-200 shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_8px_rgba(255,255,255,0.02),inset_1px_1px_4px_rgba(255,255,255,0.05)] hover:text-red-500 hover:shadow-[4px_4px_10px_rgba(239,68,68,0.2),inset_1px_1px_4px_rgba(255,255,255,0.05)] active:shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4)]"
                     >
                       <X className="w-5 h-5" />
                     </button>
@@ -171,7 +171,7 @@ export default function FriendsHub() {
                 ) : activeTab === 'blocked' ? (
                   <button aria-label="unblock"
                     onClick={(e) => { e.stopPropagation(); handleAction(() => friendsApi.unblockUser(user.username), user.username, false); }}
-                    className="px-4 py-1.5 bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] rounded-lg text-sm font-bold hover:bg-[var(--card)] transition-colors"
+                    className="px-5 py-2.5 bg-[var(--card)] text-[var(--text-main)] rounded-xl text-sm font-bold transition-all duration-200 shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_8px_rgba(255,255,255,0.02),inset_1px_1px_4px_rgba(255,255,255,0.05)] hover:brightness-110 active:shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4)]"
                   >
                     Unblock
                   </button>
