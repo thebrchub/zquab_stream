@@ -52,3 +52,46 @@ message PhotoReady {
     string url        = 3; // presigned GET URL, short-lived
     int64  expires_at = 4; // epoch ms when the URL/object expires
 }
+
+// MsgType "gift_sent" — broadcast to entire stream room
+message GiftSentEvent {
+    string sender_id           = 1;
+    string creator_id          = 2;
+    int32  gift_id             = 3;
+    string gift_name           = 4;
+    string gift_icon           = 5;
+    int32  coins               = 6;
+    string message             = 7;
+    string sender_username     = 8;
+    string sender_name         = 9;
+    string sender_avatar_url   = 10;
+}
+
+// MsgType "viewer_count" — broadcast to stream room every ~5s
+message ViewerCountEvent {
+    int64 viewer_count = 1;
+}
+
+// MsgType "stream_earnings" — sent to creator only, every ~5s during stream
+message StreamEarningsEvent {
+    int64 earnings_coins = 1;
+}
+
+// MsgType "stream_ending_soon" — sent to creator only, ~2min before auto-end
+message StreamEndingSoonEvent {
+    string stream_id           = 1;
+    int64  seconds_remaining   = 2;
+}
+
+// MsgType "stream_auto_ended" — sent to creator only when stream auto-ends
+message StreamAutoEndedEvent {
+    string stream_id = 1;
+    string room_id   = 2;
+}
+
+// MsgType "gift_confirm" — sent only to gift sender (private ack)
+message GiftConfirmEvent {
+    int32 gift_id       = 1;
+    int32 coins         = 2;
+    int64 balance_coins = 3;
+}

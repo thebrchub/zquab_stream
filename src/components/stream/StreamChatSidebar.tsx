@@ -6,6 +6,7 @@ interface StreamChatSidebarProps {
   role: 'viewer' | 'creator';
   balanceCoins: number;
   viewerCount: number;
+  recentGifts: any[]; // 🚀 ADDED THIS
   onSpendCoins: (amount: number, giftId?: number, message?: string) => void;
   onOpenPurchase?: () => void;
   onToggleCollapse: () => void;
@@ -15,6 +16,7 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
   role,
   balanceCoins,
   viewerCount,
+  recentGifts, // 🚀 ADDED THIS
   onSpendCoins,
   onOpenPurchase,
   onToggleCollapse,
@@ -55,6 +57,7 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
           userBalance={balanceCoins} 
           onSpendCoins={onSpendCoins} 
           onTopUpClick={onOpenPurchase}
+          recentGifts={recentGifts} // 🚀 PASSED IT DOWN
         />
       </div>
     </div>

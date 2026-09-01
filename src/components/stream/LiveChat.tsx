@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { type ChatMessage, MOCK_CHAT_MESSAGES } from '../../constants/streamMockData';
-import { useWallet } from '../../context/WalletContext';
-import { type GiftItem } from '../../types/wallet';
+import { useWallet, type GiftItem } from '../../context/WalletContext'; 
 import { Send, Gift, X, Trash2, Ban } from 'lucide-react';
 
 interface LiveChatProps {
@@ -9,6 +8,7 @@ interface LiveChatProps {
   onSpendCoins: (amount: number, giftId?: number, message?: string) => void;
   onTopUpClick?: () => void;
   role: 'viewer' | 'creator';
+  recentGifts?: any[]; // 🚀 Added to receive WebSocket events
 }
 
 export const LiveChat: React.FC<LiveChatProps> = ({
@@ -16,6 +16,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   onSpendCoins,
   onTopUpClick,
   role,
+  recentGifts = [], // 🚀 Destructured here
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES);
   const [inputText, setInputText] = useState<string>('');
@@ -23,11 +24,40 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   const [insufficientFundsGift, setInsufficientFundsGift] = useState<string | null>(null);
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const processedGifts = useRef<Set<any>>(new Set()); // 🚀 Prevents duplicate chat injections
   const { gifts } = useWallet();
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // 🚀 THE MAGIC: Listen for incoming WebSocket gifts and push to chat
+  useEffect(() => {
+    if (!recentGifts || recentGifts.length === 0) return;
+
+    recentGifts.forEach((gift) => {
+      // If we haven't seen this specific event object yet, add it to chat
+      if (!processedGifts.current.has(gift)) {
+        processedGifts.current.add(gift);
+        
+        const wsGiftMessage: ChatMessage = {
+          id: `ws-gift-${Date.now()}-${Math.random()}`,
+          userId: gift.sender_id || 'unknown',
+          userName: gift.sender_name || gift.sender_username || 'User',
+          avatar: gift.sender_avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+          message: gift.message || undefined,
+          gift: { 
+            name: gift.gift_name, 
+            icon: gift.gift_icon, 
+            coins: gift.coins 
+          },
+          timestamp: 'Just now',
+        };
+
+        setMessages((prev) => [...prev, wsGiftMessage]);
+      }
+    });
+  }, [recentGifts]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,9 +131,8 @@ export const LiveChat: React.FC<LiveChatProps> = ({
               
               <div className="min-w-0">
                 {item.gift ? (
-                  /* 🚀 Bespoke, High-End Gift Card (Replaces the AI-ish gradient block) */
+                  /* Bespoke, High-End Gift Card */
                   <div className="relative bg-[#0c0c0e] border border-zinc-800/80 rounded-lg p-2.5 mt-0.5 shadow-sm ring-1 ring-amber-500/10 overflow-hidden">
-                    {/* Minimalist Top Edge Highlight */}
                     <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-amber-500/0 via-amber-500/40 to-amber-500/0" />
                     
                     <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-1.5">

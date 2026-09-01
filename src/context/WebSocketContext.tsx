@@ -25,9 +25,12 @@ const PhotoReadyProto = safeLookup('eventspb.PhotoReady', 'PhotoReady');
 const UnfriendedProto = safeLookup('eventspb.Unfriended', 'Unfriended');
 
 // 🚀 NEW: Stream & Creator Event Protos
-const GiftSentProto = safeLookup('eventspb.GiftSent', 'GiftSent');
-const ViewerCountProto = safeLookup('eventspb.ViewerCountUpdated', 'ViewerCountUpdated');
-const StreamEndedProto = safeLookup('eventspb.StreamEnded', 'StreamEnded');
+const GiftSentEventProto = safeLookup('eventspb.GiftSentEvent', 'GiftSentEvent');
+const ViewerCountEventProto = safeLookup('eventspb.ViewerCountEvent', 'ViewerCountEvent');
+const StreamEarningsEventProto = safeLookup('eventspb.StreamEarningsEvent', 'StreamEarningsEvent');
+const StreamEndingSoonEventProto = safeLookup('eventspb.StreamEndingSoonEvent', 'StreamEndingSoonEvent');
+const StreamAutoEndedEventProto = safeLookup('eventspb.StreamAutoEndedEvent', 'StreamAutoEndedEvent');
+const GiftConfirmEventProto = safeLookup('eventspb.GiftConfirmEvent', 'GiftConfirmEvent');
 
 type WSListener = (message: any) => void;
 class WSEmitter {
@@ -126,12 +129,18 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             } 
             
             // 🚀 NEW: Stream Event Decoders
-            else if (t === 'gift_sent' && GiftSentProto) {
-              decodedPayload = GiftSentProto.decode(envelope.payload);
-            } else if (t === 'viewer_count_updated' && ViewerCountProto) {
-              decodedPayload = ViewerCountProto.decode(envelope.payload);
-            } else if (t === 'stream_ended' && StreamEndedProto) {
-              decodedPayload = StreamEndedProto.decode(envelope.payload);
+            else if (t === 'gift_sent' && GiftSentEventProto) {
+              decodedPayload = GiftSentEventProto.decode(envelope.payload);
+            } else if ((t === 'viewer_count' || t === 'viewer_count_updated') && ViewerCountEventProto) {
+              decodedPayload = ViewerCountEventProto.decode(envelope.payload);
+            } else if (t === 'stream_earnings' && StreamEarningsEventProto) {
+              decodedPayload = StreamEarningsEventProto.decode(envelope.payload);
+            } else if (t === 'stream_ending_soon' && StreamEndingSoonEventProto) {
+              decodedPayload = StreamEndingSoonEventProto.decode(envelope.payload);
+            } else if (t === 'stream_auto_ended' && StreamAutoEndedEventProto) {
+              decodedPayload = StreamAutoEndedEventProto.decode(envelope.payload);
+            } else if (t === 'gift_confirm' && GiftConfirmEventProto) {
+              decodedPayload = GiftConfirmEventProto.decode(envelope.payload);
             } 
             
             // Fallbacks

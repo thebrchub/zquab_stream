@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MOCK_STREAMS, MOCK_CREATORS, type Stream, type Creator } from '../../constants/streamMockData';
 import { StreamChatSidebar } from '../../components/stream/StreamChatSidebar'; 
 import { useStreamEntry } from '../../hooks/useStreamEntry';
@@ -9,7 +10,7 @@ import {
   Loader2, AlertCircle, ArrowLeft, 
   Eye, Heart, Share2, Activity, StopCircle, BadgeCheck,
   Play, Pause, Volume2, VolumeX, Settings, Maximize, Minimize, MessageSquare,
-  X, Users 
+  X, Users, Lock, Coins
 } from 'lucide-react';
 
 interface LiveRoomPageProps {
@@ -21,6 +22,8 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   streamId = 'stream-1',
   onLeaveRoom,
 }) => {
+  const navigate = useNavigate();
+
   const [role, setRole] = useState<'viewer' | 'creator'>(
     (sessionStorage.getItem('dev_stream_role') as 'viewer' | 'creator') || 'viewer'
   );
@@ -36,14 +39,12 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const [showProfileOverlay, setShowProfileOverlay] = useState(false);
   const [isAtLiveEdge, setIsAtLiveEdge] = useState(true);
   
-  // 🚀 New Inactivity State
   const [isUserActive, setIsUserActive] = useState(true);
   const activityTimeoutRef = useRef<number | null>(null);
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // 🚀 Resets the 3-second timer on any interaction
   const handleInteraction = () => {
     setIsUserActive(true);
     if (activityTimeoutRef.current) window.clearTimeout(activityTimeoutRef.current);
@@ -95,12 +96,12 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   };
 
   const { balanceCoins, openPurchaseModal } = useWallet();
-  const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall: _isPaywall, retryEnter } = useStreamEntry(streamId);
+  const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, retryEnter } = useStreamEntry(streamId);
 
   const stream = MOCK_STREAMS.find((s) => s.id === streamId) as Stream;
   const creator = MOCK_CREATORS.find((c) => c.id === stream.creatorId) as Creator;
   const roomId = (stream as any)?.roomId || stream?.id || 'mock-room-id';
-  const { viewerCount, sendGift } = useLiveStreamRoom(roomId);
+  const { viewerCount, recentGifts, sendGift } = useLiveStreamRoom(roomId);
 
   const [isFollowing, setIsFollowing] = useState(false);
   const [isHoveringPlayer, setIsHoveringPlayer] = useState(false);
@@ -111,10 +112,17 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const activeIsLoading = streamMode === 'mock' ? false : apiIsLoading;
   const activeError = streamMode === 'mock' ? null : apiError;
 
-  // 🚀 Extracted visibility logic for clean injection
   const showMobileUI = isChatCollapsed || isUserActive || !isPlaying || showProfileOverlay;
   const showDesktopUI = isHoveringPlayer || !isPlaying || showProfileOverlay;
   const uiVisibilityClasses = `transition-opacity duration-300 pointer-events-none ${showMobileUI ? 'opacity-100' : 'opacity-0'} ${showDesktopUI ? 'lg:opacity-100' : 'lg:opacity-0'}`;
+
+  const handleLeaveRoom = () => {
+    if (onLeaveRoom) {
+      onLeaveRoom();
+    } else {
+      navigate('/discover');
+    }
+  };
 
   return (
     <div className="flex flex-col lg:flex-row h-[100dvh] w-full bg-[#0e0e10] text-gray-100 overflow-hidden font-sans">
@@ -133,14 +141,13 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
         onMouseEnter={() => { setIsHoveringPlayer(true); handleInteraction(); }}
         onMouseLeave={() => setIsHoveringPlayer(false)}
         onMouseMove={handleInteraction}
-        onTouchStart={handleInteraction} // Hooks into mobile taps
+        onTouchStart={handleInteraction}
         onClick={() => {
           const isMobile = window.innerWidth < 1024;
           const areControlsHidden = !isChatCollapsed && !isUserActive && isPlaying && !showProfileOverlay;
           
           handleInteraction();
           
-          // 🚀 Prevents accidental pausing on mobile if the user is just tapping to wake up the UI
           if (isMobile && areControlsHidden) return; 
           
           setIsPlaying(!isPlaying);
@@ -157,12 +164,45 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             <div className="flex flex-col items-center gap-4 z-20 pointer-events-auto">
               <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
             </div>
+          ) : isPaywall ? (
+            // 🚀 NEW PAYWALL OVERLAY
+            <div className="flex flex-col items-center max-w-sm text-center p-8 z-20 bg-zinc-950/90 backdrop-blur-md border border-amber-500/20 rounded-[2rem] shadow-2xl pointer-events-auto">
+              <div className="w-16 h-16 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mb-4">
+                <Lock className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Premium Broadcast</h3>
+              <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
+                {activeError || "You need zCoins to enter this stream. Top up your balance to join the action."}
+              </p>
+              
+              <div className="flex flex-col w-full gap-3">
+                <button 
+                  onClick={openPurchaseModal} 
+                  className="w-full py-4 bg-amber-500 text-amber-950 rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:bg-amber-400 active:scale-95 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+                >
+                  <Coins className="w-5 h-5" /> Get zCoins
+                </button>
+                <button 
+                  onClick={retryEnter} 
+                  className="w-full py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-medium transition-colors border border-white/5"
+                >
+                  I have coins, Try Again
+                </button>
+              </div>
+            </div>
           ) : activeError || !activePlaybackUrl ? (
-            <div className="flex flex-col items-center max-w-sm text-center p-6 z-20 bg-gray-900 border border-gray-800 rounded-lg shadow-xl pointer-events-auto">
-              <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
-              <h3 className="text-base font-bold text-white mb-1">Stream Offline</h3>
-              <p className="text-sm text-gray-400 mb-5">{activeError}</p>
-              <button onClick={retryEnter} className="w-full py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-md text-sm font-semibold transition-colors">Retry</button>
+            <div className="flex flex-col items-center max-w-sm text-center p-8 z-20 bg-zinc-950/90 backdrop-blur-md border border-red-500/20 rounded-[2rem] shadow-2xl pointer-events-auto">
+              <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-4">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Stream Unavailable</h3>
+              <p className="text-sm text-zinc-400 mb-6 leading-relaxed">{activeError}</p>
+              <button 
+                onClick={retryEnter} 
+                className="w-full py-3.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-white font-bold transition-all active:scale-95"
+              >
+                Retry Connection
+              </button>
             </div>
           ) : (
             <NativeStreamPlayer 
@@ -178,9 +218,8 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           )}
         </div>
 
-        {/* 🚀 Top Nav using dynamic visibility classes */}
         <div className={`relative z-30 p-3 lg:p-4 flex justify-between items-start ${uiVisibilityClasses}`}>
-          <button onClick={onLeaveRoom} className="pointer-events-auto p-2 rounded-md bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors border border-white/10">
+          <button onClick={handleLeaveRoom} className="pointer-events-auto p-2 rounded-md bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors border border-white/10">
             <ArrowLeft className="w-5 h-5" />
           </button>
           
@@ -191,16 +230,6 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                 <span className="text-sm font-bold">{balanceCoins.toLocaleString()}</span>
               </button>
             )}
-            
-            {/* {isChatCollapsed && !isFullscreen && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); setIsChatCollapsed(false); }} 
-                className="flex items-center justify-center w-9 h-9 rounded-md bg-black/60 hover:bg-blue-600 text-white backdrop-blur-sm border border-white/10 transition-colors shadow-lg group/btn"
-                title="Expand Chat"
-              >
-                <MessageSquare className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
-              </button>
-            )} */}
           </div>
         </div>
 
@@ -255,7 +284,6 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           </div>
         </div>
 
-        {/* 🚀 Bottom Controls using dynamic visibility classes */}
         <div 
           onClick={(e) => e.stopPropagation()} 
           className={`relative z-30 w-full pt-20 pb-3 px-4 lg:pt-32 lg:pb-4 lg:px-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent ${uiVisibilityClasses}`}
@@ -343,12 +371,10 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             </div>
             <div className="flex items-center gap-1 lg:gap-2">
               
-              {/* 🚀 UX Fix: Chat toggle moved to the thumb zone */}
               {isChatCollapsed && (
                 <button 
                   onClick={async (e) => { 
                     e.stopPropagation(); 
-                    // Automatically exit full-screen if they want to chat
                     if (isFullscreen && document.fullscreenElement) {
                       await document.exitFullscreen().catch(() => {});
                     }
@@ -358,7 +384,6 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                   title="Expand Chat"
                 >
                   <MessageSquare className="w-4 h-4 lg:w-5 lg:h-5" />
-                  {/* Optional: You can easily add a red unread-notification dot right here later */}
                 </button>
               )}
 
@@ -388,6 +413,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             role={role}
             balanceCoins={balanceCoins}
             viewerCount={viewerCount}
+            recentGifts={recentGifts} // 🚀 ADD THIS ONE LINE
             onSpendCoins={(_amount, giftId, message) => { if (giftId) sendGift(giftId, message); }}
             onOpenPurchase={openPurchaseModal}
             onToggleCollapse={() => setIsChatCollapsed(true)} 

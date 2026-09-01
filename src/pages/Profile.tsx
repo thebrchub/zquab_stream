@@ -5,6 +5,7 @@ import { friendsApi } from '../api/friends';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useRooms } from '../context/RoomsContext';
+import { useWallet } from '../context/WalletContext'; // 🚀 Added Wallet Hook
 import UserCard from '../components/UserCard';
 import PaginationLoader from '../components/PaginationLoader';
 import { ALL_COUNTRIES } from '../constants/countries'; 
@@ -12,7 +13,7 @@ import {
   Loader2, Save, User, AtSign, AlignLeft, 
   Users, MessageSquare, Edit2, X, MapPin, Activity,
   LogOut, UserPlus, Search, Check, Share2, CheckCircle2, Lock, RefreshCw, ChevronDown,
-  Video, Star, Clock // 🚀 New icons
+  Video, Star, Clock, Plus // 🚀 Added Plus icon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -28,6 +29,9 @@ export default function Profile() {
   
   // 🛠️ UNIFICATION: Pull requests from memory
   const { friendRequests, setFriendRequests } = useRooms();
+  
+  // 🚀 WALLET CONNECTION
+  const { balanceCoins, openPurchaseModal } = useWallet();
 
   const [profile, setProfile] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -50,8 +54,8 @@ export default function Profile() {
 
   const [isCountryLocked, setIsCountryLocked] = useState(true); 
   const [isDetectingCountry, setIsDetectingCountry] = useState(false);
-const [showCreatorModal, setShowCreatorModal] = useState(false);
-const [creatorCategory, setCreatorCategory] = useState('Gaming');
+  const [showCreatorModal, setShowCreatorModal] = useState(false);
+  const [creatorCategory, setCreatorCategory] = useState('Gaming');
   const [creatorHeadline, setCreatorHeadline] = useState('');
   const [isSubmittingCreator, setIsSubmittingCreator] = useState(false);
   const CREATOR_CATEGORIES = ['Gaming', 'Just Chatting', 'Music', 'Education', 'Tech & Coding', 'Art'];
@@ -120,7 +124,6 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
   }, [authUser]);
 
   const fetchNetworkData = async (reset = false) => {
-    // 🛠️ UNIFICATION: Abort API if requests tab is open
     if (activeTab === 'requests') return;
 
     try {
@@ -299,7 +302,6 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
     );
   }
 
-  // 🛠️ Render mapping magic based on current tab
   const displayData = activeTab === 'requests' ? friendRequests : networkData;
   const isDisplayLoading = activeTab === 'requests' ? false : networkLoading;
   const currentHasMore = activeTab === 'requests' ? false : hasMore;
@@ -308,7 +310,6 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
     if (!creatorHeadline.trim()) return;
     setIsSubmittingCreator(true);
     try {
-      // Using your existing apiClient to hit the new endpoint
       await apiClient.post('/users/me/creator', {
         category: creatorCategory.toLowerCase(),
         headline: creatorHeadline,
@@ -316,8 +317,6 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
         one_on_one_price_coins: 0,
         one_on_one_duration_mins: 0
       });
-      
-      // Refresh the session to instantly grab the new 'pending' status
       await refreshSession();
       setShowCreatorModal(false);
     } catch (err: any) {
@@ -330,6 +329,7 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
   return (
     <div className="max-w-7xl mx-auto w-full p-4 md:p-6 lg:p-8 pb-24 relative">
       
+      {/* Modals omitted for brevity, keeping existing exact code */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[99] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 sm:p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
@@ -341,18 +341,8 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
               Are you sure you want to log out? You will need to sign back in to access your friends and chats.
             </p>
             <div className="flex gap-3">
-              <button aria-label="Cancel Logout"
-                onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-3.5 bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] rounded-xl font-bold hover:border-[#3B82F6] transition-colors"
-              >
-                Cancel
-              </button>
-              <button aria-label="Logout Confirm"
-                onClick={confirmLogout}
-                className="flex-1 py-3.5 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-500/25 flex items-center justify-center gap-2"
-              >
-                Log Out
-              </button>
+              <button aria-label="Cancel Logout" onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-3.5 bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] rounded-xl font-bold hover:border-[#3B82F6] transition-colors">Cancel</button>
+              <button aria-label="Logout Confirm" onClick={confirmLogout} className="flex-1 py-3.5 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-500/25 flex items-center justify-center gap-2">Log Out</button>
             </div>
           </div>
         </div>
@@ -372,66 +362,29 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
       {showCreatorModal && (
         <div className="fixed inset-0 z-[99] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 sm:p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h3 className="text-2xl font-black text-[var(--text-main)] mb-1">Become a Creator</h3>
                 <p className="text-[var(--text-muted)] text-sm font-medium">Start streaming and earning zCoins.</p>
               </div>
-              <button 
-                onClick={() => setShowCreatorModal(false)}
-                className="p-2 bg-[var(--background)] rounded-full hover:bg-[var(--border-color)] transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={() => setShowCreatorModal(false)} className="p-2 bg-[var(--background)] rounded-full hover:bg-[var(--border-color)] transition-colors"><X className="w-5 h-5" /></button>
             </div>
-
             <div className="space-y-5 mb-8">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-[var(--text-main)]">Primary Content Category</label>
-                <select 
-                  value={creatorCategory} 
-                  onChange={(e) => setCreatorCategory(e.target.value)}
-                  className="w-full px-4 py-3.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#4F46E5] transition-all cursor-pointer appearance-none"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                    backgroundPosition: 'right 1rem center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: '1.25em 1.25em'
-                  }}
-                >
-                  {CREATOR_CATEGORIES.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
+                <select value={creatorCategory} onChange={(e) => setCreatorCategory(e.target.value)} className="w-full px-4 py-3.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#4F46E5] transition-all cursor-pointer appearance-none" style={{backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundPosition: 'right 1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25em 1.25em'}}>
+                  {CREATOR_CATEGORIES.map(c => (<option key={c} value={c}>{c}</option>))}
                 </select>
               </div>
-
               <div className="space-y-2">
                 <label className="text-sm font-bold text-[var(--text-main)]">Channel Headline</label>
-                <input 
-                  type="text" 
-                  maxLength={60}
-                  value={creatorHeadline} 
-                  onChange={(e) => setCreatorHeadline(e.target.value)} 
-                  className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] outline-none focus:border-[#4F46E5]" 
-                  placeholder="e.g. Pro Valorant grinds & viewer games" 
-                />
+                <input type="text" maxLength={60} value={creatorHeadline} onChange={(e) => setCreatorHeadline(e.target.value)} className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] outline-none focus:border-[#4F46E5]" placeholder="e.g. Pro Valorant grinds & viewer games" />
                 <div className="text-right text-[10px] text-[var(--text-muted)] font-bold">{creatorHeadline.length}/60</div>
               </div>
             </div>
-
-            {/* 🚀 Dark Claymorphism Submit Button */}
-            <button 
-              onClick={submitCreatorApplication}
-              disabled={isSubmittingCreator || !creatorHeadline.trim()}
-              className="w-full py-4 bg-[#4F46E5] text-white rounded-[1.25rem] font-bold flex items-center justify-center gap-2 transition-all duration-200
-              shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)] 
-              hover:brightness-110 active:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.4),inset_-2px_-2px_6px_rgba(255,255,255,0.1)] 
-              disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed"
-            >
+            <button onClick={submitCreatorApplication} disabled={isSubmittingCreator || !creatorHeadline.trim()} className="w-full py-4 bg-[#4F46E5] text-white rounded-[1.25rem] font-bold flex items-center justify-center gap-2 transition-all duration-200 shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)] hover:brightness-110 active:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.4),inset_-2px_-2px_6px_rgba(255,255,255,0.1)] disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed">
               {isSubmittingCreator ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Submit Application'}
             </button>
-            
           </div>
         </div>
       )}
@@ -443,54 +396,22 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
             <div className="bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 shadow-sm animate-in fade-in zoom-in-95">
               <div className="flex items-center justify-between mb-6 border-b border-[var(--border-color)] pb-4">
                 <h2 className="text-xl font-bold text-[var(--text-main)]">Edit Profile</h2>
-                <button aria-label="Close"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setZAvatarRequested(false); 
-                  }} 
-                  className="p-2 bg-[var(--background)] rounded-full hover:bg-[var(--border-color)] transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <button aria-label="Close" onClick={() => { setIsEditing(false); setZAvatarRequested(false); }} className="p-2 bg-[var(--background)] rounded-full hover:bg-[var(--border-color)] transition-colors"><X className="w-5 h-5" /></button>
               </div>
               
               {error && <div className="p-3 bg-red-500/10 text-red-500 font-medium rounded-xl text-sm mb-4">{error}</div>}
 
               <div className="flex flex-col items-center justify-center mb-6">
                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[var(--background)] border-2 border-[var(--border-color)] flex items-center justify-center overflow-hidden shadow-sm transition-all duration-300">
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover scale-110" />
-                  ) : (
-                    <User className="w-12 h-12 text-[var(--text-muted)]" />
-                  )}
+                  {avatarPreview ? <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover scale-110" /> : <User className="w-12 h-12 text-[var(--text-muted)]" />}
                 </div>
-
                 <div className="mt-4 h-10 flex items-center justify-center">
                   {!zAvatarRequested ? (
-                    <button aria-label="New Avatar"
-                      type="button" 
-                      onClick={() => { setZAvatarRequested(true); setAvatarVariant(0); }}
-                      disabled={!username}
-                      className="px-5 py-2.5 bg-[#3B82F6]/10 text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded-full text-xs font-bold transition-colors disabled:opacity-50"
-                    >
-                      Generate New zAvatar
-                    </button>
+                    <button aria-label="New Avatar" type="button" onClick={() => { setZAvatarRequested(true); setAvatarVariant(0); }} disabled={!username} className="px-5 py-2.5 bg-[#3B82F6]/10 text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded-full text-xs font-bold transition-colors disabled:opacity-50">Generate New zAvatar</button>
                   ) : (
                     <div className="flex items-center gap-6">
-                      <button aria-label="Reroll"
-                        type="button" 
-                        onClick={() => setAvatarVariant(v => v + 1)}
-                        className="flex items-center gap-1.5 text-xs font-bold text-[#3B82F6] hover:text-blue-600 transition-colors"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" /> Reroll
-                      </button>
-                      <button aria-label="Cancel"
-                        type="button" 
-                        onClick={() => { setZAvatarRequested(false); setAvatarVariant(0); }}
-                        className="text-xs font-bold text-[var(--text-muted)] hover:text-red-500 transition-colors"
-                      >
-                        Cancel
-                      </button>
+                      <button aria-label="Reroll" type="button" onClick={() => setAvatarVariant(v => v + 1)} className="flex items-center gap-1.5 text-xs font-bold text-[#3B82F6] hover:text-blue-600 transition-colors"><RefreshCw className="w-3.5 h-3.5" /> Reroll</button>
+                      <button aria-label="Cancel" type="button" onClick={() => { setZAvatarRequested(false); setAvatarVariant(0); }} className="text-xs font-bold text-[var(--text-muted)] hover:text-red-500 transition-colors">Cancel</button>
                     </div>
                   )}
                 </div>
@@ -505,38 +426,15 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
                 <div className="space-y-2" ref={dropdownRef}>
                   <label className="text-sm font-bold text-[var(--text-main)]">Gender</label>
                   <div className="relative">
-                    <button aria-label="Dropdown"
-                      type="button"
-                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      className={`w-full px-4 py-3 bg-[var(--background)] border rounded-xl text-left flex items-center justify-between transition-all focus:outline-none ${
-                        isDropdownOpen ? 'border-[#3B82F6] ring-2 ring-[#3B82F6]/20' : 'border-[var(--border-color)]'
-                      }`}
-                    >
-                      <span className="text-[var(--text-main)]">{gender}</span>
-                      <ChevronDown className={`w-5 h-5 text-[var(--text-muted)] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                    <button aria-label="Dropdown" type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className={`w-full px-4 py-3 bg-[var(--background)] border rounded-xl text-left flex items-center justify-between transition-all focus:outline-none ${isDropdownOpen ? 'border-[#3B82F6] ring-2 ring-[#3B82F6]/20' : 'border-[var(--border-color)]'}`}>
+                      <span className="text-[var(--text-main)]">{gender}</span><ChevronDown className={`w-5 h-5 text-[var(--text-muted)] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
-
                     <AnimatePresence>
                       {isDropdownOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ duration: 0.15 }}
-                          className="absolute z-50 w-full mt-2 bg-[var(--card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden py-1"
-                        >
+                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.15 }} className="absolute z-50 w-full mt-2 bg-[var(--card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden py-1">
                           {GENDER_OPTIONS.map((option) => (
-                            <button aria-label="Change Gender"
-                              key={option}
-                              type="button"
-                              onClick={() => {
-                                setGender(option);
-                                setIsDropdownOpen(false);
-                              }}
-                              className="w-full px-4 py-3 text-left text-[var(--text-main)] hover:bg-[var(--background)] transition-colors flex items-center justify-between"
-                            >
-                              {option}
-                              {gender === option && <Check className="w-4 h-4 text-[#3B82F6]" />}
+                            <button aria-label="Change Gender" key={option} type="button" onClick={() => { setGender(option); setIsDropdownOpen(false); }} className="w-full px-4 py-3 text-left text-[var(--text-main)] hover:bg-[var(--background)] transition-colors flex items-center justify-between">
+                              {option}{gender === option && <Check className="w-4 h-4 text-[#3B82F6]" />}
                             </button>
                           ))}
                         </motion.div>
@@ -551,45 +449,20 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-[var(--text-main)] flex justify-between">
-                    Country 
-                    {isCountryLocked && <span className="text-xs font-normal text-[#3B82F6] flex items-center gap-1"><Check className="w-3 h-3"/> Auto-detected</span>}
-                  </label>
-                  
+                  <label className="text-sm font-bold text-[var(--text-main)] flex justify-between">Country {isCountryLocked && <span className="text-xs font-normal text-[#3B82F6] flex items-center gap-1"><Check className="w-3 h-3"/> Auto-detected</span>}</label>
                   {isCountryLocked ? (
                     <div className="flex items-center gap-2">
                       <div className="flex-1 px-4 py-3.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl flex items-center justify-between opacity-80 cursor-not-allowed">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-[#3B82F6]" />
-                          <span className="text-[var(--text-main)] font-semibold">{country}</span>
-                        </div>
-                        <Lock className="w-4 h-4 text-[var(--text-muted)]" />
+                        <div className="flex items-center gap-2"><MapPin className="w-4 h-4 text-[#3B82F6]" /><span className="text-[var(--text-main)] font-semibold">{country}</span></div><Lock className="w-4 h-4 text-[var(--text-muted)]" />
                       </div>
-                      <button aria-label="Change Country"
-                        type="button"
-                        onClick={handleRequestCountryChange}
-                        disabled={isDetectingCountry}
-                        className="px-4 py-3.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] hover:border-[#3B82F6] hover:text-[#3B82F6] transition-colors disabled:opacity-50 flex items-center justify-center min-w-[90px]"
-                      >
+                      <button aria-label="Change Country" type="button" onClick={handleRequestCountryChange} disabled={isDetectingCountry} className="px-4 py-3.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] hover:border-[#3B82F6] hover:text-[#3B82F6] transition-colors disabled:opacity-50 flex items-center justify-center min-w-[90px]">
                         {isDetectingCountry ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
                       </button>
                     </div>
                   ) : (
-                    <select 
-                      value={country} 
-                      onChange={(e) => setCountry(e.target.value)}
-                      className="w-full px-4 py-3.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#3B82F6] transition-all cursor-pointer appearance-none"
-                      style={{
-                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                        backgroundPosition: 'right 1rem center',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '1.25em 1.25em'
-                      }}
-                    >
+                    <select value={country} onChange={(e) => setCountry(e.target.value)} className="w-full px-4 py-3.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#3B82F6] transition-all cursor-pointer appearance-none" style={{backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundPosition: 'right 1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25em 1.25em'}}>
                       <option value="" disabled>Select country</option>
-                      {ALL_COUNTRIES.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
+                      {ALL_COUNTRIES.map(c => (<option key={c} value={c}>{c}</option>))}
                     </select>
                   )}
                 </div>
@@ -610,7 +483,6 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
               <div className="relative group mb-4">
                 <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[var(--background)] border-4 border-[var(--border-color)] overflow-hidden flex items-center justify-center shadow-sm">
                   {profile?.avatar_url ? (
-                   
                     <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover scale-110" />
                   ) : (
                     <User className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--text-muted)]" />
@@ -619,7 +491,16 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
               </div>
 
               <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] leading-tight">{profile?.name || username || 'New User'}</h1>
-              <p className="text-[var(--text-muted)] font-medium mt-1 mb-5">@{username}</p>
+              <p className="text-[var(--text-muted)] font-medium mt-1 mb-3">@{username}</p>
+
+              {/* 🚀 WALLET BADGE */}
+              <button
+                onClick={openPurchaseModal}
+                className="flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-500 hover:bg-amber-500/20 transition-colors mb-5 active:scale-95"
+              >
+                <span className="font-extrabold text-sm">🪙 {balanceCoins?.toLocaleString() || 0} zCoins</span>
+                <span className="bg-amber-500 text-white rounded-full p-0.5"><Plus className="w-3 h-3" /></span>
+              </button>
 
               <div className="flex flex-wrap justify-center gap-2 mb-6">
                 {country && (
@@ -647,11 +528,10 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
                 {bio || <span className="text-[var(--text-muted)] italic">No bio added yet. Click edit to introduce yourself!</span>}
               </p>
 
-              {/* 🚀 Creator Upgrade CTA (Dark Claymorphism) */}
               <button 
                 onClick={() => {
                   if (authUser?.approval_status === 'approved') {
-                    navigate('/dev/stream/dashboard');
+                    navigate('/creator/dashboard');
                   } else if (authUser?.approval_status !== 'pending') {
                     setShowCreatorModal(true);
                   }
@@ -672,34 +552,21 @@ const [creatorCategory, setCreatorCategory] = useState('Gaming');
               </button>
 
               <div className="w-full flex gap-3">
-                <button aria-label="Share Profile"
-                  onClick={handleShareProfile} 
-                  className="flex-1 py-3 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] hover:border-[#3B82F6] hover:text-[#3B82F6] transition-colors flex items-center justify-center gap-2 shadow-sm"
-                >
-                  {copied ? <CheckCircle2 className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
-                  {copied ? 'Copied' : 'Share'}
+                <button aria-label="Share Profile" onClick={handleShareProfile} className="flex-1 py-3 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] hover:border-[#3B82F6] hover:text-[#3B82F6] transition-colors flex items-center justify-center gap-2 shadow-sm">
+                  {copied ? <CheckCircle2 className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}{copied ? 'Copied' : 'Share'}
                 </button>
-                <button aria-label="Edit Profile"
-                  onClick={() => setIsEditing(true)} 
-                  className="flex-1 py-3 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] hover:border-[var(--text-main)] transition-colors flex items-center justify-center gap-2 shadow-sm"
-                >
+                <button aria-label="Edit Profile" onClick={() => setIsEditing(true)} className="flex-1 py-3 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] hover:border-[var(--text-main)] transition-colors flex items-center justify-center gap-2 shadow-sm">
                   <Edit2 className="w-4 h-4" /> Edit
                 </button>
-                
-                <button aria-label="Logout"
-                  onClick={() => setShowLogoutConfirm(true)} 
-                  className="flex-1 py-3 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] hover:border-red-500 hover:text-red-500 transition-colors flex items-center justify-center gap-2 shadow-sm"
-                >
+                <button aria-label="Logout" onClick={() => setShowLogoutConfirm(true)} className="flex-1 py-3 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] hover:border-red-500 hover:text-red-500 transition-colors flex items-center justify-center gap-2 shadow-sm">
                   <LogOut className="w-4 h-4" /> Logout
                 </button>
-
               </div>
             </div>
           )}
         </div>
 
         <div className="lg:col-span-8 xl:col-span-8 space-y-6">
-          
           <div className="bg-gradient-to-r from-[#3B82F6] to-indigo-600 rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between shadow-md gap-4">
             <div>
               <h3 className="text-white text-lg font-bold flex items-center gap-2 mb-1"><MessageSquare className="w-5 h-5" /> Stranger Chat</h3>

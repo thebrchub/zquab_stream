@@ -8,6 +8,7 @@ import { WebSocketProvider } from './context/WebSocketContext';
 import { RoomsProvider } from './context/RoomsContext';
 import { Loader2 } from 'lucide-react';
 import BlogPost from './pages/BlogPost';
+import { CoinPurchaseModal } from './components/stream/CoinPurchaseModal'; 
 
 import SocialPromoBanner from './components/SocialPromoBanner';
 import DevMenu from './components/DevMenu';
@@ -15,6 +16,8 @@ import DevMenu from './components/DevMenu';
 // Route-level code splitting
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
+const ChatSelectionPage = lazy(() => import('./pages/ChatSelectionPage'));
+const VideoChatPage = lazy(() => import('./pages/VideoChatPage')); 
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const BlogPage = lazy(() => import('./pages/BlogPage'));
 const Terms = lazy(() => import('./pages/Terms'));
@@ -178,7 +181,12 @@ function App() {
                 
                 {/* Public Routes */}
                 <Route path="/" element={<LandingPage />} />
-                <Route path="/chat" element={<ChatPage />} />
+                
+                {/* 🚀 NEW CHAT ROUTING HUB */}
+                <Route path="/chat" element={<ChatSelectionPage />} />
+                <Route path="/chat/text" element={<ChatPage />} />
+                <Route path="/chat/video" element={<VideoChatPage />} />
+                
                 <Route path="/about" element={<About />} />
                 <Route path="/blog" element={<BlogPage />} />
                 <Route element={<BlogPost />} path="/blog/:slug" />
@@ -189,10 +197,8 @@ function App() {
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/user/:username" element={<UserProfile />} />
 
-                {/* Auth Route */}
+                {/* Auth & Onboarding */}
                 <Route path="/auth" element={<AuthRoute><AuthPage /></AuthRoute>} />
-
-                {/* Onboarding Route */}
                 <Route path="/onboarding" element={<OnboardingRoute><OnboardingPage /></OnboardingRoute>} />
 
                 {/* Protected Dashboard & Social Routes */}
@@ -200,18 +206,23 @@ function App() {
                 <Route path="/chat/:roomId" element={<ProtectedRoute><ChatRoom /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 
-                <Route path="*" element={<NotFoundPage />} />
+                {/* GRADUATED STREAM ROUTES (Inside RootLayout = Gets Navbar) */}
+                <Route path="/discover" element={<LiveDiscoveryPage />} />
+                <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
                 
+                <Route path="*" element={<NotFoundPage />} />
               </Route>
 
-              {/* DEV UI TESTING ROUTES */}
+              {/* EDGE-TO-EDGE STREAM ROUTES (Outside RootLayout = No Navbar) */}
+              <Route path="/live/:streamId" element={<ProtectedRoute><LiveRoomPage /></ProtectedRoute>} />
+              <Route path="/stream/1on1/:creatorId" element={<ProtectedRoute><OneOnOneRoomPage /></ProtectedRoute>} />
+
+              {/* 🚀 RESTORED DEV UI TESTING ROUTES */}
               <Route path="/dev/onboarding" element={<OnboardingPage />} />
               <Route path="/dev/auth" element={<AuthPage />} />
               <Route path="/dev/home" element={<HomePage />} />
               <Route path="/dev/chat" element={<ChatRoom />} />
               <Route path="/dev/profile" element={<Profile />} />
-
-              {/* NEW DEV ROUTES FOR STREAM PIVOT */}
               <Route path="/dev/stream/discovery" element={<LiveDiscoveryPage />} />
               <Route path="/dev/stream/live" element={<LiveRoomPage />} />
               <Route path="/dev/stream/1on1" element={<OneOnOneRoomPage />} />
@@ -222,6 +233,7 @@ function App() {
 
             <SocialPromoBanner />
             <DevMenu />
+            <CoinPurchaseModal />
 
           </BrowserRouter>
           </RoomsProvider>

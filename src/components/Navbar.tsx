@@ -111,7 +111,7 @@ export default function Navbar() {
       <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 relative">
         <div className="relative flex justify-between items-center h-16 sm:h-20 pointer-events-none">
           
-          {/* LEFT: Clean Logo (No Pill) */}
+          {/* LEFT: Clean Logo */}
           <Link 
             to="/" 
             aria-label="Home" 
@@ -122,22 +122,20 @@ export default function Navbar() {
               width="32"
               height="32"
               alt="zQuab Logo Icon" 
-              className="h-8 sm:h-10 w-auto object-contain group-hover:scale-105 transition-transform" 
+              className="h-12 sm:h-14 w-auto object-contain group-hover:scale-105 transition-transform" 
             />
             <span className="font-bold text-lg sm:text-xl tracking-tight text-[var(--text-main)] pr-2">
               zQuab
             </span>
           </Link>
 
-          {/* 
-            CENTER PILL: True Claymorphism Applied 
-            Using solid bg-[var(--card)] with specific inset drop-shadows to create 3D volume
-          */}
+          {/* CENTER PILL */}
           <div className="pointer-events-auto hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 bg-[var(--card)] border border-[var(--border-color)] px-2 py-1.5 rounded-full shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.03),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] z-10">
-            <Link to="/dev/stream/discovery" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
+            {/* 🚀 Updated Routing Here */}
+            <Link to="/discover" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
               Watch Live
             </Link>
-            <Link to="/dev/stream/1on1" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
+            <Link to="/discover" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
               1:1 Calls
             </Link>
             <Link to="/chat" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
@@ -154,10 +152,7 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* 
-            RIGHT PILL: True Claymorphism Applied 
-            Matches the center pill's 3D lighting style
-          */}
+          {/* RIGHT PILL */}
           <div className="pointer-events-auto flex items-center gap-2 bg-[var(--card)] border border-[var(--border-color)] p-1 sm:p-1.5 pl-3 sm:pl-4 rounded-full shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.03),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] z-10">
             
             <Link to="/search" className="p-2 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-colors active:scale-95" aria-label="Search">
@@ -239,14 +234,15 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Cleaned Up Mobile Drawer */}
+      {/* Mobile Drawer */}
       {isMobileMenuOpen && (
         <div className="lg:hidden absolute top-[100%] left-0 w-full bg-[var(--card)]/95 backdrop-blur-2xl border-t border-[var(--border-color)] shadow-2xl flex flex-col p-6 gap-8 z-40 max-h-[85vh] overflow-y-auto pointer-events-auto">
           
           <div className="flex flex-col gap-5">
             <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Explore</span>
-            <Link to="/dev/stream/discovery" className="text-[var(--text-main)] font-medium text-lg hover:text-[#4F46E5] transition-colors">Watch Live</Link>
-            <Link to="/dev/stream/1on1" className="text-[var(--text-main)] font-medium text-lg hover:text-[#4F46E5] transition-colors">1:1 Calls</Link>
+            {/* 🚀 Updated Mobile Routing Here */}
+            <Link to="/discover" className="text-[var(--text-main)] font-medium text-lg hover:text-[#4F46E5] transition-colors">Watch Live</Link>
+            <Link to="/discover" className="text-[var(--text-main)] font-medium text-lg hover:text-[#4F46E5] transition-colors">1:1 Calls</Link>
             <button onClick={handleStartChatting} disabled={isConnecting} className="text-left text-[var(--text-main)] font-medium text-lg hover:text-[#4F46E5] transition-colors disabled:opacity-50">
               {isConnecting ? 'Connecting...' : 'Stranger Chat'}
             </button>
@@ -279,7 +275,6 @@ export default function Navbar() {
           </div>
         </div>
       )}
-
     </nav>
   );
 }

@@ -32,3 +32,8 @@ export interface StreamEndingSoonEvent {
   stream_id: string;
   seconds_remaining: number;
 }
+
+export interface StreamAutoEndedEvent {
+  stream_id: string;
+  room_id: string;
+}

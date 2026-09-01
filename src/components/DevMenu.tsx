@@ -79,9 +79,10 @@ export default function DevMenu() {
               <span className="text-[9px] uppercase bg-black px-1.5 py-0.5 rounded text-gray-400">Swap</span>
             </button>
 
-            <Link to="/dev/stream/discovery" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 p-2 rounded-md transition-colors">📡 Stream: Discovery</Link>
-            <Link to="/dev/stream/live" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 p-2 rounded-md transition-colors">🔴 Stream: Live Room</Link>
-            <Link to="/dev/stream/dashboard" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 p-2 rounded-md transition-colors">🎛️ Stream: Dashboard</Link>
+            {/* 🚀 UPDATED GRADUATED PATHS */}
+            <Link to="/discover" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 p-2 rounded-md transition-colors">📡 Stream: Discovery</Link>
+            <Link to="/live/stream-1" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 p-2 rounded-md transition-colors">🔴 Stream: Live Room</Link>
+            <Link to="/creator/dashboard" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 p-2 rounded-md transition-colors">🎛️ Stream: Dashboard</Link>
           </div>
 
           <div className="mt-2 pt-2 border-t border-gray-700">
