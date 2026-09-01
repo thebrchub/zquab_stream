@@ -15,7 +15,7 @@ export default async function middleware(req: Request) {
 
   try {
 
-    const apiRes = await fetch(`https://api.zquab.com/api/v1/blogs/${slug}`);
+    const apiRes = await fetch(`https://aarpaar-api.brchub.tech/api/v1/blogs/${slug}`);
     
     // If the API fails or the blog doesn't exist, exit and load the normal page
     if (!apiRes.ok) return; 

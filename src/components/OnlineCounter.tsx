@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'https://api.zquab.com';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'https://aarpaar-api.brchub.tech';
 
 export default function OnlineCounter() {
   const [count, setCount] = useState<number | null>(null);

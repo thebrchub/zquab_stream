@@ -12,7 +12,7 @@ export default defineConfig({
     proxy: {
       // Proxy HTTP API requests to your deployed backend
       '/api': {
-        target: 'https://api.zquab.com',
+        target: 'https://aarpaar-api.brchub.tech',
         changeOrigin: true,
       },
       // Proxy WebSocket connections to your deployed backend

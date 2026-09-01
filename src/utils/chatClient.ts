@@ -30,7 +30,7 @@ type ChatMessage = {
   replyTo?: { id: string; text: string; isOwn: boolean };
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'https://api.zquab.com';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'https://aarpaar-api.brchub.tech';
 const WS_BASE = import.meta.env.VITE_WS_BASE_URL ?? 'wss://api.zquab.com';
 
 export class ChatClient {

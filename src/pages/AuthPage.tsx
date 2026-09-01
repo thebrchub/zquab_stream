@@ -16,7 +16,7 @@ function AuthForm() {
     setIsLoading(true);
     
 
-    const HOST = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:8080' : 'https://api.zquab.com');
+    const HOST = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:8080' : 'https://aarpaar-api.brchub.tech');
     
     try {
       const response = await fetch(`${HOST}/api/v1/auth/google`, {
