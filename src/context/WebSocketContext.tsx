@@ -70,7 +70,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       console.info('🛠️ DEV MODE: Connecting to WebSocket for local testing.');
     }
     
-    const WS_BASE = import.meta.env.VITE_WS_BASE_URL ?? 'wss://api.zquab.com';
+    const WS_BASE = import.meta.env.VITE_WS_BASE_URL ?? 'wss://aarpaar-api.brchub.tech';
     const wsUrl = `${WS_BASE}/ws`;
     
     const ws = new WebSocket(wsUrl);
