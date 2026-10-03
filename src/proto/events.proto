@@ -29,6 +29,12 @@ message FriendRequest {
     string username = 3;
 }
 
+// MsgType "stream_live" (server -> streamer only)
+message StreamLive {
+    string stream_id = 1;
+    string room_id   = 2;
+}
+
 // Stranger photo sharing (request/approve, relay-free — the actual bytes go
 // direct client<->R2 via presigned URLs, never through the backend).
 

@@ -30,6 +30,7 @@ const ViewerCountEventProto = safeLookup('eventspb.ViewerCountEvent', 'ViewerCou
 const StreamEarningsEventProto = safeLookup('eventspb.StreamEarningsEvent', 'StreamEarningsEvent');
 const StreamEndingSoonEventProto = safeLookup('eventspb.StreamEndingSoonEvent', 'StreamEndingSoonEvent');
 const StreamAutoEndedEventProto = safeLookup('eventspb.StreamAutoEndedEvent', 'StreamAutoEndedEvent');
+const StreamLiveEventProto = safeLookup('eventspb.StreamLive', 'StreamLive');
 const GiftConfirmEventProto = safeLookup('eventspb.GiftConfirmEvent', 'GiftConfirmEvent');
 
 type WSListener = (message: any) => void;
@@ -139,6 +140,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               decodedPayload = StreamEndingSoonEventProto.decode(envelope.payload);
             } else if (t === 'stream_auto_ended' && StreamAutoEndedEventProto) {
               decodedPayload = StreamAutoEndedEventProto.decode(envelope.payload);
+            } else if (t === 'stream_live' && StreamLiveEventProto) {
+              decodedPayload = StreamLiveEventProto.decode(envelope.payload);
             } else if (t === 'gift_confirm' && GiftConfirmEventProto) {
               decodedPayload = GiftConfirmEventProto.decode(envelope.payload);
             } 
