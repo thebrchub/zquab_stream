@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MOCK_STREAMS, MOCK_CREATORS, type Stream, type Creator } from '../../constants/streamMockData';
 import { StreamChatSidebar } from '../../components/stream/StreamChatSidebar'; 
 import { useStreamEntry } from '../../hooks/useStreamEntry';
 import { useLiveStreamRoom } from '../../hooks/useLiveStreamRoom';
 import { useWallet } from '../../context/WalletContext';
 import { NativeStreamPlayer } from '../../components/stream/NativeStreamPlayer';
+import { streamService, type StreamMetadata } from '../../services/streamService';
+import { creatorService, type CreatorProfile } from '../../services/creatorService';
 import { 
   Loader2, AlertCircle, ArrowLeft, 
   Eye, Heart, Share2, Activity, StopCircle, BadgeCheck,
@@ -40,6 +41,12 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const [isAtLiveEdge, setIsAtLiveEdge] = useState(true);
   
   const [isUserActive, setIsUserActive] = useState(true);
+  const [stream, setStream] = useState<StreamMetadata | null>(null);
+  const [isLoadingStream, setIsLoadingStream] = useState(true);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
   const activityTimeoutRef = useRef<number | null>(null);
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -59,6 +66,43 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
       if (activityTimeoutRef.current) window.clearTimeout(activityTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const fetchStream = async () => {
+      setIsLoadingStream(true);
+      setStreamError(null);
+      try {
+        const data = await streamService.getStreamMetadata(streamId);
+        if (isCurrent) setStream(data);
+      } catch (err) {
+        if (isCurrent) setStreamError(err instanceof Error ? err.message : 'Stream not found.');
+      } finally {
+        if (isCurrent) setIsLoadingStream(false);
+      }
+    };
+
+    fetchStream();
+    return () => { isCurrent = false; };
+  }, [streamId]);
+
+  useEffect(() => {
+    if (!stream?.creator.username) return;
+    let isCurrent = true;
+
+    creatorService.getProfile(stream.creator.username)
+      .then((profile) => {
+        if (!isCurrent) return;
+        setCreatorProfile(profile);
+        setIsFollowing(profile.is_following);
+      })
+      .catch(() => {
+        if (isCurrent) setCreatorProfile(null);
+      });
+
+    return () => { isCurrent = false; };
+  }, [stream?.creator.username]);
 
   const seekToLive = () => {
     const video = videoRef.current;
@@ -98,15 +142,15 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const { balanceCoins, openPurchaseModal } = useWallet();
   const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, retryEnter } = useStreamEntry(streamId);
 
-  const stream = MOCK_STREAMS.find((s) => s.id === streamId) as Stream;
-  const creator = MOCK_CREATORS.find((c) => c.id === stream.creatorId) as Creator;
-  const roomId = (stream as any)?.roomId || stream?.id || 'mock-room-id';
+  const roomId = stream?.room_id;
   const { viewerCount, recentGifts, sendGift } = useLiveStreamRoom(roomId);
 
-  const [isFollowing, setIsFollowing] = useState(false);
   const [isHoveringPlayer, setIsHoveringPlayer] = useState(false);
 
-  if (!stream || !creator) return <div className="text-white p-10 bg-[#0e0e10] min-h-screen">Stream not found.</div>;
+  if (isLoadingStream) return <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>;
+  if (!stream) return <div className="text-white p-10 bg-[#0e0e10] min-h-screen">{streamError || 'Stream not found.'}</div>;
+
+  const creator = stream.creator;
 
   const activePlaybackUrl = streamMode === 'mock' ? "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" : apiPlaybackUrl;
   const activeIsLoading = streamMode === 'mock' ? false : apiIsLoading;
@@ -122,6 +166,31 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
     } else {
       navigate('/discover');
     }
+  };
+
+  const handleFollow = async () => {
+    if (isFollowActionLoading) return;
+
+    setIsFollowActionLoading(true);
+    try {
+      if (isFollowing) {
+        await creatorService.unfollowCreator(creator.username);
+      } else {
+        await creatorService.followCreator(creator.username);
+      }
+      setIsFollowing(!isFollowing);
+    } finally {
+      setIsFollowActionLoading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    const shareData = { title: stream.title, url: window.location.href };
+    if (navigator.share) {
+      await navigator.share(shareData);
+      return;
+    }
+    await navigator.clipboard.writeText(shareData.url);
   };
 
   return (
@@ -214,7 +283,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             />
           )}
           {!activePlaybackUrl && (
-            <img src={stream.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 blur-2xl pointer-events-none" />
+            <img src={creator.avatar_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 blur-2xl pointer-events-none" />
           )}
         </div>
 
@@ -248,10 +317,10 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             </button>
             
             <div className="flex items-start gap-4 lg:gap-6">
-              <img src={creator.avatar} alt={creator.name} className="w-16 h-16 lg:w-24 lg:h-24 rounded-full border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)] object-cover" />
+              <img src={creator.avatar_url} alt={creator.name} className="w-16 h-16 lg:w-24 lg:h-24 rounded-full border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)] object-cover" />
               <div className="flex-1 mt-1">
                 <h2 className="text-xl lg:text-3xl font-bold text-white flex items-center gap-2">
-                  {creator.name} {creator.verified && <BadgeCheck className="w-5 h-5 lg:w-7 lg:h-7 text-blue-400" />}
+                  {creator.name} {creatorProfile?.verified && <BadgeCheck className="w-5 h-5 lg:w-7 lg:h-7 text-blue-400" />}
                 </h2>
                 <p className="text-xs lg:text-sm text-indigo-400 font-medium mt-0.5 tracking-wide uppercase">{stream.category} Creator</p>
                 
@@ -259,7 +328,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                   <div className="flex flex-col">
                     <span className="text-[10px] lg:text-xs text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Followers</span>
                     <div className="flex items-center gap-1.5 text-sm lg:text-base font-semibold text-zinc-200">
-                      <Users className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-zinc-400" /> 125K
+                      <Users className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-zinc-400" /> {(creatorProfile?.follower_count || 0).toLocaleString()}
                     </div>
                   </div>
                   <div className="w-px h-8 bg-white/10"></div>
@@ -273,7 +342,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               </div>
               
               {role === 'viewer' && (
-                <button onClick={() => setIsFollowing(!isFollowing)} className={`mt-2 mr-10 lg:mr-12 px-5 py-2 lg:px-8 lg:py-2.5 rounded-xl font-bold text-sm lg:text-base transition-all shadow-lg shrink-0 ${isFollowing ? 'bg-white/10 text-white hover:bg-white/20 border border-white/5' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
+                <button onClick={handleFollow} disabled={isFollowActionLoading} className={`mt-2 mr-10 lg:mr-12 px-5 py-2 lg:px-8 lg:py-2.5 rounded-xl font-bold text-sm lg:text-base transition-all shadow-lg shrink-0 disabled:opacity-50 ${isFollowing ? 'bg-white/10 text-white hover:bg-white/20 border border-white/5' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
                   {isFollowing ? 'Following' : 'Follow'}
                 </button>
               )}
@@ -294,7 +363,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                 className="relative shrink-0 hidden lg:block cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => setShowProfileOverlay(true)}
               >
-                <img src={creator.avatar} alt={creator.name} className="w-14 h-14 rounded-full object-cover border border-gray-600 shadow-md" />
+                <img src={creator.avatar_url} alt={creator.name} className="w-14 h-14 rounded-full object-cover border border-gray-600 shadow-md" />
                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm">Live</div>
               </div>
               <div className="flex flex-col drop-shadow-md">
@@ -304,7 +373,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                     className="hover:underline cursor-pointer flex items-center gap-1"
                     onClick={() => setShowProfileOverlay(true)}
                   >
-                    {creator.name} {creator.verified && <BadgeCheck className="w-3.5 h-3.5 text-blue-400" />}
+                    {creator.name} {creatorProfile?.verified && <BadgeCheck className="w-3.5 h-3.5 text-blue-400" />}
                   </span>
                   <span className="text-gray-400">•</span>
                   <span className="hover:text-white cursor-pointer">{stream.category}</span>
@@ -315,11 +384,11 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             <div className="flex items-center gap-2 shrink-0">
               {role === 'viewer' ? (
                 <>
-                  <button onClick={() => setIsFollowing(!isFollowing)} className={`flex items-center gap-1 px-3 py-1.5 lg:px-4 lg:py-2 rounded-md text-xs lg:text-sm font-bold transition-all backdrop-blur-md ${isFollowing ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-blue-600 text-white hover:bg-blue-500'}`}>
+                  <button onClick={handleFollow} disabled={isFollowActionLoading} className={`flex items-center gap-1 px-3 py-1.5 lg:px-4 lg:py-2 rounded-md text-xs lg:text-sm font-bold transition-all backdrop-blur-md disabled:opacity-50 ${isFollowing ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-blue-600 text-white hover:bg-blue-500'}`}>
                     <Heart className={`w-3.5 h-3.5 lg:w-4 lg:h-4 ${isFollowing ? 'fill-current text-blue-400' : ''}`} />
                     {isFollowing ? 'Following' : 'Follow'}
                   </button>
-                  <button className="hidden lg:block p-2 rounded-md bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-colors"><Share2 className="w-4 h-4" /></button>
+                  <button onClick={handleShare} className="hidden lg:block p-2 rounded-md bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-colors" title="Share stream"><Share2 className="w-4 h-4" /></button>
                 </>
               ) : (
                 <div className="flex items-center gap-2 backdrop-blur-md bg-black/40 p-1 lg:p-1.5 rounded-lg border border-white/10">
@@ -366,7 +435,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               </button>
 
               <span className="flex items-center gap-1 text-[10px] lg:text-xs font-semibold text-gray-200 ml-1 lg:ml-2">
-                <Eye className="w-3.5 h-3.5 lg:w-4 lg:h-4" /> {viewerCount > 0 ? viewerCount.toLocaleString() : '1,204'}
+                <Eye className="w-3.5 h-3.5 lg:w-4 lg:h-4" /> {viewerCount.toLocaleString()}
               </span>
             </div>
             <div className="flex items-center gap-1 lg:gap-2">

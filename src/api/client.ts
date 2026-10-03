@@ -25,7 +25,9 @@ const fetchWrapper = async (endpoint: string, options: RequestInit = {}) => {
     } catch {
       message = response.statusText;
     }
-    throw new Error(message);
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
 
   // Parse JSON (unless it's a 204 No Content response)

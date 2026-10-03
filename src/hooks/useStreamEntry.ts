@@ -19,13 +19,17 @@ export const useStreamEntry = (streamId: string | undefined) => {
       const response = await apiClient.post(`/streams/${streamId}/enter`);
       
       setPlaybackUrl(response.data.playback_url);
-    } catch (err: any) {
-      // Intercept the specific 402 Payment Required status
-      if (err.response?.status === 402) {
+    } catch (err: unknown) {
+      const status = typeof err === 'object' && err !== null && 'status' in err
+        ? (err as { status?: number }).status
+        : undefined;
+      const message = err instanceof Error ? err.message : 'Stream is offline or unavailable.';
+
+      if (status === 402) {
         setIsPaywall(true);
         setError("Insufficient zCoins to enter this premium stream.");
       } else {
-        setError(err.response?.data?.error || 'Stream is offline or unavailable.');
+        setError(message);
       }
       setPlaybackUrl(null);
     } finally {

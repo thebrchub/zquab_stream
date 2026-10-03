@@ -25,7 +25,7 @@ export interface StreamCreationResponse {
   stream_id: string;
   room_id: string;
   stream_key: string;
-  rtmp_url?: string; 
+  ingest_url: string;
 }
 
 export interface CreatorStream {
@@ -44,6 +44,11 @@ export interface CreatorStream {
   entry_price_coins: number;
   peak_viewer_count: number;
   total_earnings_coins: number;
+}
+
+export interface CreatorStreamsResponse {
+  ingest_url: string;
+  streams: CreatorStream[];
 }
 
 export interface LiveStream {
@@ -143,16 +148,17 @@ export const streamService = {
         stream_id: `mock-stream-${Date.now()}`,
         room_id: `mock-room-${Date.now()}`,
         stream_key: `sk_live_mock_${Math.random().toString(36).substring(7)}`,
+        ingest_url: '',
       };
     }
     const res = await apiClient.post('/streams', payload);
     return res.data;
   },
 
-  async getMyStreams(): Promise<CreatorStream[]> {
+  async getMyStreams(): Promise<CreatorStreamsResponse> {
     if (isMockMode()) {
       await delay(500);
-      return [];
+      return { ingest_url: '', streams: [] };
     }
     const res = await apiClient.get('/streams/me');
     return res.data;

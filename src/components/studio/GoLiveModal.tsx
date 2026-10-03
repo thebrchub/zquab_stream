@@ -31,9 +31,6 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
   const [streamData, setStreamData] = useState<StreamCreationResponse | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
-  // Note: Ask your backend team for the exact RTMP ingest URL for your production environment.
-  const RTMP_URL = "rtmp://ingest.brchub.tech/live"; 
-
   if (!isOpen) return null;
 
   const handleScheduledAtChange = (value: string) => {
@@ -292,10 +289,10 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
 
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider ml-1">Server URL (RTMP)</label>
+                  <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider ml-1">Ingest URL</label>
                   <input 
                     readOnly 
-                    value={RTMP_URL}
+                    value={streamData.ingest_url}
                     className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-[1.25rem] px-4 py-3.5 text-sm text-[var(--text-main)] font-mono outline-none opacity-80"
                   />
                 </div>

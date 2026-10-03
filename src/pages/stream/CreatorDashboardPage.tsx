@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { BarChart2, Settings, TrendingUp, Loader2, DollarSign, ArrowRight, Play, Copy, Radio, X } from 'lucide-react';
+import { BarChart2, Settings, TrendingUp, Loader2, DollarSign, ArrowRight, Play, Copy, Radio, X, Clock3, RefreshCw, AlertTriangle } from 'lucide-react';
 import { creatorService, type CreatorEarnings } from '../../services/creatorService';
 import { streamService, type CreatorStream } from '../../services/streamService';
 import { GoLiveModal } from '../../components/studio/GoLiveModal'; 
 import { wsEvents } from '../../context/WebSocketContext';
+
+const toDateTimeLocal = (value: string) => {
+  const date = new Date(value);
+  const timezoneOffset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+};
 
 export const CreatorDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,8 +22,12 @@ export const CreatorDashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
   const [isGoLiveModalOpen, setIsGoLiveModalOpen] = useState(false);
   const [streams, setStreams] = useState<CreatorStream[]>([]);
+  const [ingestURL, setIngestURL] = useState('');
   const [isLoadingStreams, setIsLoadingStreams] = useState(true);
   const [streamActionID, setStreamActionID] = useState<string | null>(null);
+  const [editingPlannedEndID, setEditingPlannedEndID] = useState<string | null>(null);
+  const [plannedEndAt, setPlannedEndAt] = useState('');
+  const [streamNotice, setStreamNotice] = useState<string | null>(null);
 
   // Monetization Settings State
   const [isOneOnOneEnabled, setIsOneOnOneEnabled] = useState(false);
@@ -48,7 +58,9 @@ export const CreatorDashboardPage: React.FC = () => {
   const fetchStreams = async () => {
     setIsLoadingStreams(true);
     try {
-      setStreams(await streamService.getMyStreams());
+      const data = await streamService.getMyStreams();
+      setStreams(data.streams);
+      setIngestURL(data.ingest_url);
     } catch (err) {
       console.error('Failed to load creator streams', err);
     } finally {
@@ -63,6 +75,22 @@ export const CreatorDashboardPage: React.FC = () => {
   useEffect(() => wsEvents.subscribe((message) => {
     if (message.type === 'stream_live') {
       fetchStreams();
+    }
+
+    const payload = message.payload || {};
+    if (message.type === 'stream_ending_soon') {
+      const secondsRemaining = Number(payload.seconds_remaining || payload.secondsRemaining || 0);
+      setStreamNotice(`Your stream will end in ${Math.max(1, Math.ceil(secondsRemaining / 60))} minute${secondsRemaining > 60 ? 's' : ''}.`);
+    }
+
+    if (message.type === 'stream_auto_ended') {
+      setStreamNotice('Your stream was ended because it reached its planned end time.');
+      fetchStreams();
+    }
+
+    if (message.type === 'stream_earnings') {
+      const earnings = Number(payload.earnings_coins || payload.earningsCoins || 0);
+      if (earnings > 0) setStreamNotice(`You earned ${earnings.toLocaleString()} zCoins from your stream.`);
     }
   }), []);
 
@@ -84,6 +112,47 @@ export const CreatorDashboardPage: React.FC = () => {
 
   const copyStreamKey = (streamKey: string) => {
     navigator.clipboard.writeText(streamKey);
+  };
+
+  const copyIngestURL = () => {
+    navigator.clipboard.writeText(ingestURL);
+  };
+
+  const startEditingPlannedEnd = (stream: CreatorStream) => {
+    setEditingPlannedEndID(stream.stream_id);
+    setPlannedEndAt(toDateTimeLocal(stream.planned_end_at));
+  };
+
+  const savePlannedEnd = async (stream: CreatorStream) => {
+    const nextPlannedEnd = new Date(plannedEndAt);
+    if (Number.isNaN(nextPlannedEnd.getTime())) return;
+
+    setStreamActionID(stream.stream_id);
+    try {
+      await streamService.updatePlannedEnd(stream.stream_id, nextPlannedEnd.toISOString());
+      setEditingPlannedEndID(null);
+      setStreamNotice('Planned end updated.');
+      await fetchStreams();
+    } catch (err) {
+      console.error('Failed to update planned end', err);
+    } finally {
+      setStreamActionID(null);
+    }
+  };
+
+  const regenerateStreamKey = async (stream: CreatorStream) => {
+    if (!window.confirm('Reset this stream key? OBS will stop accepting the old key.')) return;
+
+    setStreamActionID(stream.stream_id);
+    try {
+      await streamService.regenerateKey(stream.stream_id);
+      setStreamNotice('Stream key reset. Copy the new key into OBS before broadcasting.');
+      await fetchStreams();
+    } catch (err) {
+      console.error('Failed to regenerate stream key', err);
+    } finally {
+      setStreamActionID(null);
+    }
   };
 
   const maxDailyEarning = earnings?.daily.length 
@@ -165,6 +234,32 @@ export const CreatorDashboardPage: React.FC = () => {
                   <Radio className="w-4 h-4 text-zinc-400 dark:text-zinc-600" />
                 </div>
 
+                {ingestURL && (
+                  <div className="mb-4 flex items-center gap-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 px-3 py-2.5">
+                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-zinc-500">Ingest URL</span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs text-zinc-700 dark:text-zinc-300">{ingestURL}</span>
+                    <button onClick={copyIngestURL} className="shrink-0 text-zinc-500 hover:text-zinc-900 dark:hover:text-white" title="Copy ingest URL">
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {!isLoadingStreams && !ingestURL && (
+                  <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>Streaming setup is unavailable. Ask an administrator to configure the ingest URL.</span>
+                  </div>
+                )}
+
+                {streamNotice && (
+                  <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-500/10 px-3 py-2.5 text-xs text-blue-700 dark:text-blue-300">
+                    <span>{streamNotice}</span>
+                    <button onClick={() => setStreamNotice(null)} className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-200" title="Dismiss notification">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
                 {isLoadingStreams ? (
                   <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 text-zinc-400 animate-spin" /></div>
                 ) : streams.length === 0 ? (
@@ -183,7 +278,22 @@ export const CreatorDashboardPage: React.FC = () => {
                         <div className="flex flex-wrap items-center gap-2">
                           {stream.status === 'scheduled' && (
                             <button onClick={() => copyStreamKey(stream.stream_key)} className="inline-flex items-center gap-1.5 px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
-                              <Copy className="w-3.5 h-3.5" /> Copy RTMP Key
+                              <Copy className="w-3.5 h-3.5" /> Copy Stream Key
+                            </button>
+                          )}
+                          <button
+                            onClick={() => editingPlannedEndID === stream.stream_id ? setEditingPlannedEndID(null) : startEditingPlannedEnd(stream)}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                          >
+                            <Clock3 className="w-3.5 h-3.5" /> Edit End
+                          </button>
+                          {stream.status === 'scheduled' && (
+                            <button
+                              onClick={() => regenerateStreamKey(stream)}
+                              disabled={streamActionID === stream.stream_id}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors disabled:opacity-50"
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${streamActionID === stream.stream_id ? 'animate-spin' : ''}`} /> Reset Key
                             </button>
                           )}
                           <button
@@ -195,6 +305,23 @@ export const CreatorDashboardPage: React.FC = () => {
                             {stream.status === 'live' ? 'End Stream' : 'Cancel'}
                           </button>
                         </div>
+                        {editingPlannedEndID === stream.stream_id && (
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 border-t border-zinc-100 dark:border-zinc-800 pt-3">
+                            <input
+                              type="datetime-local"
+                              value={plannedEndAt}
+                              onChange={(event) => setPlannedEndAt(event.target.value)}
+                              className="flex-1 bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 focus:border-blue-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none"
+                            />
+                            <button
+                              onClick={() => savePlannedEnd(stream)}
+                              disabled={streamActionID === stream.stream_id}
+                              className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium disabled:opacity-50"
+                            >
+                              Save End Time
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
