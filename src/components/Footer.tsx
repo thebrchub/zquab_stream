@@ -3,10 +3,11 @@ import { useTheme } from '../hooks/useTheme';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
-    const { theme } = useTheme();
+  const { theme } = useTheme();
 
   return (
-    <footer className="w-full pb-8 pt-12 bg-transparent">
+    // 🚀 Added 'hidden sm:block' here so it vanishes on mobile phones!
+    <footer className="hidden sm:block w-full pb-8 pt-12 bg-transparent">
       {/* Fluid margins matching the Hero and CTA sections */}
       <div className="mx-4 md:mx-8 lg:mx-12">
         
@@ -50,20 +51,18 @@ export default function Footer() {
                   />
                 </a>
                 <a 
-  href="https://x.com/zquabapp" 
-  target="_blank" 
-  rel="noopener noreferrer"
-  // 🛠️ Changed hover colors from Reddit Orange to a clean, neutral X theme
-  className="p-2.5 bg-[var(--background)] border border-[var(--border-color)] rounded-full hover:border-gray-500/30 hover:bg-[var(--text-main)]/5 transition-all active:scale-95 flex items-center justify-center"
-  aria-label="X (formerly Twitter)"
->
-  <img 
-    // 🛠️ Automatically switches: x-w.svg (White) for Dark Mode, x.svg (Dark) for Light Mode
-    src={theme === 'dark' ? '/x-w.svg' : '/x.svg'} 
-    alt="X" 
-    className="w-7 h-7 object-contain opacity-80 hover:opacity-100 transition-opacity" 
-  />
-</a>
+                  href="https://x.com/zquabapp" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-2.5 bg-[var(--background)] border border-[var(--border-color)] rounded-full hover:border-gray-500/30 hover:bg-[var(--text-main)]/5 transition-all active:scale-95 flex items-center justify-center"
+                  aria-label="X (formerly Twitter)"
+                >
+                  <img 
+                    src={theme === 'dark' ? '/x-w.svg' : '/x.svg'} 
+                    alt="X" 
+                    className="w-7 h-7 object-contain opacity-80 hover:opacity-100 transition-opacity" 
+                  />
+                </a>
                 <a 
                   href="https://www.reddit.com/r/zQuabChat/" 
                   target="_blank" 

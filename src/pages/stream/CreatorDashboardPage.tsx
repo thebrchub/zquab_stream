@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { BarChart2, Settings, TrendingUp, Loader2, DollarSign, ArrowRight, Play } from 'lucide-react';
 import { creatorService, type CreatorEarnings } from '../../services/creatorService';
 import { GoLiveModal } from '../../components/studio/GoLiveModal'; 
 
 export const CreatorDashboardPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
   const [earnings, setEarnings] = useState<CreatorEarnings | null>(null);
   const [isLoadingEarnings, setIsLoadingEarnings] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
@@ -13,6 +18,13 @@ export const CreatorDashboardPage: React.FC = () => {
   const [isOneOnOneEnabled, setIsOneOnOneEnabled] = useState(false);
   const [price, setPrice] = useState(100);
   const [duration, setDuration] = useState(15);
+
+  // Guard: Redirect non-approved users
+  useEffect(() => {
+    if (user && user.approval_status !== 'approved') {
+      navigate('/profile', { replace: true });
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     const fetchEarnings = async () => {
@@ -31,6 +43,9 @@ export const CreatorDashboardPage: React.FC = () => {
   const maxDailyEarning = earnings?.daily.length 
     ? Math.max(...earnings.daily.map(d => d.earnings_coins))
     : 100;
+
+  // Prevent rendering the dashboard momentarily before redirect
+  if (user?.approval_status !== 'approved') return null;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans selection:bg-blue-500/30 transition-colors duration-300">

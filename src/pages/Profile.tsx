@@ -522,6 +522,12 @@ export default function Profile() {
                     <User className="w-3.5 h-3.5" /> {profile.gender}
                   </span>
                 )}
+
+                {authUser?.approval_status === 'approved' && (
+    <span className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-xs font-bold flex items-center gap-1.5 text-indigo-500 shadow-sm">
+      <Video className="w-3.5 h-3.5" /> Official Creator
+    </span>
+  )}
               </div>
 
               <p className="text-sm text-[var(--text-main)] w-full leading-relaxed whitespace-pre-wrap bg-[var(--background)]/50 p-4 rounded-xl border border-[var(--border-color)] mb-6 text-left">
