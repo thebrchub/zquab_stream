@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Users, BadgeCheck, Search, Play } from 'lucide-react';
-import { streamService, type LiveStream } from '../../services/streamService';
+import { Loader2, Users, BadgeCheck, Search, Play, CalendarClock } from 'lucide-react';
+import { streamService, type LiveStream, type UpcomingStream } from '../../services/streamService';
 import { creatorService, type DiscoverCreator } from '../../services/creatorService';
-import { MOCK_CREATORS } from '../../constants/streamMockData'; 
-import { useAuth } from '../../context/AuthContext'; 
+import { MOCK_CREATORS } from '../../constants/streamMockData';
+import { useAuth } from '../../context/AuthContext';
 
 // 🚀 CLEAN UI (For layout, cards, inputs, and tabs)
 const CLEAN_CARD = "bg-[var(--card)] rounded-[2rem] border border-[var(--border-color)] shadow-sm hover:shadow-md transition-all duration-300";
@@ -22,13 +22,14 @@ const CLAY_BUTTON_ACTIVE = "bg-[#3B82F6] text-white font-bold rounded-[1.25rem] 
   "dark:shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)]";
 
 export const LiveDiscoveryPage: React.FC = () => {
-  const navigate = useNavigate(); 
-  const { user } = useAuth(); 
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  
+
   const [liveStreams, setLiveStreams] = useState<LiveStream[]>([]);
+  const [upcomingStreams, setUpcomingStreams] = useState<UpcomingStream[]>([]);
   const [discoverCreators, setDiscoverCreators] = useState<DiscoverCreator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -49,15 +50,19 @@ export const LiveDiscoveryPage: React.FC = () => {
       try {
         const apiCategory = selectedCategory === 'All' ? undefined : selectedCategory;
         const [streamsData, creatorsData] = await Promise.all([
-          streamService.getLiveStreams().catch(() => []),
+          streamService.getDiscoverStreams().catch(() => ({ live: [], upcoming: [] })),
           creatorService.getDiscoverFeed(apiCategory).catch(() => [])
         ]);
 
         const filteredStreams = apiCategory 
-          ? streamsData.filter((s: LiveStream) => s.category === apiCategory)
-          : streamsData;
+          ? streamsData.live.filter((s: LiveStream) => s.category === apiCategory)
+          : streamsData.live;
+        const filteredUpcomingStreams = apiCategory
+          ? streamsData.upcoming.filter((s: UpcomingStream) => s.category === apiCategory)
+          : streamsData.upcoming;
 
         setLiveStreams(filteredStreams);
+        setUpcomingStreams(filteredUpcomingStreams);
         setDiscoverCreators(creatorsData);
       } catch (error) {
         console.error("Failed to load discovery feeds:", error);
@@ -70,6 +75,9 @@ export const LiveDiscoveryPage: React.FC = () => {
 
   const query = searchQuery.toLowerCase();
   const displayedStreams = liveStreams.filter(s => 
+    s.title.toLowerCase().includes(query) || s.name.toLowerCase().includes(query) || s.category.toLowerCase().includes(query)
+  );
+  const displayedUpcomingStreams = upcomingStreams.filter(s =>
     s.title.toLowerCase().includes(query) || s.name.toLowerCase().includes(query) || s.category.toLowerCase().includes(query)
   );
   const displayedCreators = discoverCreators.filter(c => 
@@ -229,6 +237,53 @@ export const LiveDiscoveryPage: React.FC = () => {
                 </div>
               )}
             </section>
+
+            {/* --- Section: Upcoming Streams --- */}
+            {displayedUpcomingStreams.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-6 px-2">
+                  <div className="w-10 h-10 rounded-xl bg-[#3B82F6]/10 flex items-center justify-center shadow-inner text-[#3B82F6]">
+                    <CalendarClock className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-xl font-bold text-[var(--text-main)]">Upcoming Broadcasts</h2>
+                  <span className="px-3 py-1 rounded-full bg-[var(--card)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-muted)] shadow-sm">{displayedUpcomingStreams.length}</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {displayedUpcomingStreams.map((stream) => (
+                    <div
+                      key={stream.stream_id}
+                      onClick={() => navigate(`/user/${stream.username}`)}
+                      className={`group cursor-pointer flex flex-col overflow-hidden ${CLEAN_CARD} hover:-translate-y-1`}
+                    >
+                      <div className="relative aspect-video w-full bg-black overflow-hidden rounded-t-[1.9rem]">
+                        <img
+                          src={stream.avatar_url || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop'}
+                          alt="Cover"
+                          className="w-full h-full object-cover opacity-60 group-hover:scale-105 group-hover:opacity-100 transition-all duration-700"
+                        />
+                        <div className="absolute top-4 left-4 bg-[#3B82F6] text-white text-[10px] font-extrabold px-3 py-1.5 rounded-lg flex items-center gap-1.5 uppercase tracking-widest shadow-md">
+                          <CalendarClock className="w-3 h-3" /> Upcoming
+                        </div>
+                      </div>
+
+                      <div className="p-5 flex gap-4 flex-1">
+                        <img
+                          src={stream.avatar_url || 'https://via.placeholder.com/150'}
+                          alt={stream.name}
+                          className="w-12 h-12 rounded-xl object-cover shadow-sm border border-[var(--border-color)]"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-bold text-[var(--text-main)] truncate group-hover:text-[#3B82F6] transition-colors">{stream.title}</h3>
+                          <p className="text-xs text-[var(--text-muted)] font-medium mt-1 truncate">{stream.name}</p>
+                          <p className="text-xs text-[#3B82F6] font-bold mt-2">{new Date(stream.scheduled_at).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* --- Section: Discover Creators --- */}
             {displayedCreators.length > 0 && (

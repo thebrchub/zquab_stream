@@ -276,6 +276,7 @@ export default function Profile() {
   const genderLower = profile?.gender?.toLowerCase() || '';
   const isMale = genderLower === 'male';
   const isFemale = genderLower === 'female';
+  const creatorApprovalStatus = profile?.approval_status ?? authUser?.approval_status;
 
   if (profileLoading) {
     return (
@@ -523,7 +524,7 @@ export default function Profile() {
                 )}
 
              
-                {authUser?.approval_status === 'approved' && (
+                {creatorApprovalStatus === 'approved' && (
                   <span className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-xs font-bold flex items-center gap-1.5 text-indigo-500 shadow-sm">
                     <Video className="w-3.5 h-3.5" /> Official Creator
                   </span>
@@ -536,21 +537,21 @@ export default function Profile() {
 
               <button 
                 onClick={() => {
-                  if (authUser?.approval_status === 'approved') {
+                  if (creatorApprovalStatus === 'approved') {
                     navigate('/creator/dashboard');
-                  } else if (authUser?.approval_status !== 'pending') {
+                  } else if (creatorApprovalStatus !== 'pending') {
                     setShowCreatorModal(true);
                   }
                 }}
-                disabled={authUser?.approval_status === 'pending'}
+                disabled={creatorApprovalStatus === 'pending'}
                 className="w-full py-4 mb-4 bg-[#4F46E5] text-white rounded-[1.25rem] font-bold flex items-center justify-center gap-2 transition-all duration-200
                 shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)] 
                 hover:brightness-110 active:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.4),inset_-2px_-2px_6px_rgba(255,255,255,0.1)] 
                 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {authUser?.approval_status === 'approved' ? (
+                {creatorApprovalStatus === 'approved' ? (
                   <><Video className="w-5 h-5 drop-shadow-md" /> Creator Dashboard</>
-                ) : authUser?.approval_status === 'pending' ? (
+                ) : creatorApprovalStatus === 'pending' ? (
                   <><Clock className="w-5 h-5 drop-shadow-md" /> Application Pending...</>
                 ) : (
                   <><Star className="w-5 h-5 drop-shadow-md" /> Become a Creator</>

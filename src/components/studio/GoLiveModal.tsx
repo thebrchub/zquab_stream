@@ -5,9 +5,15 @@ import { streamService, type CreateStreamPayload, type StreamCreationResponse } 
 interface GoLiveModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onStreamCreated?: () => void;
 }
 
-export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose }) => {
+const toDateTimeLocal = (date: Date) => {
+  const timezoneOffset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+};
+
+export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStreamCreated }) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +21,9 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose }) => 
   // Step 1 Form State
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('gaming');
-  const [durationHours, setDurationHours] = useState(2);
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [plannedEndAt, setPlannedEndAt] = useState(() => toDateTimeLocal(new Date(Date.now() + 60 * 60 * 1000)));
   const [isPremium, setIsPremium] = useState(false);
   const [price, setPrice] = useState(100);
 
@@ -28,27 +36,48 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose }) => 
 
   if (!isOpen) return null;
 
+  const handleScheduledAtChange = (value: string) => {
+    setScheduledAt(value);
+    const start = new Date(value);
+    if (!Number.isNaN(start.getTime())) {
+      setPlannedEndAt(toDateTimeLocal(new Date(start.getTime() + 60 * 60 * 1000)));
+    }
+  };
+
+  const enableScheduling = () => {
+    const start = new Date(Date.now() + 5 * 60 * 1000);
+    setIsScheduled(true);
+    setScheduledAt(toDateTimeLocal(start));
+    setPlannedEndAt(toDateTimeLocal(new Date(start.getTime() + 60 * 60 * 1000)));
+  };
+
   const handleCreateStream = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
     try {
-      const endTime = new Date();
-      endTime.setHours(endTime.getHours() + durationHours);
+      const plannedEnd = new Date(plannedEndAt);
+      const scheduledStart = isScheduled ? new Date(scheduledAt) : null;
+      if (Number.isNaN(plannedEnd.getTime()) || (scheduledStart && (Number.isNaN(scheduledStart.getTime()) || plannedEnd <= scheduledStart))) {
+        setError('Choose a planned end after the scheduled start.');
+        return;
+      }
 
       const payload: CreateStreamPayload = {
         title,
         category,
         tags: ["live"], 
-        planned_end_at: endTime.toISOString(),
+        planned_end_at: plannedEnd.toISOString(),
         is_premium: isPremium,
         entry_price_coins: isPremium ? price : 0,
       };
+      if (scheduledStart) payload.scheduled_at = scheduledStart.toISOString();
 
       const data = await streamService.createStream(payload);
       setStreamData(data);
       setStep(2); 
+      onStreamCreated?.();
     } catch (err: any) {
       setError(err.message || "Failed to create stream");
     } finally {
@@ -83,6 +112,9 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose }) => 
       setStep(1);
       setTitle('');
       setIsPremium(false);
+		  setIsScheduled(false);
+		  setScheduledAt('');
+		  setPlannedEndAt(toDateTimeLocal(new Date(Date.now() + 60 * 60 * 1000)));
       setStreamData(null);
       setError(null);
     }, 200);
@@ -162,25 +194,43 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose }) => 
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-bold text-[var(--text-main)] ml-1">Duration</label>
-                  <select 
-                    value={durationHours}
-                    onChange={(e) => setDurationHours(Number(e.target.value))}
-                    className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-[1.25rem] px-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#3B82F6] transition-all shadow-sm cursor-pointer appearance-none"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                      backgroundPosition: 'right 1rem center',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundSize: '1.25em 1.25em'
-                    }}
-                  >
-                    <option value={1}>1 Hour</option>
-                    <option value={2}>2 Hours</option>
-                    <option value={4}>4 Hours</option>
-                    <option value={8}>8 Hours</option>
-                  </select>
+                  <label className="block text-sm font-bold text-[var(--text-main)] ml-1">Planned End</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={plannedEndAt}
+                    onChange={(e) => setPlannedEndAt(e.target.value)}
+                    className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-[1.25rem] px-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#3B82F6] transition-all shadow-sm"
+                  />
                 </div>
               </div>
+
+              <div className="p-5 rounded-[1.5rem] bg-[var(--background)] border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-bold text-[var(--text-main)]">Schedule for later</div>
+                  <div className="text-xs font-medium text-[var(--text-muted)] mt-1">Choose a future start time instead of going live now.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => isScheduled ? setIsScheduled(false) : enableScheduling()}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${isScheduled ? 'bg-[#3B82F6]' : 'bg-[var(--card)] border border-[var(--border-color)]'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${isScheduled ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+
+              {isScheduled && (
+                <div className="space-y-2 animate-in slide-in-from-top-2 fade-in duration-200">
+                  <label className="block text-sm font-bold text-[var(--text-main)] ml-1">Scheduled Start</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={scheduledAt}
+                    onChange={(e) => handleScheduledAtChange(e.target.value)}
+                    className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-[1.25rem] px-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#3B82F6] transition-all shadow-sm"
+                  />
+                </div>
+              )}
 
               {/* Premium Gate Card */}
               <div className="p-5 rounded-[1.5rem] bg-[var(--background)] border border-[var(--border-color)] shadow-sm flex flex-col gap-4 transition-colors">

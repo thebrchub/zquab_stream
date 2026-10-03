@@ -28,6 +28,24 @@ export interface StreamCreationResponse {
   rtmp_url?: string; 
 }
 
+export interface CreatorStream {
+  stream_id: string;
+  room_id: string;
+  title: string;
+  category: string;
+  tags: string[];
+  status: 'scheduled' | 'live' | 'ended' | 'cancelled';
+  stream_key: string;
+  scheduled_at: string | null;
+  planned_end_at: string;
+  started_at: string | null;
+  ended_at: string | null;
+  is_premium: boolean;
+  entry_price_coins: number;
+  peak_viewer_count: number;
+  total_earnings_coins: number;
+}
+
 export interface LiveStream {
   stream_id: string;
   room_id: string;
@@ -39,6 +57,15 @@ export interface LiveStream {
   username: string;
   name: string;
   avatar_url: string;
+}
+
+export interface UpcomingStream extends LiveStream {
+  scheduled_at: string;
+}
+
+export interface DiscoverStreams {
+  live: LiveStream[];
+  upcoming: UpcomingStream[];
 }
 
 export interface StreamMetadata {
@@ -65,6 +92,15 @@ export interface StreamMetadata {
 export const streamService = {
   
   // --- Viewer Endpoints ---
+
+  async getDiscoverStreams(): Promise<DiscoverStreams> {
+    if (isMockMode()) {
+      const live = await this.getLiveStreams();
+      return { live, upcoming: [] };
+    }
+    const res = await apiClient.get('/streams');
+    return res.data;
+  },
 
   async enterStream(streamId: string): Promise<{ playback_url: string }> {
     if (isMockMode()) {
@@ -113,6 +149,15 @@ export const streamService = {
     return res.data;
   },
 
+  async getMyStreams(): Promise<CreatorStream[]> {
+    if (isMockMode()) {
+      await delay(500);
+      return [];
+    }
+    const res = await apiClient.get('/streams/me');
+    return res.data;
+  },
+
   async updatePlannedEnd(streamId: string, plannedEndAt: string): Promise<{ status: string }> {
     if (isMockMode()) {
       await delay(500);
@@ -137,6 +182,15 @@ export const streamService = {
       return { room_id: `room-${streamId}`, status: 'ended' };
     }
     const res = await apiClient.post(`/streams/${streamId}/end`);
+    return res.data;
+  },
+
+  async cancelStream(streamId: string): Promise<{ status: string }> {
+    if (isMockMode()) {
+      await delay(500);
+      return { status: 'cancelled' };
+    }
+    const res = await apiClient.post(`/streams/${streamId}/cancel`);
     return res.data;
   },
 
