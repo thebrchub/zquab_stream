@@ -501,8 +501,7 @@ export default function Profile() {
                 <span className="font-extrabold text-sm">🪙 {balanceCoins?.toLocaleString() || 0} zCoins</span>
                 <span className="bg-amber-500 text-white rounded-full p-0.5"><Plus className="w-3 h-3" /></span>
               </button>
-
-              <div className="flex flex-wrap justify-center gap-2 mb-6">
+<div className="flex flex-wrap justify-center gap-2 mb-6">
                 {country && (
                   <span className="px-3 py-1 bg-[var(--background)] border border-[var(--border-color)] rounded-full text-xs font-bold flex items-center gap-1.5 text-[var(--text-main)]">
                     <MapPin className="w-3.5 h-3.5 text-[#3B82F6]" /> {country}
@@ -523,11 +522,12 @@ export default function Profile() {
                   </span>
                 )}
 
+             
                 {authUser?.approval_status === 'approved' && (
-    <span className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-xs font-bold flex items-center gap-1.5 text-indigo-500 shadow-sm">
-      <Video className="w-3.5 h-3.5" /> Official Creator
-    </span>
-  )}
+                  <span className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-xs font-bold flex items-center gap-1.5 text-indigo-500 shadow-sm">
+                    <Video className="w-3.5 h-3.5" /> Official Creator
+                  </span>
+                )}
               </div>
 
               <p className="text-sm text-[var(--text-main)] w-full leading-relaxed whitespace-pre-wrap bg-[var(--background)]/50 p-4 rounded-xl border border-[var(--border-color)] mb-6 text-left">
