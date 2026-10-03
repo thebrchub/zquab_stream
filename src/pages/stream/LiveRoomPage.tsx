@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { StreamChatSidebar } from '../../components/stream/StreamChatSidebar'; 
 import { useStreamEntry } from '../../hooks/useStreamEntry';
 import { useLiveStreamRoom } from '../../hooks/useLiveStreamRoom';
@@ -24,6 +24,8 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   onLeaveRoom,
 }) => {
   const navigate = useNavigate();
+  const { streamId: routeStreamId } = useParams<{ streamId: string }>();
+  const resolvedStreamId = routeStreamId || streamId;
 
   const [role, setRole] = useState<'viewer' | 'creator'>(
     (sessionStorage.getItem('dev_stream_role') as 'viewer' | 'creator') || 'viewer'
@@ -74,7 +76,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
       setIsLoadingStream(true);
       setStreamError(null);
       try {
-        const data = await streamService.getStreamMetadata(streamId);
+        const data = await streamService.getStreamMetadata(resolvedStreamId);
         if (isCurrent) setStream(data);
       } catch (err) {
         if (isCurrent) setStreamError(err instanceof Error ? err.message : 'Stream not found.');
@@ -85,7 +87,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
 
     fetchStream();
     return () => { isCurrent = false; };
-  }, [streamId]);
+  }, [resolvedStreamId]);
 
   useEffect(() => {
     if (!stream?.creator.username) return;
@@ -140,7 +142,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   };
 
   const { balanceCoins, openPurchaseModal } = useWallet();
-  const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, retryEnter } = useStreamEntry(streamId);
+  const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, retryEnter } = useStreamEntry(resolvedStreamId);
 
   const roomId = stream?.room_id;
   const { viewerCount, recentGifts, sendGift } = useLiveStreamRoom(roomId);
