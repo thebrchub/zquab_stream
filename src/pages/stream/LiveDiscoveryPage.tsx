@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, Users, BadgeCheck, Search, Play, CalendarClock } from 'lucide-react';
 import { streamService, type LiveStream, type UpcomingStream } from '../../services/streamService';
 import { creatorService, type DiscoverCreator } from '../../services/creatorService';
-import { MOCK_CREATORS } from '../../constants/streamMockData';
+// import { MOCK_CREATORS } from '../../constants/streamMockData';
 import { useAuth } from '../../context/AuthContext';
 
 // 🚀 CLEAN UI (For layout, cards, inputs, and tabs)
@@ -13,13 +13,13 @@ const TAB_BUTTON = "bg-[var(--card)] border border-[var(--border-color)] rounded
 const TAB_BUTTON_ACTIVE = "bg-[#3B82F6] text-white font-bold rounded-full border-none shadow-md transition-colors px-5 py-2.5 whitespace-nowrap capitalize text-sm";
 
 // 🚀 TRUE CLAYMORPHISM (Reserved STRICTLY for primary action buttons)
-const CLAY_BUTTON = "bg-[var(--card)] rounded-[1.25rem] border-none text-[var(--text-muted)] hover:text-[var(--text-main)] active:scale-95 transition-all " +
-  "shadow-[4px_4px_10px_rgba(0,0,0,0.06),-4px_-4px_10px_rgba(255,255,255,0.9),inset_1px_1px_2px_rgba(255,255,255,0.8)] " +
-  "dark:shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_8px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.05)]";
+// const CLAY_BUTTON = "bg-[var(--card)] rounded-[1.25rem] border-none text-[var(--text-muted)] hover:text-[var(--text-main)] active:scale-95 transition-all " +
+//   "shadow-[4px_4px_10px_rgba(0,0,0,0.06),-4px_-4px_10px_rgba(255,255,255,0.9),inset_1px_1px_2px_rgba(255,255,255,0.8)] " +
+//   "dark:shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_8px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.05)]";
 
-const CLAY_BUTTON_ACTIVE = "bg-[#3B82F6] text-white font-bold rounded-[1.25rem] border-none transition-all " +
-  "shadow-[4px_4px_12px_rgba(59,130,246,0.3),-4px_-4px_10px_rgba(255,255,255,0.9),inset_2px_2px_4px_rgba(255,255,255,0.4),inset_-2px_-2px_4px_rgba(0,0,0,0.1)] " +
-  "dark:shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)]";
+// const CLAY_BUTTON_ACTIVE = "bg-[#3B82F6] text-white font-bold rounded-[1.25rem] border-none transition-all " +
+//   "shadow-[4px_4px_12px_rgba(59,130,246,0.3),-4px_-4px_10px_rgba(255,255,255,0.9),inset_2px_2px_4px_rgba(255,255,255,0.4),inset_-2px_-2px_4px_rgba(0,0,0,0.1)] " +
+//   "dark:shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)]";
 
 export const LiveDiscoveryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -34,7 +34,7 @@ export const LiveDiscoveryPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const categories = ['All', 'gaming', 'chatting', 'music'];
-  const creatorsAcceptingCalls = MOCK_CREATORS.filter((c) => c.oneOnOne.enabled);
+  // const creatorsAcceptingCalls = MOCK_CREATORS.filter((c) => c.oneOnOne.enabled);
 
   const handleProtectedAction = (path: string) => {
     if (!user || user.is_guest) {
@@ -83,9 +83,9 @@ export const LiveDiscoveryPage: React.FC = () => {
   const displayedCreators = discoverCreators.filter(c => 
     c.name.toLowerCase().includes(query) || c.username.toLowerCase().includes(query)
   );
-  const displayed1on1 = creatorsAcceptingCalls.filter(c => 
-    c.name.toLowerCase().includes(query) || c.handle.toLowerCase().includes(query)
-  );
+  // const displayed1on1 = creatorsAcceptingCalls.filter(c => 
+  //   c.name.toLowerCase().includes(query) || c.handle.toLowerCase().includes(query)
+  // );
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--text-main)] pb-20 transition-colors duration-300 font-sans selection:bg-[#3B82F6]/30">
