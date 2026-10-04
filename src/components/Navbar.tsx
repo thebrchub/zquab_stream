@@ -133,9 +133,9 @@ export default function Navbar() {
               <Link to="/discover" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
                 Watch Live
               </Link>
-              <Link to="/discover" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
+              {/* <Link to="/discover" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
                 1:1 Calls
-              </Link>
+              </Link> */}
               <Link to="/chat" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
                 Stranger Chat
               </Link>

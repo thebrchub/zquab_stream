@@ -339,7 +339,7 @@ export const LiveDiscoveryPage: React.FC = () => {
               </section>
             )}
 
-            {/* --- Section: 1:1 Creator Interactions --- */}
+            {/* --- Section: 1:1 Creator Interactions ---
             {displayed1on1.length > 0 && (
               <section>
                 <div className="flex items-center gap-3 mb-6 px-2">
@@ -419,7 +419,7 @@ export const LiveDiscoveryPage: React.FC = () => {
                   ))}
                 </div>
               </section>
-            )}
+            )} */}
 
           </div>
         )}

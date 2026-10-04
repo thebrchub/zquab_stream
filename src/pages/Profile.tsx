@@ -5,7 +5,7 @@ import { friendsApi } from '../api/friends';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useRooms } from '../context/RoomsContext';
-import { useWallet } from '../context/WalletContext'; // 🚀 Added Wallet Hook
+import { useWallet } from '../context/WalletContext'; 
 import UserCard from '../components/UserCard';
 import PaginationLoader from '../components/PaginationLoader';
 import { ALL_COUNTRIES } from '../constants/countries'; 
@@ -13,10 +13,9 @@ import {
   Loader2, Save, User, AtSign, AlignLeft, 
   Users, MessageSquare, Edit2, X, MapPin, Activity,
   LogOut, UserPlus, Search, Check, Share2, CheckCircle2, Lock, RefreshCw, ChevronDown,
-  Video, Star, Clock, Plus // 🚀 Added Plus icon
+  Video, Star, Clock, Plus 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
 import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
 
@@ -27,10 +26,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const { user: authUser, logout: logoutUser, refreshSession } = useAuth();
   
-  // 🛠️ UNIFICATION: Pull requests from memory
   const { friendRequests, setFriendRequests } = useRooms();
-  
-  // 🚀 WALLET CONNECTION
   const { balanceCoins, openPurchaseModal } = useWallet();
 
   const [profile, setProfile] = useState<any>(null);
@@ -80,12 +76,28 @@ export default function Profile() {
   const [searchQuery, setSearchQuery] = useState('');
   const LIMIT = 15;
 
+  // 🚀 FIX: Prevent the background sync from wiping out the dev_mock_999 session
+  useEffect(() => {
+    if (authUser && !authUser.is_guest && authUser.user_id !== 'dev_mock_999') {
+      refreshSession().catch(console.error);
+    }
+  }, []);
+
   useEffect(() => {
     const fetchProfile = async () => {
       if (authUser?.is_guest) {
         setProfileLoading(false);
         return;
       }
+
+      // 🚀 FIX: Bypass real API call for mock user so the profile renders properly
+      if (authUser?.user_id === 'dev_mock_999') {
+        setProfile(authUser);
+        setUsername(authUser.username || '');
+        setProfileLoading(false);
+        return;
+      }
+
       try {
         const data = await usersApi.getMe();
         setProfile(data);
@@ -330,7 +342,6 @@ export default function Profile() {
   return (
     <div className="max-w-7xl mx-auto w-full p-4 md:p-6 lg:p-8 pb-24 relative">
       
-      {/* Modals omitted for brevity, keeping existing exact code */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[99] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 sm:p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
@@ -422,6 +433,9 @@ export default function Profile() {
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-[var(--text-main)] flex items-center gap-2"><AtSign className="w-4 h-4 text-[#3B82F6]" /> Username</label>
                   <input type="text" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} disabled={hasExistingUsername} className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] outline-none focus:border-[#3B82F6] disabled:opacity-50" placeholder="choose_a_username" />
+                  {hasExistingUsername && (
+                    <p className="text-[10px] text-[var(--text-muted)] mt-1 font-medium">Usernames cannot be changed once set.</p>
+                  )}
                 </div>
 
                 <div className="space-y-2" ref={dropdownRef}>
@@ -459,6 +473,9 @@ export default function Profile() {
                       <button aria-label="Change Country" type="button" onClick={handleRequestCountryChange} disabled={isDetectingCountry} className="px-4 py-3.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] hover:border-[#3B82F6] hover:text-[#3B82F6] transition-colors disabled:opacity-50 flex items-center justify-center min-w-[90px]">
                         {isDetectingCountry ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
                       </button>
+                      <button type="button" onClick={() => setIsCountryLocked(false)} className="text-xs text-[var(--text-muted)] hover:text-[#3B82F6] font-bold underline px-2 whitespace-nowrap">
+                        Edit Manually
+                      </button>
                     </div>
                   ) : (
                     <select value={country} onChange={(e) => setCountry(e.target.value)} className="w-full px-4 py-3.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#3B82F6] transition-all cursor-pointer appearance-none" style={{backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundPosition: 'right 1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25em 1.25em'}}>
@@ -481,7 +498,15 @@ export default function Profile() {
           ) : (
             <div className="bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 sm:p-8 shadow-sm flex flex-col items-center text-center relative">
               
-              <div className="relative group mb-4">
+              <button
+                aria-label="Logout"
+                onClick={() => setShowLogoutConfirm(true)}
+                className="absolute top-6 right-6 p-2 text-[var(--text-muted)] hover:text-red-500 bg-[var(--background)] rounded-full border border-[var(--border-color)] shadow-sm transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+
+              <div className="relative group mb-4 mt-2">
                 <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[var(--background)] border-4 border-[var(--border-color)] overflow-hidden flex items-center justify-center shadow-sm">
                   {profile?.avatar_url ? (
                     <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover scale-110" />
@@ -502,7 +527,8 @@ export default function Profile() {
                 <span className="font-extrabold text-sm">🪙 {balanceCoins?.toLocaleString() || 0} zCoins</span>
                 <span className="bg-amber-500 text-white rounded-full p-0.5"><Plus className="w-3 h-3" /></span>
               </button>
-<div className="flex flex-wrap justify-center gap-2 mb-6">
+              
+              <div className="flex flex-wrap justify-center gap-2 mb-6">
                 {country && (
                   <span className="px-3 py-1 bg-[var(--background)] border border-[var(--border-color)] rounded-full text-xs font-bold flex items-center gap-1.5 text-[var(--text-main)]">
                     <MapPin className="w-3.5 h-3.5 text-[#3B82F6]" /> {country}
@@ -522,7 +548,6 @@ export default function Profile() {
                     <User className="w-3.5 h-3.5" /> {profile.gender}
                   </span>
                 )}
-
              
                 {creatorApprovalStatus === 'approved' && (
                   <span className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-xs font-bold flex items-center gap-1.5 text-indigo-500 shadow-sm">
@@ -565,9 +590,6 @@ export default function Profile() {
                 <button aria-label="Edit Profile" onClick={() => setIsEditing(true)} className="flex-1 py-3 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] hover:border-[var(--text-main)] transition-colors flex items-center justify-center gap-2 shadow-sm">
                   <Edit2 className="w-4 h-4" /> Edit
                 </button>
-                <button aria-label="Logout" onClick={() => setShowLogoutConfirm(true)} className="flex-1 py-3 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] hover:border-red-500 hover:text-red-500 transition-colors flex items-center justify-center gap-2 shadow-sm">
-                  <LogOut className="w-4 h-4" /> Logout
-                </button>
               </div>
             </div>
           )}
@@ -590,6 +612,7 @@ export default function Profile() {
                 { id: 'friends', icon: Users, label: 'My Friends' },
                 { id: 'requests', icon: UserPlus, label: 'Requests' },
                 { id: 'search', icon: Search, label: 'Find Friends' },
+                // { id: 'blocked', icon: Ban, label: 'Blocked' }, // Commented out as requested
               ].map(tab => (
                 <button aria-label="Tab Text"
                   key={tab.id}
@@ -614,6 +637,7 @@ export default function Profile() {
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
                   <input
+                    autoFocus
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
