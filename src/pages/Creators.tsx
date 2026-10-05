@@ -226,13 +226,31 @@ export default function Creators() {
         </motion.div>
       )}
 
-      {/* MODAL INTEGRATION */}
-      {/* 
-        <CreatorApplicationModal 
-          isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)} 
-        /> 
-      */}
+       {/* MODAL INTEGRATION (Placeholder to fix TS error) */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          >
+            <div className="bg-[var(--card)] p-8 rounded-[2rem] border border-[var(--border-color)] shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02)] max-w-md w-full text-center relative">
+              <Sparkles className="w-12 h-12 text-[#3B82F6] mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-[var(--text-main)] mb-2">Creator Application</h3>
+              <p className="text-[var(--text-muted)] mb-8">
+                Your custom application form component will load here!
+              </p>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="w-full py-4 bg-[#3B82F6] hover:bg-blue-600 text-white rounded-xl font-bold active:scale-95 transition-all shadow-md shadow-blue-500/20"
+              >
+                Close Placeholder
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
