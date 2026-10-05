@@ -9,6 +9,7 @@ export const CoinPurchaseModal: React.FC = () => {
     packages,
     buyCoinPackage,
     isProcessingPayment,
+    isLoadingPackages,
     balanceCoins,
   } = useWallet();
 
@@ -48,7 +49,11 @@ export const CoinPurchaseModal: React.FC = () => {
 
         {/* Package Selection */}
         <div className="flex flex-col gap-3">
-          {packages.length === 0 ? (
+          {isLoadingPackages ? (
+            <div className="p-8 flex items-center justify-center text-[var(--text-muted)]">
+              <Loader2 className="w-5 h-5 animate-spin" />
+            </div>
+          ) : packages.length === 0 ? (
             <div className="p-8 text-center text-sm font-medium text-[var(--text-muted)] bg-[var(--background)] border border-[var(--border-color)] border-dashed rounded-2xl">
               No coin packages available right now.
             </div>

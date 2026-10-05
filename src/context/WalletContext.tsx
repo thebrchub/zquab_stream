@@ -2,6 +2,43 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { apiClient } from '../api/client';
 import { useAuth } from './AuthContext';
 
+type RazorpayConstructor = new (options: Record<string, unknown>) => {
+  on: (event: 'payment.failed', handler: (response: { error: unknown }) => void) => void;
+  open: () => void;
+};
+
+const getRazorpay = () => (window as Window & { Razorpay?: RazorpayConstructor }).Razorpay;
+
+let razorpayScriptPromise: Promise<void> | null = null;
+
+const loadRazorpay = (): Promise<void> => {
+  if (getRazorpay()) return Promise.resolve();
+  if (razorpayScriptPromise) return razorpayScriptPromise;
+
+  razorpayScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => {
+      if (getRazorpay()) {
+        resolve();
+      } else {
+        razorpayScriptPromise = null;
+        script.remove();
+        reject(new Error('Razorpay checkout failed to initialize.'));
+      }
+    };
+    script.onerror = () => {
+      razorpayScriptPromise = null;
+      script.remove();
+      reject(new Error('Failed to load Razorpay checkout.'));
+    };
+    document.head.appendChild(script);
+  });
+
+  return razorpayScriptPromise;
+};
+
 export interface CoinPackage {
   id: number;
   coins: number;
@@ -23,6 +60,7 @@ interface WalletContextType {
   gifts: GiftItem[]; // 🚀 ADDED
   isPurchaseModalOpen: boolean;
   isProcessingPayment: boolean;
+  isLoadingPackages: boolean;
   openPurchaseModal: () => void;
   closePurchaseModal: () => void;
   buyCoinPackage: (pkg: CoinPackage) => Promise<void>;
@@ -34,32 +72,40 @@ const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const userId = user?.user_id;
+  const isGuest = user?.is_guest;
   const [balanceCoins, setBalanceCoins] = useState<number>(0);
   const [packages, setPackages] = useState<CoinPackage[]>([]);
   const [gifts, setGifts] = useState<GiftItem[]>([]); // 🚀 ADDED
+  const [isLoadingPackages, setIsLoadingPackages] = useState(false);
+  const [hasLoadedPackages, setHasLoadedPackages] = useState(false);
   
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const refreshBalance = useCallback(async () => {
-    if (!user || user.is_guest) return;
+    if (!userId || isGuest) return;
     try {
       const res = await apiClient.get('/wallet');
       setBalanceCoins(res.data.balance_coins);
     } catch (error) {
       console.error("Failed to fetch wallet balance:", error);
     }
-  }, [user]);
+  }, [userId, isGuest]);
 
   const fetchPackages = useCallback(async () => {
-    if (!user || user.is_guest) return;
+    if (!userId || isGuest || isLoadingPackages || hasLoadedPackages) return;
+    setIsLoadingPackages(true);
     try {
       const res = await apiClient.get('/wallet/packages');
       setPackages(res.data);
+      setHasLoadedPackages(true);
     } catch (error) {
       console.error("Failed to fetch coin packages:", error);
+    } finally {
+      setIsLoadingPackages(false);
     }
-  }, [user]);
+  }, [userId, isGuest, isLoadingPackages, hasLoadedPackages]);
 
   // 🚀 ADDED: Fetch the live gift catalog
   const fetchGifts = useCallback(async () => {
@@ -73,11 +119,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     refreshBalance();
-    fetchPackages();
     fetchGifts(); 
-  }, [refreshBalance, fetchPackages, fetchGifts]);
+  }, [refreshBalance, fetchGifts]);
 
-  const openPurchaseModal = () => setIsPurchaseModalOpen(true);
+  const openPurchaseModal = () => {
+    setIsPurchaseModalOpen(true);
+    void fetchPackages();
+  };
   const closePurchaseModal = () => setIsPurchaseModalOpen(false);
 
   const pollOrderStatus = async (internalOrderId: string): Promise<boolean> => {
@@ -99,6 +147,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsProcessingPayment(true);
 
     try {
+      await loadRazorpay();
       const { data: orderData } = await apiClient.post('/wallet/purchase', {
         package_id: pkg.id
       });
@@ -113,7 +162,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         theme: {
           color: "#3B82F6"
         },
-        handler: async function (_response: any) {
+        handler: async function () {
           const success = await pollOrderStatus(orderData.order_id);
           if (success) {
             await refreshBalance();
@@ -130,7 +179,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       };
 
-      const rzp = new (window as any).Razorpay(options);
+      const Razorpay = getRazorpay();
+      if (!Razorpay) throw new Error('Razorpay checkout failed to initialize.');
+      const rzp = new Razorpay(options);
       rzp.on('payment.failed', function (response: any) {
         console.error("Payment failed:", response.error);
         setIsProcessingPayment(false);
@@ -155,6 +206,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       gifts, // 🚀 ADDED
       isPurchaseModalOpen,
       isProcessingPayment,
+      isLoadingPackages,
       openPurchaseModal,
       closePurchaseModal,
       buyCoinPackage,

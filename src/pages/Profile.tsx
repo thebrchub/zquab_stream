@@ -18,6 +18,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
+import { CreatorApplicationModal } from '../components/studio/CreatorApplicationModal';
 
 const GENDER_OPTIONS = ['Prefer not to say', 'Male', 'Female', 'Other'];
 type Tab = 'friends' | 'requests' | 'search' | 'blocked';
@@ -371,35 +372,11 @@ export default function Profile() {
         </div>
       )}
 
-      {showCreatorModal && (
-        <div className="fixed inset-0 z-[99] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 sm:p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h3 className="text-2xl font-black text-[var(--text-main)] mb-1">Become a Creator</h3>
-                <p className="text-[var(--text-muted)] text-sm font-medium">Start streaming and earning zCoins.</p>
-              </div>
-              <button onClick={() => setShowCreatorModal(false)} className="p-2 bg-[var(--background)] rounded-full hover:bg-[var(--border-color)] transition-colors"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="space-y-5 mb-8">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-[var(--text-main)]">Primary Content Category</label>
-                <select value={creatorCategory} onChange={(e) => setCreatorCategory(e.target.value)} className="w-full px-4 py-3.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#4F46E5] transition-all cursor-pointer appearance-none" style={{backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundPosition: 'right 1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25em 1.25em'}}>
-                  {CREATOR_CATEGORIES.map(c => (<option key={c} value={c}>{c}</option>))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-[var(--text-main)]">Channel Headline</label>
-                <input type="text" maxLength={60} value={creatorHeadline} onChange={(e) => setCreatorHeadline(e.target.value)} className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] outline-none focus:border-[#4F46E5]" placeholder="e.g. Pro Valorant grinds & viewer games" />
-                <div className="text-right text-[10px] text-[var(--text-muted)] font-bold">{creatorHeadline.length}/60</div>
-              </div>
-            </div>
-            <button onClick={submitCreatorApplication} disabled={isSubmittingCreator || !creatorHeadline.trim()} className="w-full py-4 bg-[#4F46E5] text-white rounded-[1.25rem] font-bold flex items-center justify-center gap-2 transition-all duration-200 shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)] hover:brightness-110 active:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.4),inset_-2px_-2px_6px_rgba(255,255,255,0.1)] disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed">
-              {isSubmittingCreator ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Submit Application'}
-            </button>
-          </div>
-        </div>
-      )}
+      <CreatorApplicationModal 
+  isOpen={showCreatorModal} 
+  onClose={() => setShowCreatorModal(false)} 
+  username={username || 'creator'} 
+/>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 relative">
         <div className="lg:col-span-4 xl:col-span-4 lg:sticky lg:top-24 h-fit space-y-6">
