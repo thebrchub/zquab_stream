@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Loader2, MessageSquare, User, Search, Bell, Compass, LayoutDashboard, Menu, Info, FileText, Video } from 'lucide-react';
+import { Loader2, MessageSquare, User, Search, Bell, Compass, LayoutDashboard, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useRooms } from '../context/RoomsContext';
@@ -20,9 +20,10 @@ const getDismissedIds = (): number[] => {
 
 export default function Navbar() {
   const location = useLocation();
-  const isChatPage = location.pathname === '/chat';
+  // 🛠️ FIX: Use startsWith to catch /chat/text, /chat/video, etc.
+  const isChatRoute = location.pathname.startsWith('/chat');
   const isHomePage = location.pathname === '/home';
-  const isStaticPage = isChatPage || isHomePage;
+  const isStaticPage = isChatRoute || isHomePage;
   
   const { user, loginAsGuest, isLoading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
@@ -118,8 +119,8 @@ export default function Navbar() {
             <div className="pointer-events-auto hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 bg-[var(--card)] border border-[var(--border-color)] px-2 py-1.5 rounded-full shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.03),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] z-10">
               <Link to="/discover" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">Watch Live</Link>
               <Link to="/creators" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
-  Creators
-</Link>
+                Creators
+              </Link>
               <div className="w-px h-4 bg-[var(--border-color)] mx-2"></div>
               <Link to="/about" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">About</Link>
               <Link to="/blog" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">Blog</Link>
@@ -146,7 +147,6 @@ export default function Navbar() {
               </div>
 
               {/* PILL 2: Dynamic Shape-Shifting Menu */}
-              {/* PILL 2: Dynamic Shape-Shifting Menu */}
               {isAuthLoading ? (
                 <div className="w-[48px] h-[48px] sm:w-[54px] sm:h-[54px] bg-[var(--card)] border border-[var(--border-color)] animate-pulse rounded-full"></div>
               ) : (
@@ -157,7 +157,6 @@ export default function Navbar() {
                     </Link>
                   )}
 
-                  {/* INVISIBLE Wrapper: Holds exact layout space without duplicating visuals */}
                   {/* INVISIBLE Wrapper: Holds exact layout space without duplicating visuals */}
                   <div className={`relative ${!isFullUser ? 'lg:hidden' : 'flex'} items-center w-[48px] h-[48px] sm:w-[54px] sm:h-[54px] z-20`} ref={menuRef}>
                     
@@ -199,7 +198,6 @@ export default function Navbar() {
                             <div className="w-full flex flex-col pb-3 gap-1 px-2 lg:px-0 lg:items-center">
                               <div className="w-5 h-px bg-[var(--border-color)] opacity-50 mb-1 mx-auto lg:mx-0"></div>
                               
-                              {/* Tablet/Mobile specific links (hidden on desktop because center pill has them) */}
                               <Link to="/discover" onClick={()=>setIsMenuOpen(false)} className="flex lg:hidden items-center gap-3 px-3 py-2.5 rounded-xl text-[var(--text-main)] hover:bg-[var(--text-main)]/5">
                                 <span className="font-bold text-sm">Watch Live</span>
                               </Link>
@@ -212,7 +210,7 @@ export default function Navbar() {
                               
                               {isFullUser && <div className="h-px bg-[var(--border-color)] opacity-50 my-1 block lg:hidden"></div>}
 
-                              {/* Auth-only Links: Icon+Text on Tablet, Icon-only on Desktop */}
+                              {/* Auth-only Links */}
                               {isFullUser && (
                                 <>
                                   <Link to="/home" onClick={() => setIsMenuOpen(false)} className="relative flex lg:justify-center items-center gap-3 px-3 lg:px-0 lg:w-10 h-10 rounded-xl lg:rounded-full lg:hover:bg-[#4F46E5]/10 text-[var(--text-main)] lg:text-[var(--text-muted)] hover:bg-[var(--background)] hover:text-[#4F46E5]">
@@ -221,7 +219,7 @@ export default function Navbar() {
                                     {totalUnread > 0 && <span className="absolute top-2 right-2 lg:top-1.5 lg:right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-[var(--card)]"></span>}
                                   </Link>
                                   
-                                  <button onClick={() => { setIsMenuOpen(false); setIsNotificationsOpen(true); }} className="relative flex lg:justify-center items-center gap-3 px-3 lg:px-0 lg:w-10 h-10 rounded-xl lg:rounded-full lg:hover:bg-amber-500/10 text-[var(--text-main)] lg:text-[var(--text-muted)] hover:bg-[var(--background)] hover:text-amber-500">
+                                  <button onClick={() => { setIsMenuOpen(false); setIsNotificationsOpen(true); }} className="relative flex lg:justify-center items-center gap-3 px-3 lg:px-0 lg:w-10 h-10 rounded-xl lg:rounded-full lg:hover:bg-amber-500/10 text-[var(--text-main)] lg:text-[var(--text-muted)] hover:bg-[var(--background)] hover:text-amber-500  ">
                                     <Bell className="w-[18px] h-[18px]" strokeWidth={2.5} />
                                     <span className="font-bold text-sm block lg:hidden">Notifications</span>
                                     {unreadRequestsCount > 0 && <span className="absolute top-2 right-2 lg:top-1.5 lg:right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-[var(--card)]"></span>}
@@ -239,14 +237,19 @@ export default function Navbar() {
                       </AnimatePresence>
                     </motion.div>
 
-                    <NotificationsDropdown 
-                      isOpen={isNotificationsOpen}
-                      onClose={() => setIsNotificationsOpen(false)}
-                      friendRequests={friendRequests}
-                      setFriendRequests={setFriendRequests}
-                      isLoadingRequests={isLoadingRequests}
-                      isFullUser={isFullUser}
-                    />
+                    {/* 🛠️ FIX: Wrapped Notification Dropdown to force it below the navbar */}
+                    <div className="absolute top-full right-0 pt-3 md:pt-4 pointer-events-none w-0 h-0">
+                      <div className="pointer-events-auto">
+                        <NotificationsDropdown 
+                          isOpen={isNotificationsOpen}
+                          onClose={() => setIsNotificationsOpen(false)}
+                          friendRequests={friendRequests}
+                          setFriendRequests={setFriendRequests}
+                          isLoadingRequests={isLoadingRequests}
+                          isFullUser={isFullUser}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </>
               )}
@@ -256,49 +259,52 @@ export default function Navbar() {
       </nav>
 
       {/* --- EXTENDED NATIVE APP BOTTOM BAR (Visible <1024px) --- */}
-      <div className="lg:hidden fixed bottom-0 left-0 w-full z-50 bg-[var(--card)]/90 backdrop-blur-xl border-t border-[var(--border-color)] pb-[env(safe-area-inset-bottom)]">
-        <div className="flex items-center justify-around px-2 py-2 relative">
-          
-          <Link to="/discover" className={`flex flex-col items-center gap-1 p-2 transition-colors ${isActive('/discover') ? 'text-[#4F46E5]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
-            <Compass className="w-6 h-6" strokeWidth={isActive('/discover') ? 2.5 : 2} />
-            <span className="text-[9px] font-bold tracking-wide">Live</span>
-          </Link>
-          
-          <Link to="/search" className={`flex flex-col items-center gap-1 p-2 transition-colors ${isActive('/search') ? 'text-[#4F46E5]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
-            <Search className="w-6 h-6" strokeWidth={isActive('/search') ? 2.5 : 2} />
-            <span className="text-[9px] font-bold tracking-wide">Search</span>
-          </Link>
+      {/* 🛠️ FIX: Hides completely when inside a chat route */}
+      {!isChatRoute && (
+        <div className="lg:hidden fixed bottom-0 left-0 w-full z-50 bg-[var(--card)]/90 backdrop-blur-xl border-t border-[var(--border-color)] pb-[env(safe-area-inset-bottom)]">
+          <div className="flex items-center justify-around px-2 py-2 relative">
+            
+            <Link to="/discover" className={`flex flex-col items-center gap-1 p-2 transition-colors ${isActive('/discover') ? 'text-[#4F46E5]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
+              <Compass className="w-6 h-6" strokeWidth={isActive('/discover') ? 2.5 : 2} />
+              <span className="text-[9px] font-bold tracking-wide">Live</span>
+            </Link>
+            
+            <Link to="/search" className={`flex flex-col items-center gap-1 p-2 transition-colors ${isActive('/search') ? 'text-[#4F46E5]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
+              <Search className="w-6 h-6" strokeWidth={isActive('/search') ? 2.5 : 2} />
+              <span className="text-[9px] font-bold tracking-wide">Search</span>
+            </Link>
 
-          <div className="relative -top-5 px-2">
-            <button
-              onClick={handleStartChatting}
-              disabled={isConnecting}
-              className="flex items-center justify-center w-14 h-14 bg-[#4F46E5] text-white rounded-full shadow-[0_8px_16px_rgba(79,70,229,0.4)] border-4 border-[var(--background)] transition-transform active:scale-95 disabled:opacity-70"
-            >
-              {isConnecting ? <Loader2 className="w-6 h-6 animate-spin" /> : <MessageSquare className="w-6 h-6" fill="currentColor" />}
-            </button>
+            <div className="relative -top-5 px-2">
+              <button
+                onClick={handleStartChatting}
+                disabled={isConnecting}
+                className="flex items-center justify-center w-14 h-14 bg-[#4F46E5] text-white rounded-full shadow-[0_8px_16px_rgba(79,70,229,0.4)] border-4 border-[var(--background)] transition-transform active:scale-95 disabled:opacity-70"
+              >
+                {isConnecting ? <Loader2 className="w-6 h-6 animate-spin" /> : <MessageSquare className="w-6 h-6" fill="currentColor" />}
+              </button>
+            </div>
+
+            <Link to="/home" className={`relative flex flex-col items-center gap-1 p-2 transition-colors ${isActive('/home') ? 'text-[#4F46E5]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
+              <LayoutDashboard className="w-6 h-6" strokeWidth={isActive('/home') ? 2.5 : 2} />
+              <span className="text-[9px] font-bold tracking-wide">Inbox</span>
+              {totalUnread > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[var(--card)]"></span>}
+            </Link>
+
+            {isFullUser ? (
+               <Link to="/profile" className={`flex flex-col items-center gap-1 p-2 transition-colors ${isActive('/profile') ? 'text-[#4F46E5]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
+                 <User className="w-6 h-6" strokeWidth={isActive('/profile') ? 2.5 : 2} />
+                 <span className="text-[9px] font-bold tracking-wide">Profile</span>
+               </Link>
+            ) : (
+               <Link to="/auth" className={`flex flex-col items-center gap-1 p-2 transition-colors ${isActive('/auth') ? 'text-[#4F46E5]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
+                 <User className="w-6 h-6" strokeWidth={2} />
+                 <span className="text-[9px] font-bold tracking-wide">Log In</span>
+               </Link>
+            )}
+
           </div>
-
-          <Link to="/home" className={`relative flex flex-col items-center gap-1 p-2 transition-colors ${isActive('/home') ? 'text-[#4F46E5]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
-            <LayoutDashboard className="w-6 h-6" strokeWidth={isActive('/home') ? 2.5 : 2} />
-            <span className="text-[9px] font-bold tracking-wide">Inbox</span>
-            {totalUnread > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[var(--card)]"></span>}
-          </Link>
-
-          {isFullUser ? (
-             <Link to="/profile" className={`flex flex-col items-center gap-1 p-2 transition-colors ${isActive('/profile') ? 'text-[#4F46E5]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
-               <User className="w-6 h-6" strokeWidth={isActive('/profile') ? 2.5 : 2} />
-               <span className="text-[9px] font-bold tracking-wide">Profile</span>
-             </Link>
-          ) : (
-             <Link to="/auth" className={`flex flex-col items-center gap-1 p-2 transition-colors ${isActive('/auth') ? 'text-[#4F46E5]' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
-               <User className="w-6 h-6" strokeWidth={2} />
-               <span className="text-[9px] font-bold tracking-wide">Log In</span>
-             </Link>
-          )}
-
         </div>
-      </div>
+      )}
     </>
   );
 }

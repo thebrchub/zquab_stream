@@ -34,7 +34,6 @@ export default function ChatInput({
 
   const STORAGE_CDN_BASE_URL = import.meta.env.VITE_STORAGE_CDN_BASE_URL ?? 'https://cdn.zquab.com/';
 
-  // 🛠️ NEW: Auto-focus the input field when a user swipes to reply
   useEffect(() => {
     if (replyingTo && textareaRef.current) {
       textareaRef.current.focus();
@@ -80,7 +79,6 @@ export default function ChatInput({
   return (
     <div className="bg-[var(--card)] border-t border-[var(--border-color)] flex flex-col w-full relative z-20">
       
-      {/* 🛠️ NEW: The Glassmorphic Reply Preview Block */}
       <AnimatePresence>
         {replyingTo && (
           <motion.div
@@ -101,19 +99,18 @@ export default function ChatInput({
                   </p>
                 </div>
               </div>
-              {/* 🛠️ THE FIX: Force the textarea to lose focus (blur) to close the keyboard before cancelling */}
-<button 
-  aria-label="Cancel Reply" 
-  onClick={() => {
-    if (textareaRef.current) {
-      textareaRef.current.blur();
-    }
-    if (onCancelReply) onCancelReply();
-  }} 
-  className="p-2 bg-[var(--card)] hover:bg-[var(--border-color)] border border-[var(--border-color)] rounded-full text-[var(--text-muted)] transition-colors"
->
-  <X className="w-4 h-4" />
-</button>
+              <button 
+                aria-label="Cancel Reply" 
+                onClick={() => {
+                  if (textareaRef.current) {
+                    textareaRef.current.blur();
+                  }
+                  if (onCancelReply) onCancelReply();
+                }} 
+                className="p-2 bg-[var(--card)] hover:bg-[var(--border-color)] border border-[var(--border-color)] rounded-full text-[var(--text-muted)] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </motion.div>
         )}
@@ -152,7 +149,6 @@ export default function ChatInput({
             <div className="p-4 sm:p-6">
               
               <div className="flex justify-between items-center mb-3">
-                {/* 🛠️ Accessibility Fix: Changed h4 to p */}
                 <p className="font-bold text-[var(--text-main)]">Attachments</p>
                 <button aria-label="Close" onClick={() => setShowDrawer(false)} className="text-[var(--text-muted)] hover:text-[var(--text-main)] bg-[var(--card)] p-1 rounded-full border border-[var(--border-color)]">
                   <X className="w-4 h-4" />
@@ -206,7 +202,8 @@ export default function ChatInput({
           </button>
         )}
 
-        <div className="flex-1 flex items-end gap-1 sm:gap-2 bg-[var(--background)] border border-[var(--border-color)] focus-within:border-[#3B82F6] focus-within:ring-1 focus-within:ring-[#3B82F6] rounded-[24px] sm:rounded-[28px] px-1.5 sm:px-2 py-1 transition-all">
+        {/* 🛠️ FIX #1: Added clay inset shadows to text area pill */}
+        <div className="flex-1 flex items-end gap-1 sm:gap-2 bg-[var(--background)] border border-[var(--border-color)] focus-within:border-[#3B82F6] focus-within:ring-1 focus-within:ring-[#3B82F6] rounded-[24px] sm:rounded-[28px] px-1.5 sm:px-2 py-1 transition-all shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2),inset_-2px_-2px_4px_rgba(255,255,255,0.02)]">
           <button aria-label="Show Emoji"
             onClick={() => {
               setShowEmoji(!showEmoji);
@@ -233,12 +230,12 @@ export default function ChatInput({
           />
         </div>
         
+        {/* 🛠️ FIX #1: Upgraded Send Button to match global Claymorphism logic */}
         <button aria-label="Send"
           onClick={handleSend}
           disabled={!text.trim() || disabled}
-          className="w-11 h-11 sm:w-[50px] sm:h-[50px] flex items-center justify-center flex-shrink-0 mb-[1px] sm:mb-[2px] bg-[#3B82F6] text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:hover:bg-[#3B82F6] transition-all transform active:scale-95 shadow-md"
+          className="w-11 h-11 sm:w-[50px] sm:h-[50px] flex items-center justify-center flex-shrink-0 mb-[1px] sm:mb-[2px] bg-[#3B82F6] text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:hover:bg-[#3B82F6] transition-all transform active:scale-95 shadow-[4px_4px_8px_rgba(0,0,0,0.4),-1px_-1px_4px_rgba(255,255,255,0.05),inset_1px_1px_2px_rgba(255,255,255,0.3),inset_-1px_-1px_2px_rgba(0,0,0,0.4)] disabled:shadow-none"
         >
-          {/* 🛠️ THE FIX: Removed margin right and added optical centering trick */}
           <Send className="w-5 h-5 sm:w-6 sm:h-6 relative -left-[1px] top-[1px]" />
         </button>
 

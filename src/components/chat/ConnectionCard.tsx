@@ -45,7 +45,8 @@ export default function ConnectionCard({
   };
 
   return (
-    <div className="glass rounded-2xl flex flex-col h-full border border-[var(--border-color)] shadow-sm bg-[var(--card)] relative overflow-hidden">
+    
+    <div className="rounded-[2rem] flex flex-col h-full border border-[var(--border-color)] bg-[var(--card)] relative overflow-hidden shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.03),inset_-1px_-1px_2px_rgba(0,0,0,0.08)]">
       
       {/* 1. INLINE CONFIRMATION OVERLAY FOR ADD FRIEND */}
       {showAddConfirm && (
@@ -105,7 +106,6 @@ export default function ConnectionCard({
         </div>
       )}
 
-      {/* 🛠️ THE FIX: Aggressively forces width and height to 0 so iOS/macOS can't render the overlay */}
       <div className="p-6 flex flex-col h-full overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:!hidden [&::-webkit-scrollbar]:!w-0 [&::-webkit-scrollbar]:!h-0 [-ms-overflow-style:none] [scrollbar-width:none]">
         
         {/* STATUS HEADER */}
@@ -140,7 +140,7 @@ export default function ConnectionCard({
           
           {/* UNIFIED STRANGER WARNING BLOCK */}
           {status === 'connected' && (
-            <div className="bg-[var(--background)]/50 py-6 px-4 rounded-3xl border border-[var(--border-color)] border-dashed flex flex-col items-center justify-center text-center relative">
+            <div className="bg-[var(--background)]/50 py-6 px-4 rounded-[1.5rem] border border-[var(--border-color)] border-dashed flex flex-col items-center justify-center text-center relative shadow-[inset_1px_1px_4px_rgba(0,0,0,0.1)]">
               <div className="relative mb-3">
                 <div className="w-20 h-20 bg-indigo-500/10 border-2 border-indigo-500/20 rounded-full flex items-center justify-center shadow-sm overflow-hidden transition-colors">
                   <User className="w-10 h-10 text-indigo-500" />
@@ -170,79 +170,8 @@ export default function ConnectionCard({
             </div>
           )}
 
-          {/* 🛠️ COMMENTED OUT FOR FUTURE SCALING: REGISTERED USER PROFILE */}
-          {/*
-          {status === 'connected' && partnerUsername && (
-            <div className="bg-[var(--background)]/50 p-6 rounded-3xl border border-[var(--border-color)] flex flex-col items-center justify-center text-center relative">
-              <div className="relative mb-3">
-                <div className="w-20 h-20 bg-indigo-500/10 border-2 border-indigo-500/20 rounded-full flex items-center justify-center shadow-sm overflow-hidden">
-                  {partnerAvatar ? (
-                    <img src={partnerAvatar} alt={partnerUsername} className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-10 h-10 text-indigo-500" />
-                  )}
-                </div>
-
-                {!isAlreadyFriend && friendRequestStatus === 'none' ? (
-                  <button 
-                    onClick={() => setShowAddConfirm(true)}
-                    className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#3B82F6] hover:bg-blue-600 text-white flex items-center justify-center transition-transform active:scale-95 shadow-md border-[3px] border-[var(--background)]"
-                    aria-label="Add Friend"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                ) : friendRequestStatus === 'loading' ? (
-                  <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[var(--card)] border-[3px] border-[var(--background)] flex items-center justify-center shadow-md">
-                    <Loader2 className="w-4 h-4 animate-spin text-[#3B82F6]" />
-                  </div>
-                ) : (
-                  <div className={`absolute bottom-0 right-0 w-8 h-8 rounded-full ${isAlreadyFriend ? 'bg-emerald-500' : 'bg-green-500'} text-white flex items-center justify-center shadow-md border-[3px] border-[var(--background)]`}>
-                    <Check className="w-4 h-4" />
-                  </div>
-                )}
-              </div>
-              
-              <a 
-                href={`/user/${partnerUsername}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-black text-[var(--text-main)] hover:text-[#3B82F6] hover:underline transition-colors text-xl leading-tight mb-1"
-                title={`View @${partnerUsername}'s profile in a new tab`}
-              >
-                @{partnerUsername}
-              </a>
-              <span className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold">
-                {isAlreadyFriend ? 'Already Friends' : (partnerGender || 'Verified User')}
-              </span>
-            </div>
-          )}
-          */}
-
-          {/* 🛠️ COMMENTED OUT FOR FUTURE SCALING: ANONYMOUS PROFILE PLACEHOLDER */}
-          {/*
-          {status === 'connected' && !partnerUsername && (
-            <div className="bg-[var(--background)]/50 py-6 px-4 rounded-3xl border border-[var(--border-color)] border-dashed flex flex-col items-center justify-center text-center relative">
-              <button aria-label="Help" type="button" className="relative mb-3 group focus:outline-none">
-                <div className="w-20 h-20 bg-gray-500/10 border-2 border-gray-500/20 rounded-full flex items-center justify-center shadow-sm transition-colors group-hover:border-gray-500/40 group-focus:border-gray-500/40">
-                  <HelpCircle className="w-10 h-10 text-gray-500" />
-                </div>
-                <div className="absolute -top-12 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-200 pointer-events-none z-20">
-                  <div className="bg-[var(--text-main)] text-[var(--background)] text-xs font-bold px-3 py-2 rounded-xl shadow-xl whitespace-nowrap">
-                    No account created
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-[var(--text-main)]"></div>
-                  </div>
-                </div>
-              </button>
-              <span className="font-black text-[var(--text-main)] text-xl leading-tight mb-1">Anonymous</span>
-              <span className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold">
-                Guest User
-              </span>
-            </div>
-          )}
-          */}
-
           {/* LOCATIONS */}
-          <div className="flex items-center justify-between rounded-2xl border border-[var(--border-color)] bg-[var(--background)]/50 p-4">
+          <div className="flex items-center justify-between rounded-[1.5rem] border border-[var(--border-color)] bg-[var(--background)]/50 p-4 shadow-[inset_1px_1px_4px_rgba(0,0,0,0.1)]">
             <div className="flex-1 flex flex-col items-center group relative cursor-help">
               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">You</span>
               {userCountry?.code ? (
@@ -272,11 +201,11 @@ export default function ConnectionCard({
             </div>
           </div>
 
-          {/* BUTTONS */}
+          {/* BUTTONS: Upgraded to claymorphism shadow logic */}
           <button aria-label="Next Stranger"
-            onClick={handleNextClick} 
-            className="w-full flex items-center justify-center gap-2 bg-[var(--background)] hover:bg-[var(--border-color)] border border-[var(--border-color)] text-[var(--text-main)] py-4 rounded-xl font-bold transition-all active:scale-[0.98] mt-2"
-          >
+  onClick={handleNextClick} 
+  className="w-full flex items-center justify-center gap-2 bg-[var(--background)] hover:bg-[var(--border-color)] border border-[var(--border-color)] text-[var(--text-main)] py-4 rounded-xl font-bold transition-all active:scale-[0.98] mt-2 shadow-[2px_2px_8px_rgba(0,0,0,0.15),inset_1px_1px_2px_rgba(255,255,255,0.02)] hover:shadow-none"
+>
             <UserPlus className="w-5 h-5" />
             Next Stranger
           </button>

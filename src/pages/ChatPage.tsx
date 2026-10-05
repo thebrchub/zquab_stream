@@ -382,7 +382,6 @@ export default function ChatPage() {
     }]);
 
     if (!isDev) {
-      // 🛠️ THE FIX: Added replyingTo?.id to pass to your ChatClient
       (chatClient as any)?.sendChatMessage(text, replyingTo?.id);
     }
     
@@ -590,7 +589,11 @@ export default function ChatPage() {
       path="/chat"
     />
         
-    <div className="w-full flex flex-col overflow-hidden fixed top-[64px] inset-x-0 bottom-0 z-40 md:relative md:top-auto md:inset-auto md:z-auto md:max-w-7xl md:mx-auto md:flex-row md:gap-6 md:p-6 md:h-[calc(100dvh-82px)]">
+    {/* 🛠️ FIX #2 & #3: Responsive Wrapper updated. 
+        - Mobile: Stops right above the bottom nav (bottom-[calc(64px+env(...))])
+        - Tablet/Desktop: Pushed the side-by-side break point from md to lg (1024px) 
+    */}
+    <div className="w-full flex flex-col overflow-hidden fixed top-[64px] inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-40 lg:relative lg:top-auto lg:inset-auto lg:z-auto lg:max-w-7xl lg:mx-auto lg:flex-row lg:gap-6 lg:p-6 lg:h-[calc(100dvh-82px)]">
       
       <AnimatePresence>
         {viewingImage && (
@@ -621,6 +624,7 @@ export default function ChatPage() {
         )}
       </AnimatePresence>
 
+      {/* DEV PILL UNTOUCHED */}
       {isDev && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 backdrop-blur-md px-4 py-2 rounded-full shadow-lg">
           <span className="text-xs font-bold text-purple-400 uppercase tracking-wider mr-2">Dev</span>
@@ -642,7 +646,7 @@ export default function ChatPage() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-[var(--card)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full shadow-2xl relative"
+              className="bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 max-w-sm w-full shadow-2xl relative"
             >
               <button aria-label="Close"
                 onClick={() => setShowAuthWarning(false)}
@@ -733,7 +737,7 @@ export default function ChatPage() {
       <AnimatePresence>
         {showMobileNextConfirm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[102] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-[var(--card)] p-6 md:p-8 rounded-[2rem] w-full max-w-sm border border-[var(--border-color)] shadow-2xl text-center">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-[var(--card)] p-6 md:p-8 rounded-[2rem] w-full max-w-sm border border-[var(--border-color)] shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.03),inset_-1px_-1px_2px_rgba(0,0,0,0.08)] text-center">
               <div className="w-16 h-16 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto mb-6 ring-1 ring-inset ring-orange-500/20">
                 <AlertTriangle className="w-8 h-8" />
               </div>
@@ -757,7 +761,7 @@ export default function ChatPage() {
       <AnimatePresence>
         {showLeaveConfirm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[102] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-[var(--card)] p-6 md:p-8 rounded-[2rem] w-full max-w-sm border border-[var(--border-color)] shadow-2xl text-center">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-[var(--card)] p-6 md:p-8 rounded-[2rem] w-full max-w-sm border border-[var(--border-color)] shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.03),inset_-1px_-1px_2px_rgba(0,0,0,0.08)] text-center">
               <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-6 ring-1 ring-inset ring-red-500/20">
                 <LogOut className="w-8 h-8" />
               </div>
@@ -791,7 +795,7 @@ export default function ChatPage() {
               initial={{ scale: 0.95, y: 20, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.95, y: 20, opacity: 0 }}
-              className="bg-[var(--card)] p-6 md:p-8 rounded-[2rem] w-full max-w-md border border-[var(--border-color)] shadow-2xl text-center relative overflow-hidden"
+              className="bg-[var(--card)] p-6 md:p-8 rounded-[2rem] w-full max-w-md border border-[var(--border-color)] shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.03),inset_-1px_-1px_2px_rgba(0,0,0,0.08)] text-center relative overflow-hidden"
             >
               <h3 className="text-3xl font-black text-[var(--text-main)] mb-2 tracking-tight mt-2">
                 Welcome to zQuab!
@@ -801,7 +805,7 @@ export default function ChatPage() {
               </p>
 
               <div className="space-y-4 text-left mb-6">
-                <div className="flex items-start gap-4 p-4 bg-[var(--background)] rounded-xl border border-[var(--border-color)]">
+                <div className="flex items-start gap-4 p-4 bg-[var(--background)] rounded-xl border border-[var(--border-color)] shadow-sm">
                   <div className="bg-green-500/10 p-2.5 rounded-lg mt-0.5">
                     <Users className="w-5 h-5 text-green-500" />
                   </div>
@@ -811,7 +815,7 @@ export default function ChatPage() {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-4 p-4 bg-[var(--background)] rounded-xl border border-[var(--border-color)]">
+                <div className="flex items-start gap-4 p-4 bg-[var(--background)] rounded-xl border border-[var(--border-color)] shadow-sm">
                   <div className="bg-purple-500/10 p-2.5 rounded-lg mt-0.5">
                     <Star className="w-5 h-5 text-purple-500" />
                   </div>
@@ -831,7 +835,7 @@ export default function ChatPage() {
 
               <button aria-label="Start Chat"
                 onClick={() => setShowWelcomeModal(false)}
-                className="w-full py-4 bg-[#3B82F6] hover:bg-blue-600 active:scale-95 text-white rounded-xl font-bold transition-all"
+                className="w-full py-4 bg-[#3B82F6] hover:bg-blue-600 active:scale-95 text-white rounded-xl font-bold transition-all shadow-md shadow-blue-500/20"
               >
                 Let's Start Chatting
               </button>
@@ -855,7 +859,7 @@ export default function ChatPage() {
               initial={{ scale: 0.95, y: 20, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.95, y: 20, opacity: 0 }}
-              className="bg-[var(--card)] p-6 md:p-8 rounded-[2rem] w-full max-w-xl border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[90vh]"
+              className="bg-[var(--card)] p-6 md:p-8 rounded-[2rem] w-full max-w-xl border border-[var(--border-color)] shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.03),inset_-1px_-1px_2px_rgba(0,0,0,0.08)] flex flex-col max-h-[90vh]"
             >
               <h3 className="text-3xl font-bold text-[var(--text-main)] text-center tracking-tight">
                 Community Guidelines
@@ -969,7 +973,7 @@ export default function ChatPage() {
               <button aria-label="Confirmation"
                 onClick={handleAcceptRules}
                 disabled={!rulesAgreed}
-                className="w-full py-4 bg-[#3B82F6] text-white rounded-xl font-bold disabled:opacity-50 transition-opacity"
+                className="w-full py-4 bg-[#3B82F6] text-white rounded-xl font-bold disabled:opacity-50 transition-opacity shadow-md shadow-blue-500/20"
               >
                 I Understand & Agree
               </button>
@@ -983,7 +987,7 @@ export default function ChatPage() {
       <AnimatePresence>
         {showLoginPrompt && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-[var(--card)] p-6 md:p-8 rounded-[2rem] w-full max-w-sm border border-[var(--border-color)] shadow-2xl text-center">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-[var(--card)] p-6 md:p-8 rounded-[2rem] w-full max-w-sm border border-[var(--border-color)] shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.03),inset_-1px_-1px_2px_rgba(0,0,0,0.08)] text-center">
               <div className="w-16 h-16 rounded-full bg-blue-500/10 text-[#3B82F6] flex items-center justify-center mx-auto mb-6">
                 <ShieldAlert className="w-8 h-8" />
               </div>
@@ -997,7 +1001,7 @@ export default function ChatPage() {
                   } else {
                     navigate('/auth');
                   }
-                }} className="w-full py-4 bg-[#3B82F6] text-white rounded-xl font-bold">Log In / Sign Up</button>
+                }} className="w-full py-4 bg-[#3B82F6] text-white rounded-xl font-bold shadow-md shadow-blue-500/20">Log In / Sign Up</button>
                 <button aria-label="Show Login" onClick={() => setShowLoginPrompt(false)} className="w-full py-4 bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] rounded-xl font-bold">Maybe Later</button>
               </div>
             </motion.div>
@@ -1005,22 +1009,23 @@ export default function ChatPage() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 flex flex-col bg-[var(--background)] md:bg-[var(--card)] md:rounded-2xl md:border md:border-[var(--border-color)] overflow-hidden relative">
-        <div className="p-3 md:p-4 border-b border-[var(--border-color)] bg-[var(--card)]/80 backdrop-blur-md flex-shrink-0 flex justify-between items-center z-20">
+      {/* 🛠️ FIX #1 & #3: Claymorphism integration + iPad breakpoint shifted to lg */}
+      <div className="flex-1 flex flex-col bg-[var(--background)] lg:bg-[var(--card)] lg:rounded-[2rem] lg:border lg:border-[var(--border-color)] lg:shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.03),inset_-1px_-1px_2px_rgba(0,0,0,0.08)] overflow-hidden relative">
+        <div className="p-3 lg:p-4 border-b border-[var(--border-color)] bg-[var(--card)]/80 backdrop-blur-md flex-shrink-0 flex justify-between items-center z-20">
           
           <div className="flex items-center gap-3">
-            <h2 className="hidden md:block font-bold text-lg text-[var(--text-main)]">Anonymous Chat</h2>
+            <h2 className="hidden lg:block font-bold text-lg text-[var(--text-main)]">Anonymous Chat</h2>
             
-            <div className="md:hidden flex items-center gap-2">
+            <div className="lg:hidden flex items-center gap-2">
               {status === 'idle' && <><div className="w-2.5 h-2.5 rounded-full bg-zinc-400" /> <span className="text-sm font-semibold text-zinc-400">Waiting</span></>}
               {status === 'searching' && <><div className="w-2.5 h-2.5 rounded-full bg-[#3B82F6] animate-ping" /> <span className="text-sm font-semibold text-[#3B82F6]">Searching</span></>}
               {status === 'connected' && <><div className="w-2.5 h-2.5 rounded-full bg-green-500" /> <span className="text-sm font-semibold text-green-500">Connected</span></>}
             </div>
           </div>
 
-          <div className="flex md:hidden items-center gap-1.5">
+          <div className="flex lg:hidden items-center gap-1.5">
             {status !== 'idle' && (
-              <button aria-label="Mobile Next" onClick={handleMobileNextClick} className="bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-1.5">
+              <button aria-label="Mobile Next" onClick={handleMobileNextClick} className="bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-sm">
                 <UserPlus className="w-4 h-4" /> Next
               </button>
             )}
@@ -1094,7 +1099,7 @@ export default function ChatPage() {
               <button 
                 aria-label="Scroll to bottom" 
                 onClick={scrollToBottom} 
-                className="w-10 h-10 bg-[var(--card)]/90 backdrop-blur-md border border-[var(--border-color)] rounded-full flex items-center justify-center shadow-xl text-[var(--text-muted)] hover:text-[#3B82F6] transition-all active:scale-95"
+                className="w-10 h-10 bg-[var(--card)]/90 backdrop-blur-md border border-[var(--border-color)] rounded-full flex items-center justify-center shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02)] text-[var(--text-muted)] hover:text-[#3B82F6] transition-all active:scale-95"
               >
                 <ChevronDown className="w-5 h-5" />
               </button>
@@ -1110,7 +1115,7 @@ export default function ChatPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-20 md:bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm glass rounded-xl border border-[var(--border-color)] shadow-xl p-4 z-30"
+              className="absolute bottom-20 lg:bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm glass rounded-[1.5rem] border border-[var(--border-color)] shadow-xl p-4 z-30"
             >
               <p className="text-sm font-medium text-[var(--text-main)] mb-3 flex items-center gap-2">
                 <Image className="w-4 h-4 text-[#3B82F6]" /> Stranger wants to see a photo of you.
@@ -1140,7 +1145,8 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div className="hidden md:block w-80 h-full flex-shrink-0">
+      {/* 🛠️ FIX #3: Connection Card sidebar breakpoint shifted to lg */}
+      <div className="hidden lg:block w-80 h-full flex-shrink-0">
         <ConnectionCard 
           status={status} 
           onNext={handleNext} 
