@@ -117,7 +117,9 @@ export default function Navbar() {
             {/* Desktop Center Pill */}
             <div className="pointer-events-auto hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 bg-[var(--card)] border border-[var(--border-color)] px-2 py-1.5 rounded-full shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.03),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] z-10">
               <Link to="/discover" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">Watch Live</Link>
-              <Link to="/chat" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">Stranger Chat</Link>
+              <Link to="/creators" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
+  Creators
+</Link>
               <div className="w-px h-4 bg-[var(--border-color)] mx-2"></div>
               <Link to="/about" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">About</Link>
               <Link to="/blog" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">Blog</Link>
@@ -150,7 +152,7 @@ export default function Navbar() {
               ) : (
                 <>
                   {!isFullUser && (
-                    <Link to="/auth" className="px-4 py-2 text-sm font-bold text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-colors mr-1 bg-[var(--card)] border border-[var(--border-color)] shadow-sm">
+                    <Link to="/auth" className="px-5 py-2.5 text-sm font-bold text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-colors mr-1 sm:mr-2 bg-[var(--card)] border border-[var(--border-color)] shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.03),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] active:scale-95 flex items-center justify-center">
                       Log in
                     </Link>
                   )}
@@ -219,7 +221,7 @@ export default function Navbar() {
                                     {totalUnread > 0 && <span className="absolute top-2 right-2 lg:top-1.5 lg:right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-[var(--card)]"></span>}
                                   </Link>
                                   
-                                  <button onClick={() => { setIsMenuOpen(false); setIsNotificationsOpen(true); }} className="relative flex lg:justify-center items-center gap-3 px-3 lg:px-0 lg:w-10 h-10 rounded-xl lg:rounded-full lg:hover:bg-amber-500/10 text-[var(--text-main)] lg:text-[var(--text-muted)] hover:bg-[var(--background)] hover:text-amber-500 w-full lg:w-auto">
+                                  <button onClick={() => { setIsMenuOpen(false); setIsNotificationsOpen(true); }} className="relative flex lg:justify-center items-center gap-3 px-3 lg:px-0 lg:w-10 h-10 rounded-xl lg:rounded-full lg:hover:bg-amber-500/10 text-[var(--text-main)] lg:text-[var(--text-muted)] hover:bg-[var(--background)] hover:text-amber-500">
                                     <Bell className="w-[18px] h-[18px]" strokeWidth={2.5} />
                                     <span className="font-bold text-sm block lg:hidden">Notifications</span>
                                     {unreadRequestsCount > 0 && <span className="absolute top-2 right-2 lg:top-1.5 lg:right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-[var(--card)]"></span>}

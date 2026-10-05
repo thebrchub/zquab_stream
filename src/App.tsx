@@ -25,6 +25,7 @@ const Privacy = lazy(() => import('./pages/Privacy'));
 const Safety = lazy(() => import('./pages/Safety'));
 const About = lazy(() => import('./pages/About'));
 const Contact = lazy(() => import('./pages/Contact'));
+const Creators = lazy(() => import('./pages/Creators')); // <-- ADDED: Creators Page
 
 // Protected App Pages
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
@@ -190,6 +191,7 @@ function App() {
                 <Route path="/about" element={<About />} />
                 <Route path="/blog" element={<BlogPage />} />
                 <Route element={<BlogPost />} path="/blog/:slug" />
+                <Route path="/creators" element={<Creators />} /> {/* <-- ADDED: Creators Route */}
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/safety" element={<Safety />} />
