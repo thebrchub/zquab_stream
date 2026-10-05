@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import  { useState } from 'react';
 import { Loader2, X, CheckCircle2, Copy, ShieldCheck, ArrowRight, ArrowLeft } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
