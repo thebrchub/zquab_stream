@@ -59,15 +59,15 @@ export default function ChatInput({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      // Detect if the user is on a touch device (mobile/tablet)
+    
       const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
       
       if (isTouchDevice) {
-        // Let the mobile keyboard's 'Return' key create a new line naturally
+       
         return; 
       }
 
-      // On desktop, 'Enter' sends the message ('Shift+Enter' creates a new line)
+     
       e.preventDefault(); 
       handleSend();
     }

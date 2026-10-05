@@ -1,5 +1,6 @@
 import { useEffect, useRef, type CSSProperties, type MouseEvent } from 'react';
 import { Radio, Video, Shuffle, type LucideIcon } from 'lucide-react';
+import EcosystemAnimation from '../showcase_animation/EcosystemAnimation'; // 🚀 IMPORT NEW FILE
 
 interface EcosystemSection {
   id: number;
@@ -68,7 +69,6 @@ function SpotlightCard({
     <div
       ref={setRefs}
       onMouseMove={handleMouseMove}
-      // 🚀 THEME FIX: Using your app's global CSS variables for colors
       className="group relative rounded-3xl sm:rounded-[2rem] border border-[var(--border-color)] bg-[var(--card)] p-6 sm:p-12 overflow-hidden shadow-2xl shadow-black/5 dark:shadow-black/80 hover:border-[#3B82F6]/50 transition-colors duration-500 w-full"
       style={{ 
         '--x': '50%', 
@@ -102,17 +102,20 @@ function SpotlightCard({
           </p>
         </div>
 
-        <div className="relative w-full aspect-video sm:aspect-[21/9] rounded-xl sm:rounded-2xl border border-[var(--border-color)] bg-[var(--background)] overflow-hidden shadow-inner flex items-center justify-center">
-          <Icon
-            size={48}
-            strokeWidth={1}
-            className="text-[var(--text-muted)] opacity-20 group-hover:opacity-50 group-hover:scale-110 transition-all duration-700 ease-out"
-          />
-          <div className="absolute top-3 left-3 sm:top-4 sm:left-4 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] opacity-30 group-hover:opacity-100 transition-opacity duration-500" />
-            <span className="font-mono text-[10px] sm:text-[11px] tracking-widest text-[var(--text-muted)] opacity-50 uppercase">Preview</span>
+        {/* 🚀 THE FIX: Render EcosystemAnimation and pass the ID */}
+        <div className="relative w-full aspect-[4/3] sm:aspect-[21/9] rounded-xl sm:rounded-2xl border border-[var(--border-color)] bg-[var(--background)] overflow-hidden shadow-inner flex items-center justify-center">
+          
+          <div className="absolute inset-0 w-full h-full opacity-60 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none">
+             <EcosystemAnimation id={sec.id} />
+          </div>
+
+          {/* Moved PREVIEW tag to bottom-left */}
+          <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 flex items-center gap-2 z-20 bg-[var(--card)]/90 backdrop-blur-md px-2.5 py-1.5 rounded-lg border border-[var(--border-color)] shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] opacity-50 group-hover:opacity-100 group-hover:bg-[#3B82F6] transition-colors duration-500" />
+            <span className="font-mono text-[9px] sm:text-[10px] tracking-widest text-[var(--text-muted)] uppercase">Preview</span>
           </div>
         </div>
+
       </div>
     </div>
   );
@@ -140,18 +143,17 @@ export default function EcosystemShowcase() {
 
         const distance = nextRect.top - currentRect.top;
         
-        // 🚀 SCROLL FIX: Starts animating much earlier so it feels like a continuous swipe
         let progress = 0;
-        const activationDistance = vh * 0.7; // Starts when the next card is 70% of the screen away
+        const activationDistance = vh * 0.7; 
         
         if (distance < activationDistance) {
           progress = 1 - (distance / activationDistance);
         }
-        progress = Math.max(0, Math.min(1, progress)); // Lock between 0 and 1
+        progress = Math.max(0, Math.min(1, progress)); 
 
         const scale = 1 - (progress * 0.08); 
         const translate = progress * 30; 
-        const dim = 1 - (progress * 0.3); // Slight dimming effect
+        const dim = 1 - (progress * 0.3); 
 
         currentCard.style.transform = `scale(${scale}) translateY(${translate}px)`;
         currentCard.style.filter = `brightness(${dim})`;
@@ -165,7 +167,6 @@ export default function EcosystemShowcase() {
   }, []);
 
   return (
-    // 🚀 THEME FIX: Main container respects global theme
     <section className="relative bg-[var(--background)] px-4 sm:px-6 transition-colors duration-300">
       <div className="max-w-4xl mx-auto text-center pt-20 sm:pt-32 pb-12 sm:pb-24">
         <p className="font-mono text-[10px] sm:text-[11px] tracking-[0.2em] text-[var(--text-muted)] uppercase mb-3">
@@ -176,14 +177,13 @@ export default function EcosystemShowcase() {
         </h2>
       </div>
 
-      {/* 🚀 SCROLL FIX: Drastically reduced the gap so it overlaps in a single scroll motion */}
       <div className="max-w-4xl mx-auto px-0 pb-[15vh] flex flex-col gap-[20vh] md:gap-[25vh]">
         {SECTIONS.map((sec, i) => (
           <div
             key={sec.id}
             className="sticky"
             style={{ 
-              top: `calc(5rem + ${i * 1.5}rem)`, // Creates the stacked "deck of cards" effect
+              top: `calc(5rem + ${i * 1.5}rem)`, 
               zIndex: i + 1 
             }}
           >
