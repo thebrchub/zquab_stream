@@ -3,13 +3,13 @@ import { memo } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 
 export interface ReplyData {
-  id: string; // 🛠️ NEW: Needed to target the scroll
+  id: string; 
   text: string;
   isOwn: boolean;
 }
 
 interface Props {
-  id: string; // 🛠️ NEW: Unique ID for the DOM element
+  id: string; 
   message?: string;
   content?: string; 
   isOwn: boolean;
@@ -21,9 +21,9 @@ interface Props {
   isSystem?: boolean;
   replyTo?: ReplyData;
   onSwipeToReply?: () => void;
-  onReplyClick?: (id: string) => void; // 🛠️ NEW: Click handler
-  isHighlighted?: boolean; // 🛠️ NEW: Controls the temporary glow
-  partnerName?: string; // 🛠️ ADD THIS
+  onReplyClick?: (id: string) => void; 
+  isHighlighted?: boolean; 
+  partnerName?: string; 
 }
 
 const isOnlyEmojis = (str: string) => {
@@ -71,10 +71,9 @@ function MessageBubble({ id, message, content, isOwn, status, time, imageUrl, on
   };
 
   return (
-    // 🛠️ THE FIX: Attached the DOM ID here
     <div id={`msg-${id}`} className={`relative flex flex-col w-full mb-4 ${isOwn ? 'items-end' : 'items-start'} group overflow-visible`}>
       
-      {/* 🛠️ THE FIX: The Temporary Highlight Overlay */}
+      {/* The Temporary Highlight Overlay */}
       <div 
         className={`absolute -inset-y-1 -inset-x-2 md:-inset-x-4 rounded-xl pointer-events-none transition-all duration-700 z-0 ${
           isHighlighted 
@@ -128,40 +127,40 @@ function MessageBubble({ id, message, content, isOwn, status, time, imageUrl, on
             className={`max-w-[75%] md:max-w-[65%] min-w-0 flex flex-col relative transition-all duration-200 ease-out
               ${emojiOnly 
                 ? 'bg-transparent text-4xl leading-tight'
-                : `rounded-2xl px-4 py-2.5 shadow-sm text-base md:text-[17px] leading-relaxed
+                : `rounded-[1.25rem] px-4 py-2.5 text-base md:text-[17px] leading-relaxed
                    ${isOwn 
-                     ? 'bg-[#3B82F6] text-white rounded-tr-sm' 
-                     : 'bg-[var(--card)] border border-[var(--border-color)] text-[var(--text-main)] rounded-tl-sm'
+                     ? 'bg-gradient-to-b from-[#3B82F6] to-[#2563EB] text-white rounded-br-sm shadow-[inset_0px_1px_2px_rgba(255,255,255,0.3),inset_0px_-1px_2px_rgba(0,0,0,0.2),2px_2px_6px_rgba(0,0,0,0.15)]' 
+                     : 'bg-[var(--card)] border border-[var(--border-color)] text-[var(--text-main)] rounded-bl-sm shadow-[2px_2px_8px_rgba(0,0,0,0.05)]'
                    }`
               }`}
           >
             
-            {/* 🛠️ THE FIX: Made the inline reply block clickable */}
+            {/* Inline Reply Target inside the bubble */}
             {replyTo && (
               <div 
                 onClick={(e) => {
                   e.stopPropagation();
                   if (replyTo.id && onReplyClick) onReplyClick(replyTo.id);
                 }}
-                className={`cursor-pointer active:scale-[0.98] transition-all mb-2 pl-3 py-1.5 border-l-[3px] rounded-r-md text-sm ${
+                className={`cursor-pointer active:scale-[0.98] transition-all mb-2 px-3 py-2 rounded-xl text-sm ${
                   isOwn 
-                    ? 'border-white/50 bg-black/10 hover:bg-black/20' 
-                    : 'border-[#3B82F6] bg-[var(--background)] hover:bg-[var(--border-color)]'
+                    ? 'bg-black/20 hover:bg-black/30 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.2)] border border-white/10' 
+                    : 'bg-[var(--background)] hover:bg-[var(--border-color)] border border-[var(--border-color)]'
                 }`}
               >
                 <p className={`font-bold text-[11px] uppercase tracking-wider mb-0.5 ${isOwn ? 'text-blue-100' : 'text-[#3B82F6]'}`}>
-    {replyTo.isOwn ? 'You' : (partnerName || 'Stranger')}
-  </p>
+                  {replyTo.isOwn ? 'You' : (partnerName || 'Stranger')}
+                </p>
                 <p className={`line-clamp-2 leading-snug ${isOwn ? 'text-white/90' : 'text-[var(--text-muted)]'}`}>
                   {replyTo.text}
                 </p>
               </div>
             )}
 
-            <p className="break-words whitespace-pre-wrap">{displayText}</p>
+            <p className="break-words whitespace-pre-wrap relative z-10">{displayText}</p>
             
             {formattedTime && !emojiOnly && (
-              <div className={`flex items-center gap-1 mt-1 text-[10px] uppercase font-bold self-end ${isOwn ? 'text-blue-100' : 'text-[var(--text-muted)]'}`}>
+              <div className={`flex items-center gap-1 mt-1 text-[10px] uppercase font-bold self-end relative z-10 ${isOwn ? 'text-blue-100' : 'text-[var(--text-muted)]'}`}>
                 <span>{formattedTime}</span>
                 <div className="flex items-center ml-0.5">
                   {renderStatusIcon()}

@@ -59,6 +59,15 @@ export default function ChatInput({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
+      // Detect if the user is on a touch device (mobile/tablet)
+      const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+      
+      if (isTouchDevice) {
+        // Let the mobile keyboard's 'Return' key create a new line naturally
+        return; 
+      }
+
+      // On desktop, 'Enter' sends the message ('Shift+Enter' creates a new line)
       e.preventDefault(); 
       handleSend();
     }
@@ -79,18 +88,23 @@ export default function ChatInput({
   return (
     <div className="bg-[var(--card)] border-t border-[var(--border-color)] flex flex-col w-full relative z-20">
       
+      {/* 🛠️ UPGRADED: Glassmorphic Floating Reply Pill */}
       <AnimatePresence>
         {replyingTo && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="w-full bg-[var(--background)] border-b border-[var(--border-color)] overflow-hidden"
+            initial={{ height: 0, opacity: 0, y: 10 }}
+            animate={{ height: 'auto', opacity: 1, y: 0 }}
+            exit={{ height: 0, opacity: 0, y: 10 }}
+            className="w-full max-w-5xl mx-auto px-2 sm:px-4 pt-2 overflow-hidden"
           >
-            <div className="flex items-center justify-between px-4 py-3 max-w-5xl mx-auto">
-              <div className="flex items-center gap-3 overflow-hidden">
+            <div className="flex items-center justify-between p-3 pr-3 pl-4 bg-[var(--card)]/60 backdrop-blur-md border border-[var(--border-color)] rounded-[1.25rem] relative overflow-hidden shadow-[2px_2px_8px_rgba(0,0,0,0.05)]">
+              
+              {/* Glowing Left Accent */}
+              <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#3B82F6] shadow-[0_0_12px_rgba(59,130,246,0.8)]" />
+              
+              <div className="flex items-center gap-3 overflow-hidden ml-2">
                 <Reply className="w-5 h-5 text-[#3B82F6] flex-shrink-0" />
-                <div className="border-l-[3px] border-[#3B82F6] pl-3 overflow-hidden">
+                <div className="overflow-hidden">
                   <p className="font-bold text-[11px] uppercase tracking-wider text-[#3B82F6] mb-0.5">
                     Replying to {replyingTo.isOwn ? 'Yourself' : (partnerName || 'Stranger')}
                   </p>
@@ -99,6 +113,8 @@ export default function ChatInput({
                   </p>
                 </div>
               </div>
+              
+              {/* Upgraded Circular Cancel Button */}
               <button 
                 aria-label="Cancel Reply" 
                 onClick={() => {
@@ -107,7 +123,7 @@ export default function ChatInput({
                   }
                   if (onCancelReply) onCancelReply();
                 }} 
-                className="p-2 bg-[var(--card)] hover:bg-[var(--border-color)] border border-[var(--border-color)] rounded-full text-[var(--text-muted)] transition-colors"
+                className="p-2 bg-[var(--background)] hover:bg-[var(--border-color)] border border-[var(--border-color)] rounded-full text-[var(--text-main)] transition-colors active:scale-95 flex-shrink-0 ml-2 shadow-sm"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -202,7 +218,6 @@ export default function ChatInput({
           </button>
         )}
 
-        {/* 🛠️ FIX #1: Added clay inset shadows to text area pill */}
         <div className="flex-1 flex items-end gap-1 sm:gap-2 bg-[var(--background)] border border-[var(--border-color)] focus-within:border-[#3B82F6] focus-within:ring-1 focus-within:ring-[#3B82F6] rounded-[24px] sm:rounded-[28px] px-1.5 sm:px-2 py-1 transition-all shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2),inset_-2px_-2px_4px_rgba(255,255,255,0.02)]">
           <button aria-label="Show Emoji"
             onClick={() => {
@@ -230,7 +245,6 @@ export default function ChatInput({
           />
         </div>
         
-        {/* 🛠️ FIX #1: Upgraded Send Button to match global Claymorphism logic */}
         <button aria-label="Send"
           onClick={handleSend}
           disabled={!text.trim() || disabled}
