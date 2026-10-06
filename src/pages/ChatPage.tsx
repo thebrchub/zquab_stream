@@ -593,7 +593,7 @@ export default function ChatPage() {
         - Mobile: Stops right above the bottom nav (bottom-[calc(64px+env(...))])
         - Tablet/Desktop: Pushed the side-by-side break point from md to lg (1024px) 
     */}
-    <div className="w-full flex flex-col overflow-hidden fixed top-[64px] inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-40 lg:relative lg:top-auto lg:inset-auto lg:z-auto lg:max-w-7xl lg:mx-auto lg:flex-row lg:gap-6 lg:p-6 lg:h-[calc(100dvh-82px)]">
+    <div className="w-full flex flex-col overflow-hidden fixed top-[64px] inset-x-0 bottom-0 pb-[env(safe-area-inset-bottom)] z-40 lg:relative lg:top-auto lg:inset-auto lg:z-auto lg:max-w-7xl lg:mx-auto lg:flex-row lg:gap-6 lg:p-6 lg:h-[calc(100dvh-82px)] lg:pb-6">
       
       <AnimatePresence>
         {viewingImage && (

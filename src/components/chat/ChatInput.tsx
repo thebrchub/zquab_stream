@@ -160,24 +160,29 @@ export default function ChatInput({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden bg-[var(--background)] border-b border-[var(--border-color)]"
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="overflow-hidden bg-[var(--card)]/90 backdrop-blur-xl border-b border-[var(--border-color)] relative z-10"
           >
-            <div className="p-4 sm:p-6">
+            <div className="p-4 sm:p-6 max-w-5xl mx-auto">
               
-              <div className="flex justify-between items-center mb-3">
-                <p className="font-bold text-[var(--text-main)]">Attachments</p>
-                <button aria-label="Close" onClick={() => setShowDrawer(false)} className="text-[var(--text-muted)] hover:text-[var(--text-main)] bg-[var(--card)] p-1 rounded-full border border-[var(--border-color)]">
+              <div className="flex justify-between items-center mb-4">
+                <p className="font-bold text-[var(--text-main)] text-sm tracking-wide uppercase">Attachments</p>
+                <button aria-label="Close" onClick={() => setShowDrawer(false)} className="text-[var(--text-muted)] hover:text-[var(--text-main)] bg-[var(--background)] hover:bg-[var(--border-color)] p-1.5 rounded-full border border-[var(--border-color)] transition-colors active:scale-95 shadow-sm">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="flex items-start gap-3 mb-4 bg-blue-500/10 p-3 rounded-xl border border-blue-500/20">
-                <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-[var(--text-main)] leading-relaxed">
+              {/* Upgraded Info Box with Inset Claymorphism */}
+              <div className="flex items-start gap-3 mb-5 bg-[var(--background)] p-4 rounded-2xl border border-[var(--border-color)] shadow-[inset_2px_2px_6px_rgba(0,0,0,0.1),inset_-2px_-2px_6px_rgba(255,255,255,0.02)]">
+                <div className="bg-blue-500/10 p-2 rounded-xl border border-blue-500/20 flex-shrink-0 shadow-sm">
+                  <Info className="w-5 h-5 text-blue-500" />
+                </div>
+                <p className="text-sm text-[var(--text-muted)] leading-relaxed pt-0.5">
                   For safety, direct photo uploads are disabled. You can only request photos. If you want to send one, the stranger must request it from you first!
                 </p>
               </div>
 
+              {/* Upgraded Premium Action Button */}
               <button aria-label="Request a Image"
                 type="button"
                 onClick={() => {
@@ -185,7 +190,7 @@ export default function ChatInput({
                   setShowDrawer(false);
                 }}
                 disabled={disabled || photoRequestDisabled}
-                className="w-full flex items-center justify-center gap-2 bg-[#3B82F6] hover:bg-blue-600 active:scale-[0.98] text-white py-3.5 rounded-xl font-bold transition-all disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-blue-500/20"
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-b from-[#3B82F6] to-[#2563EB] hover:from-blue-500 hover:to-blue-600 active:scale-[0.98] text-white py-4 rounded-[1.25rem] font-bold transition-all disabled:opacity-50 disabled:active:scale-100 shadow-[4px_4px_12px_rgba(0,0,0,0.3),-1px_-1px_4px_rgba(255,255,255,0.05),inset_1px_1px_2px_rgba(255,255,255,0.3),inset_-1px_-1px_2px_rgba(0,0,0,0.4)] disabled:shadow-none"
               >
                 <ImageIcon className="w-5 h-5" />
                 Request a Photo
@@ -194,7 +199,6 @@ export default function ChatInput({
           </motion.div>
         )}
       </AnimatePresence>
-
       <div className="flex items-end gap-2 sm:gap-3 px-2 sm:px-4 py-2 sm:py-3 w-full max-w-5xl mx-auto pb-safe">
         
         {(onRequestPhoto || onDirectImageClick) && (

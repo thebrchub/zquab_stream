@@ -74,8 +74,9 @@ function AuthForm() {
           </div>
 
           <div className="flex flex-col gap-4 items-center w-full">
-            {/* Claymorphic Pill Wrapper for Google Auth */}
-            <div className="w-full max-w-[320px] flex items-center justify-center min-h-[50px] bg-[var(--card)] border border-[var(--border-color)] rounded-full p-1 shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.03),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] transition-transform duration-200 active:scale-95">
+            
+            {/* 🛠️ FIX: Added `[&>div]:w-full [&_iframe]:!w-full` to stretch the Google iframe perfectly to the edges */}
+            <div className="w-full max-w-[320px] flex items-center justify-center min-h-[50px] bg-[var(--card)] border border-[var(--border-color)] rounded-full p-1 shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.03),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] transition-transform duration-200 active:scale-95 [&>div]:w-full [&_iframe]:!w-full">
               {isLoading ? (
                 <div className="flex items-center justify-center gap-2 py-2 text-sm font-semibold text-[var(--text-muted)]">
                   <Loader2 className="w-4 h-4 animate-spin text-[#4F46E5]" />
@@ -92,7 +93,7 @@ function AuthForm() {
                   theme="filled_black"
                   shape="pill"
                   size="large"
-                  width="300"
+                  // 🛠️ FIX: Removed fixed width so CSS can take control
                 />
               )}
             </div>
@@ -135,7 +136,7 @@ function AuthForm() {
 export default function AuthPage() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <div className="min-h-[calc(100dvh-5rem)] flex flex-col justify-center items-center px-4 py-12 bg-[var(--background)] relative overflow-hidden">
+      <div className="min-h-[100dvh] -mt-[64px] sm:-mt-[80px] pt-[64px] sm:pt-[80px] flex flex-col justify-center items-center px-4 pb-12 bg-[var(--background)] relative overflow-hidden">
         {/* Soft background ambient glows */}
         <div className="absolute top-[-10%] left-[-10%] w-80 h-80 bg-[#4F46E5]/15 rounded-full blur-[120px] pointer-events-none z-0" />
         <div className="absolute bottom-[-10%] right-[-10%] w-80 h-80 bg-purple-500/10 rounded-full blur-[120px] pointer-events-none z-0" />
