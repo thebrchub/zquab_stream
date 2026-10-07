@@ -20,7 +20,6 @@ const getDismissedIds = (): number[] => {
 
 export default function Navbar() {
   const location = useLocation();
-  // 🛠️ FIX: Use startsWith to catch /chat/text, /chat/video, etc.
   const isChatRoute = location.pathname.startsWith('/chat');
   const isHomePage = location.pathname === '/home';
   const isStaticPage = isChatRoute || isHomePage;
@@ -129,7 +128,7 @@ export default function Navbar() {
             {/* RIGHT UI ELEMENTS */}
             <div className="pointer-events-auto flex items-center gap-2 sm:gap-3 z-10">
               
-              {/* PILL 1: Search & Stranger Chat (Hidden on Mobile Phones, Visible on Tablets/Desktop) */}
+              {/* PILL 1: Search & Stranger Chat */}
               <div className="hidden sm:flex items-center gap-1 sm:gap-2 bg-[var(--card)] border border-[var(--border-color)] p-1 sm:p-1.5 pl-2 sm:pl-3 rounded-full shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.03),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)]">
                 <Link to="/search" className="p-2 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-colors active:scale-95" aria-label="Search">
                   <Search className="w-5 h-5 sm:w-5 sm:h-5" strokeWidth={2.5} />
@@ -157,10 +156,10 @@ export default function Navbar() {
                     </Link>
                   )}
 
-                  {/* INVISIBLE Wrapper: Holds exact layout space without duplicating visuals */}
+                  {/* INVISIBLE Wrapper */}
                   <div className={`relative ${!isFullUser ? 'lg:hidden' : 'flex'} items-center w-[48px] h-[48px] sm:w-[54px] sm:h-[54px] z-20`} ref={menuRef}>
                     
-                    {/* Shape-Shifting Capsule: The ONLY visible element */}
+                    {/* Shape-Shifting Capsule */}
                     <motion.div 
                       layout
                       initial={false}
@@ -201,6 +200,12 @@ export default function Navbar() {
                               <Link to="/discover" onClick={()=>setIsMenuOpen(false)} className="flex lg:hidden items-center gap-3 px-3 py-2.5 rounded-xl text-[var(--text-main)] hover:bg-[var(--text-main)]/5">
                                 <span className="font-bold text-sm">Watch Live</span>
                               </Link>
+                              
+                              {/* 🛠️ FIX: Added Creators link to mobile dropdown */}
+                              <Link to="/creators" onClick={()=>setIsMenuOpen(false)} className="flex lg:hidden items-center gap-3 px-3 py-2.5 rounded-xl text-[var(--text-main)] hover:bg-[var(--text-main)]/5">
+                                <span className="font-bold text-sm">Creators</span>
+                              </Link>
+                              
                               <Link to="/about" onClick={()=>setIsMenuOpen(false)} className="flex lg:hidden items-center gap-3 px-3 py-2.5 rounded-xl text-[var(--text-main)] hover:bg-[var(--text-main)]/5">
                                 <span className="font-bold text-sm">About</span>
                               </Link>
@@ -237,7 +242,6 @@ export default function Navbar() {
                       </AnimatePresence>
                     </motion.div>
 
-                    {/* 🛠️ FIX: Wrapped Notification Dropdown to force it below the navbar */}
                     <div className="absolute top-full right-0 pt-3 md:pt-4 pointer-events-none w-0 h-0">
                       <div className="pointer-events-auto">
                         <NotificationsDropdown 
@@ -259,7 +263,6 @@ export default function Navbar() {
       </nav>
 
       {/* --- EXTENDED NATIVE APP BOTTOM BAR (Visible <1024px) --- */}
-      {/* 🛠️ FIX: Hides completely when inside a chat route */}
       {!isChatRoute && (
         <div className="lg:hidden fixed bottom-0 left-0 w-full z-50 bg-[var(--card)]/90 backdrop-blur-xl border-t border-[var(--border-color)] pb-[env(safe-area-inset-bottom)]">
           <div className="flex items-center justify-around px-2 py-2 relative">

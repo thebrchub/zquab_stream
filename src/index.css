@@ -49,6 +49,7 @@
     border: 1px solid var(--glass-border);
   }
 }
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

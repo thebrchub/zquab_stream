@@ -1,9 +1,10 @@
-import  { useState } from 'react';
+import { useState } from 'react';
 import { Loader2, X, CheckCircle2, Copy, ShieldCheck, ArrowRight, ArrowLeft } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
-// --- Custom SVG Brand Icons (Matches Lucide Styling) ---
+// --- Custom SVG Brand Icons ---
 const InstagramIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
@@ -43,7 +44,9 @@ interface CreatorApplicationModalProps {
 export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorApplicationModalProps) {
   const { refreshSession } = useAuth();
   
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [direction, setDirection] = useState(0); // 1 for forward, -1 for backward
+
   const [links, setLinks] = useState({
     instagram: '',
     youtube: '',
@@ -52,16 +55,24 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const verificationCode = `zQuab-${username}`;
 
   if (!isOpen) return null;
 
-  // Check how many fields have actual text in them
   const filledLinksCount = Object.values(links).filter(link => link.trim().length > 0).length;
   const canSubmit = filledLinksCount >= 2;
+
+  const handleNext = () => {
+    setDirection(1);
+    setStep(2);
+  };
+
+  const handleBack = () => {
+    setDirection(-1);
+    setStep(1);
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -78,7 +89,8 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
       });
       
       await refreshSession();
-      setIsSuccess(true);
+      setDirection(1);
+      setStep(3); // Success Step
     } catch (err: any) {
       alert(err?.response?.data?.error || err.message || 'Failed to submit application');
     } finally {
@@ -96,174 +108,252 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
     onClose();
     setTimeout(() => {
       setStep(1);
-      setIsSuccess(false);
+      setDirection(0);
       setLinks({ instagram: '', youtube: '', twitter: '', other: '' });
     }, 300);
   };
 
+  // Framer Motion variants for sliding
+  const slideVariants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? 50 : -50,
+      opacity: 0
+    }),
+    center: {
+      zIndex: 1,
+      x: 0,
+      opacity: 1
+    },
+    exit: (direction: number) => ({
+      zIndex: 0,
+      x: direction < 0 ? 50 : -50,
+      opacity: 0
+    })
+  };
+
   return (
-    <div className="fixed inset-0 z-[99] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 sm:p-8 max-w-md w-full shadow-2xl relative overflow-hidden transition-all duration-300">
+    // Solid background overlay, completely removing glassmorphism
+    <div className="fixed inset-0 z-[99] flex items-center justify-center p-4 bg-black/90">
+      
+      {/* Wizard Container - Locks max height so it fits on mobile */}
+      <div className="bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] max-w-md w-full shadow-2xl flex flex-col relative max-h-[95dvh] overflow-hidden">
         
-        {/* Close Button - Absolute positioning to stay consistent across steps */}
-        <button 
-          onClick={resetAndClose} 
-          className="absolute top-6 right-6 p-2 bg-[var(--background)] rounded-full hover:bg-[var(--border-color)] transition-colors z-10"
-        >
-          <X className="w-5 h-5 text-[var(--text-muted)] hover:text-[var(--text-main)]" />
-        </button>
-
-        {isSuccess ? (
-          // SUCCESS STATE
-          <div className="py-8 flex flex-col items-center text-center animate-in fade-in zoom-in duration-300">
-            <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mb-6 border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
-              <CheckCircle2 className="w-10 h-10" />
-            </div>
-            <h4 className="text-2xl font-black text-[var(--text-main)] mb-3">Verification Pending</h4>
-            <p className="text-[var(--text-muted)] text-sm leading-relaxed mb-8 max-w-[280px]">
-              Our team is reviewing your connected profiles. <br/><br/>
-              <span className="text-[var(--text-main)] font-bold">Do not remove the code from your bios</span> until you are officially approved.
-            </p>
-            <button 
-              onClick={resetAndClose}
-              className="w-full py-4 bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] rounded-[1.25rem] font-bold hover:border-[#3B82F6] transition-colors shadow-sm"
-            >
-              Done
-            </button>
+        {/* Persistent Header */}
+        <div className="flex items-center justify-between p-6 border-b border-[var(--border-color)] bg-[var(--card)] shrink-0 z-10">
+          <div className="flex gap-2 items-center">
+            {step < 3 && (
+              <>
+                <div className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${step >= 1 ? 'bg-[#3B82F6]' : 'bg-[var(--border-color)]'}`} />
+                <div className={`w-8 h-1 rounded-full transition-colors duration-300 ${step >= 2 ? 'bg-[#3B82F6]' : 'bg-[var(--border-color)]'}`} />
+                <div className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${step >= 2 ? 'bg-[#3B82F6]' : 'bg-[var(--border-color)]'}`} />
+              </>
+            )}
+            {step === 3 && (
+              <span className="text-sm font-bold text-emerald-500 uppercase tracking-widest">Complete</span>
+            )}
           </div>
+          <button 
+            onClick={resetAndClose} 
+            className="p-2 -mr-2 bg-[var(--background)] rounded-full hover:bg-[var(--border-color)] transition-colors"
+          >
+            <X className="w-5 h-5 text-[var(--text-muted)] hover:text-[var(--text-main)]" />
+          </button>
+        </div>
 
-        ) : step === 1 ? (
-          // STEP 1: EXPLANATION
-          <div className="py-2 flex flex-col items-center text-center animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="w-20 h-20 bg-[#3B82F6]/10 text-[#3B82F6] rounded-full flex items-center justify-center mb-6 border border-[#3B82F6]/20 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
-              <ShieldCheck className="w-10 h-10" />
-            </div>
+        {/* Dynamic Wizard Body */}
+        <div className="flex-1 overflow-y-auto hide-scrollbar relative bg-[var(--background)]">
+          <AnimatePresence custom={direction} mode="wait">
             
-            <h3 className="text-2xl font-black text-[var(--text-main)] mb-3">Protect Your Identity</h3>
-            
-            <p className="text-[var(--text-muted)] text-sm leading-relaxed mb-8">
-              To keep zQuab safe and prevent impersonators from claiming your brand, we require creators to securely link their established social profiles.
-              <br/><br/>
-              In the next step, we will ask you to link your accounts so we can verify you are the real owner.
-            </p>
+            {/* STEP 1: INFO */}
+            {step === 1 && (
+              <motion.div
+                key="step1"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="flex flex-col p-6 sm:p-8"
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-20 h-20 bg-[#3B82F6]/10 text-[#3B82F6] rounded-full flex items-center justify-center mb-6 border border-[#3B82F6]/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
+                    <ShieldCheck className="w-10 h-10" />
+                  </div>
+                  
+                  <h3 className="text-2xl font-black text-[var(--text-main)] mb-3">Protect Your Identity</h3>
+                  
+                  <p className="text-[var(--text-muted)] text-sm leading-relaxed mb-8">
+                    To keep zQuab safe and prevent impersonators from claiming your brand, we require creators to securely link their established social profiles.
+                    <br/><br/>
+                    In the next step, we will ask you to link your accounts so we can verify you are the real owner.
+                  </p>
+                </div>
+              </motion.div>
+            )}
 
+            {/* STEP 2: LINKING PROFILES */}
+            {step === 2 && (
+              <motion.div
+                key="step2"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="flex flex-col p-6 sm:p-8"
+              >
+                <h3 className="text-xl font-black text-[var(--text-main)] mb-1">Link Profiles</h3>
+                <p className="text-[var(--text-muted)] text-xs font-medium mb-6">
+                  Connect at least <strong className="text-[var(--text-main)]">two</strong> accounts below.
+                </p>
+
+                {/* Verification Code Block */}
+                <div className="flex items-center justify-between bg-[var(--card)] border border-[#3B82F6]/30 rounded-[1rem] p-3 mb-4 shadow-[inset_2px_2px_4px_rgba(0,0,0,0.05)] w-full overflow-hidden">
+                  <div className="flex flex-col gap-0.5 pl-2 truncate pr-3">
+                    <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Verification Code</span>
+                    <span className="font-mono font-bold text-[#3B82F6] text-sm truncate">{verificationCode}</span>
+                  </div>
+                  <button 
+                    onClick={copyCode}
+                    className="shrink-0 p-2.5 bg-[#3B82F6]/10 hover:bg-[#3B82F6]/20 text-[#3B82F6] rounded-xl transition-colors flex items-center gap-2 active:scale-95"
+                  >
+                    {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    <span className="text-xs font-bold hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+                
+                <p className="text-[var(--text-muted)] text-[11px] leading-relaxed mb-6 px-1 font-medium">
+                  * Paste the code above into the bios of the accounts you link below. You can remove it after approval.
+                </p>
+
+                <div className="space-y-3 pb-2">
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                      <InstagramIcon className={`h-5 w-5 transition-colors duration-300 ${links.instagram ? 'text-[#E1306C]' : 'text-[var(--text-muted)] group-focus-within:text-[#E1306C]'}`} />
+                    </div>
+                    <input 
+                      type="url" 
+                      value={links.instagram} 
+                      onChange={(e) => setLinks({...links, instagram: e.target.value})} 
+                      className="w-full bg-[var(--card)] border border-[var(--border-color)] rounded-[1rem] pl-12 pr-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#E1306C] shadow-[inset_2px_2px_4px_rgba(0,0,0,0.1),inset_-2px_-2px_4px_rgba(255,255,255,0.02)] transition-all" 
+                      placeholder="Instagram profile URL" 
+                    />
+                  </div>
+
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                      <YoutubeIcon className={`h-5 w-5 transition-colors duration-300 ${links.youtube ? 'text-[#FF0000]' : 'text-[var(--text-muted)] group-focus-within:text-[#FF0000]'}`} />
+                    </div>
+                    <input 
+                      type="url" 
+                      value={links.youtube} 
+                      onChange={(e) => setLinks({...links, youtube: e.target.value})} 
+                      className="w-full bg-[var(--card)] border border-[var(--border-color)] rounded-[1rem] pl-12 pr-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#FF0000] shadow-[inset_2px_2px_4px_rgba(0,0,0,0.1),inset_-2px_-2px_4px_rgba(255,255,255,0.02)] transition-all" 
+                      placeholder="YouTube channel URL" 
+                    />
+                  </div>
+
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                      <TwitterIcon className={`h-5 w-5 transition-colors duration-300 ${links.twitter ? 'text-[#1DA1F2]' : 'text-[var(--text-muted)] group-focus-within:text-[#1DA1F2]'}`} />
+                    </div>
+                    <input 
+                      type="url" 
+                      value={links.twitter} 
+                      onChange={(e) => setLinks({...links, twitter: e.target.value})} 
+                      className="w-full bg-[var(--card)] border border-[var(--border-color)] rounded-[1rem] pl-12 pr-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#1DA1F2] shadow-[inset_2px_2px_4px_rgba(0,0,0,0.1),inset_-2px_-2px_4px_rgba(255,255,255,0.02)] transition-all" 
+                      placeholder="X (Twitter) profile URL" 
+                    />
+                  </div>
+
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                      <GlobeIcon className={`h-5 w-5 transition-colors duration-300 ${links.other ? 'text-[#10B981]' : 'text-[var(--text-muted)] group-focus-within:text-[#10B981]'}`} />
+                    </div>
+                    <input 
+                      type="url" 
+                      value={links.other} 
+                      onChange={(e) => setLinks({...links, other: e.target.value})} 
+                      className="w-full bg-[var(--card)] border border-[var(--border-color)] rounded-[1rem] pl-12 pr-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#10B981] shadow-[inset_2px_2px_4px_rgba(0,0,0,0.1),inset_-2px_-2px_4px_rgba(255,255,255,0.02)] transition-all" 
+                      placeholder="TikTok / Twitch / Other URL" 
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* STEP 3: SUCCESS */}
+            {step === 3 && (
+              <motion.div
+                key="step3"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="flex flex-col p-6 sm:p-8 items-center text-center"
+              >
+                <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mb-6 border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+                  <CheckCircle2 className="w-10 h-10" />
+                </div>
+                <h4 className="text-2xl font-black text-[var(--text-main)] mb-3">Verification Pending</h4>
+                <p className="text-[var(--text-muted)] text-sm leading-relaxed mb-8 max-w-[280px]">
+                  Our team is reviewing your connected profiles. <br/><br/>
+                  <span className="text-[var(--text-main)] font-bold">Do not remove the code from your bios</span> until you are officially approved.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Persistent Footer Actions */}
+        <div className="p-6 border-t border-[var(--border-color)] bg-[var(--card)] shrink-0 z-10 flex gap-3">
+          
+          {step === 1 && (
             <button 
-              onClick={() => setStep(2)} 
-              className="w-full py-4 bg-[#4F46E5] text-white rounded-[1.25rem] font-bold flex items-center justify-center gap-2 transition-all duration-200 shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)] hover:brightness-110 active:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.4),inset_-2px_-2px_6px_rgba(255,255,255,0.1)]"
+              onClick={handleNext} 
+              className="w-full py-4 bg-[#4F46E5] text-white rounded-[1.25rem] font-bold flex items-center justify-center gap-2 transition-all shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)] hover:brightness-110 active:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.4),inset_-2px_-2px_6px_rgba(255,255,255,0.1)]"
             >
-              Link My Accounts <ArrowRight className="w-5 h-5 ml-1" />
+              Begin Setup <ArrowRight className="w-5 h-5 ml-1" />
             </button>
-          </div>
+          )}
 
-        ) : (
-          // STEP 2: LINKING
-          <div className="flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
-            
-            <div className="flex items-center gap-3 mb-6 pr-8">
+          {step === 2 && (
+            <>
               <button 
-                onClick={() => setStep(1)} 
-                className="p-2 -ml-2 bg-transparent text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-full transition-colors"
+                onClick={handleBack}
+                className="py-4 px-5 bg-[var(--background)] text-[var(--text-main)] border border-[var(--border-color)] rounded-[1.25rem] transition-colors hover:bg-[var(--border-color)] active:scale-95 flex items-center justify-center shrink-0"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
-              <div>
-                <h3 className="text-xl font-black text-[var(--text-main)]">Link Your Profiles</h3>
-                <p className="text-[var(--text-muted)] text-xs font-medium mt-1">
-                  Connect at least <strong className="text-[var(--text-main)]">two</strong> accounts below.
-                </p>
-              </div>
-            </div>
 
-            {/* Premium Code Copy Block */}
-            <div className="flex items-center justify-between bg-gradient-to-r from-[var(--background)] to-[#3B82F6]/5 border border-[#3B82F6]/20 rounded-[1rem] p-3 mb-6 shadow-sm">
-              <div className="flex flex-col gap-0.5 pl-2">
-                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Verification Code</span>
-                <span className="font-mono font-bold text-[#3B82F6] text-sm">{verificationCode}</span>
-              </div>
               <button 
-                onClick={copyCode}
-                className="p-2.5 bg-[var(--card)] hover:bg-[#3B82F6]/10 text-[var(--text-muted)] hover:text-[#3B82F6] border border-[var(--border-color)] rounded-xl transition-colors flex items-center gap-2 shadow-sm active:scale-95"
+                onClick={handleSubmit} 
+                disabled={isSubmitting || !canSubmit} 
+                className="flex-1 py-4 bg-[#4F46E5] text-white rounded-[1.25rem] font-bold flex items-center justify-center gap-2 transition-all shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)] hover:brightness-110 active:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.4),inset_-2px_-2px_6px_rgba(255,255,255,0.1)] disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed"
               >
-                {copied ? <CheckCircle2 className="w-4 h-4 text-[#3B82F6]" /> : <Copy className="w-4 h-4" />}
-                <span className="text-xs font-bold">{copied ? 'Copied' : 'Copy'}</span>
+                {isSubmitting ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  canSubmit ? 'Submit Application' : `${filledLinksCount}/2 Linked`
+                )}
               </button>
-            </div>
-            
-            <p className="text-[var(--text-muted)] text-[11px] leading-relaxed mb-5 px-1 font-medium">
-              * Paste the code above into the bios of the accounts you link below before submitting. You can remove it after approval.
-            </p>
+            </>
+          )}
 
-            <div className="space-y-3.5 mb-8">
-              {/* Instagram */}
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                  <InstagramIcon className={`h-5 w-5 transition-colors duration-300 ${links.instagram ? 'text-[#E1306C]' : 'text-[var(--text-muted)] group-focus-within:text-[#E1306C]'}`} />
-                </div>
-                <input 
-                  type="url" 
-                  value={links.instagram} 
-                  onChange={(e) => setLinks({...links, instagram: e.target.value})} 
-                  className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-[1rem] pl-12 pr-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#E1306C] focus:ring-1 focus:ring-[#E1306C]/30 transition-all shadow-sm" 
-                  placeholder="Instagram profile URL" 
-                />
-              </div>
-
-              {/* YouTube */}
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                  <YoutubeIcon className={`h-5 w-5 transition-colors duration-300 ${links.youtube ? 'text-[#FF0000]' : 'text-[var(--text-muted)] group-focus-within:text-[#FF0000]'}`} />
-                </div>
-                <input 
-                  type="url" 
-                  value={links.youtube} 
-                  onChange={(e) => setLinks({...links, youtube: e.target.value})} 
-                  className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-[1rem] pl-12 pr-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#FF0000] focus:ring-1 focus:ring-[#FF0000]/30 transition-all shadow-sm" 
-                  placeholder="YouTube channel URL" 
-                />
-              </div>
-
-              {/* Twitter / X */}
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                  <TwitterIcon className={`h-5 w-5 transition-colors duration-300 ${links.twitter ? 'text-[#1DA1F2]' : 'text-[var(--text-muted)] group-focus-within:text-[#1DA1F2]'}`} />
-                </div>
-                <input 
-                  type="url" 
-                  value={links.twitter} 
-                  onChange={(e) => setLinks({...links, twitter: e.target.value})} 
-                  className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-[1rem] pl-12 pr-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#1DA1F2] focus:ring-1 focus:ring-[#1DA1F2]/30 transition-all shadow-sm" 
-                  placeholder="X (Twitter) profile URL" 
-                />
-              </div>
-
-              {/* Other */}
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                  <GlobeIcon className={`h-5 w-5 transition-colors duration-300 ${links.other ? 'text-[#10B981]' : 'text-[var(--text-muted)] group-focus-within:text-[#10B981]'}`} />
-                </div>
-                <input 
-                  type="url" 
-                  value={links.other} 
-                  onChange={(e) => setLinks({...links, other: e.target.value})} 
-                  className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-[1rem] pl-12 pr-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]/30 transition-all shadow-sm" 
-                  placeholder="TikTok / Twitch / Other URL" 
-                />
-              </div>
-            </div>
-
+          {step === 3 && (
             <button 
-              onClick={handleSubmit} 
-              disabled={isSubmitting || !canSubmit} 
-              className="w-full py-4 bg-[#4F46E5] text-white rounded-[1.25rem] font-bold flex items-center justify-center gap-2 transition-all duration-200 shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)] hover:brightness-110 active:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.4),inset_-2px_-2px_6px_rgba(255,255,255,0.1)] disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed"
+              onClick={resetAndClose}
+              className="w-full py-4 bg-[#4F46E5] text-white rounded-[1.25rem] font-bold transition-all shadow-[6px_6px_12px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)] hover:brightness-110 active:scale-[0.98]"
             >
-              {isSubmitting ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                canSubmit ? 'Submit Application' : `Link ${2 - filledLinksCount} more account${2 - filledLinksCount === 1 ? '' : 's'}`
-              )}
+              Done
             </button>
-          </div>
-        )}
+          )}
+        </div>
+
       </div>
     </div>
   );
