@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usersApi } from '../api/users';
 import { friendsApi } from '../api/friends';
-import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useRooms } from '../context/RoomsContext';
 import { useWallet } from '../context/WalletContext'; 
@@ -52,10 +51,7 @@ export default function Profile() {
   const [isCountryLocked, setIsCountryLocked] = useState(true); 
   const [isDetectingCountry, setIsDetectingCountry] = useState(false);
   const [showCreatorModal, setShowCreatorModal] = useState(false);
-  const [creatorCategory, setCreatorCategory] = useState('Gaming');
-  const [creatorHeadline, setCreatorHeadline] = useState('');
-  const [isSubmittingCreator, setIsSubmittingCreator] = useState(false);
-  const CREATOR_CATEGORIES = ['Gaming', 'Just Chatting', 'Music', 'Education', 'Tech & Coding', 'Art'];
+
   const [zAvatarRequested, setZAvatarRequested] = useState(false);
   const [avatarVariant, setAvatarVariant] = useState(0);
 
@@ -77,7 +73,6 @@ export default function Profile() {
   const [searchQuery, setSearchQuery] = useState('');
   const LIMIT = 15;
 
-  // 🚀 FIX: Prevent the background sync from wiping out the dev_mock_999 session
   useEffect(() => {
     if (authUser && !authUser.is_guest && authUser.user_id !== 'dev_mock_999') {
       refreshSession().catch(console.error);
@@ -91,7 +86,6 @@ export default function Profile() {
         return;
       }
 
-      // 🚀 FIX: Bypass real API call for mock user so the profile renders properly
       if (authUser?.user_id === 'dev_mock_999') {
         setProfile(authUser);
         setUsername(authUser.username || '');
@@ -320,26 +314,6 @@ export default function Profile() {
   const isDisplayLoading = activeTab === 'requests' ? false : networkLoading;
   const currentHasMore = activeTab === 'requests' ? false : hasMore;
 
-  const submitCreatorApplication = async () => {
-    if (!creatorHeadline.trim()) return;
-    setIsSubmittingCreator(true);
-    try {
-      await apiClient.post('/users/me/creator', {
-        category: creatorCategory.toLowerCase(),
-        headline: creatorHeadline,
-        one_on_one_enabled: false,
-        one_on_one_price_coins: 0,
-        one_on_one_duration_mins: 0
-      });
-      await refreshSession();
-      setShowCreatorModal(false);
-    } catch (err: any) {
-      alert(err?.response?.data?.error || err.message || 'Failed to submit application');
-    } finally {
-      setIsSubmittingCreator(false);
-    }
-  };
-
   return (
     <div className="max-w-7xl mx-auto w-full p-4 md:p-6 lg:p-8 pb-24 relative">
       
@@ -373,10 +347,10 @@ export default function Profile() {
       )}
 
       <CreatorApplicationModal 
-  isOpen={showCreatorModal} 
-  onClose={() => setShowCreatorModal(false)} 
-  username={username || 'creator'} 
-/>
+        isOpen={showCreatorModal} 
+        onClose={() => setShowCreatorModal(false)} 
+        username={username || 'creator'} 
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 relative">
         <div className="lg:col-span-4 xl:col-span-4 lg:sticky lg:top-24 h-fit space-y-6">
@@ -589,7 +563,6 @@ export default function Profile() {
                 { id: 'friends', icon: Users, label: 'My Friends' },
                 { id: 'requests', icon: UserPlus, label: 'Requests' },
                 { id: 'search', icon: Search, label: 'Find Friends' },
-                // { id: 'blocked', icon: Ban, label: 'Blocked' }, // Commented out as requested
               ].map(tab => (
                 <button aria-label="Tab Text"
                   key={tab.id}
