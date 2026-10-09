@@ -31,7 +31,11 @@ const StreamEarningsEventProto = safeLookup('eventspb.StreamEarningsEvent', 'Str
 const StreamEndingSoonEventProto = safeLookup('eventspb.StreamEndingSoonEvent', 'StreamEndingSoonEvent');
 const StreamAutoEndedEventProto = safeLookup('eventspb.StreamAutoEndedEvent', 'StreamAutoEndedEvent');
 const StreamLiveEventProto = safeLookup('eventspb.StreamLive', 'StreamLive');
-const GiftConfirmEventProto = safeLookup('eventspb.GiftConfirmEvent', 'GiftConfirmEvent');
+const GiftRequestProto = safeLookup('eventspb.GiftRequest', 'GiftRequest');
+const GiftConfirmProto = safeLookup('eventspb.GiftConfirm', 'GiftConfirm');
+const StreamEndedProto = safeLookup('eventspb.StreamEnded', 'StreamEnded');
+const RetractMessageRequestProto = safeLookup('eventspb.RetractMessageRequest', 'RetractMessageRequest');
+const MessageRetractedProto = safeLookup('eventspb.MessageRetracted', 'MessageRetracted');
 
 type WSListener = (message: any) => void;
 class WSEmitter {
@@ -142,8 +146,12 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               decodedPayload = StreamAutoEndedEventProto.decode(envelope.payload);
             } else if (t === 'stream_live' && StreamLiveEventProto) {
               decodedPayload = StreamLiveEventProto.decode(envelope.payload);
-            } else if (t === 'gift_confirm' && GiftConfirmEventProto) {
-              decodedPayload = GiftConfirmEventProto.decode(envelope.payload);
+            } else if (t === 'gift_confirm' && GiftConfirmProto) {
+              decodedPayload = GiftConfirmProto.decode(envelope.payload);
+            } else if (t === 'stream_ended' && StreamEndedProto) {
+              decodedPayload = StreamEndedProto.decode(envelope.payload);
+            } else if (t === 'message_retracted' && MessageRetractedProto) {
+              decodedPayload = MessageRetractedProto.decode(envelope.payload);
             } 
             
             // Fallbacks
@@ -223,7 +231,16 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           replyTo: payload.reply_to || payload.replyTo || ''
         });
         payloadBytes = ChatMessageProto.encode(chatMsg).finish();
-      } 
+      } else if (type === 'gift' && payload && GiftRequestProto) {
+        payloadBytes = GiftRequestProto.encode(GiftRequestProto.create({
+          giftId: payload.gift_id || payload.giftId,
+          message: payload.message || '',
+        })).finish();
+      } else if (type === 'retract_message' && payload && RetractMessageRequestProto) {
+        payloadBytes = RetractMessageRequestProto.encode(RetractMessageRequestProto.create({
+          messageId: payload.message_id || payload.messageId,
+        })).finish();
+      }
       // Handle raw JSON payloads sent from the client just in case
       else if (payload && typeof payload === 'object') {
         const jsonString = JSON.stringify(payload);

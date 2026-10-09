@@ -1,14 +1,39 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWallet } from '../context/WalletContext';
 import { useWebSocket } from '../context/WebSocketContext';
-import type { GiftSentEvent } from '../types/streamEvents'; 
+import { streamService } from '../services/streamService';
+import type { LiveChatMessage } from '../types/streamEvents';
 
-export const useLiveStreamRoom = (roomId: string | undefined) => {
+export const useLiveStreamRoom = (roomId: string | undefined, streamId: string) => {
   const [viewerCount, setViewerCount] = useState<number>(0);
-  const [recentGifts, setRecentGifts] = useState<GiftSentEvent[]>([]);
+  const [messages, setMessages] = useState<LiveChatMessage[]>([]);
+  const [isGiftPending, setIsGiftPending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [isStreamEnded, setIsStreamEnded] = useState(false);
+  const hasConnectedRef = useRef(false);
   
   const { updateBalanceLocally } = useWallet();
   const { isConnected, sendMessage, lastMessage } = useWebSocket();
+
+  useEffect(() => {
+    if (!isConnected) return;
+    if (!hasConnectedRef.current) {
+      hasConnectedRef.current = true;
+      return;
+    }
+
+    let isCurrent = true;
+    streamService.getStreamMetadata(streamId)
+      .then((stream) => {
+        if (isCurrent && stream.status !== 'live') {
+          setIsStreamEnded(true);
+          setIsGiftPending(false);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => { isCurrent = false; };
+  }, [isConnected, streamId]);
 
   // 1. Join the room on mount or reconnect
   useEffect(() => {
@@ -29,6 +54,11 @@ export const useLiveStreamRoom = (roomId: string | undefined) => {
 
     // Protobufjs might expose this as camelCase or snake_case depending on your options
     const msgRoomId = lastMessage.room_id || lastMessage.roomId;
+    if (lastMessage.type === 'error') {
+      if (isGiftPending) setIsGiftPending(false);
+      setSendError(lastMessage.payload?.message || 'Unable to send message.');
+      return;
+    }
     if (msgRoomId !== roomId) return;
 
     switch (lastMessage.type) {
@@ -40,14 +70,38 @@ export const useLiveStreamRoom = (roomId: string | undefined) => {
         break;
       }
 
+      case 'chat_message': {
+        const messageId = String(lastMessage.id || '');
+        if (!messageId) break;
+        setMessages((current) => current.some((message) => message.id === messageId)
+          ? current
+          : [...current, {
+              id: messageId,
+              senderId: lastMessage.from || '',
+              senderName: lastMessage.from || 'Viewer',
+              avatarUrl: '',
+              text: lastMessage.payload?.text || '',
+            }]);
+        break;
+      }
+
       case 'gift_sent': {
-        const newGift = lastMessage.payload as GiftSentEvent;
-        setRecentGifts(prev => [...prev, newGift]);
-        
-        // 🚀 Fix: Rely purely on object reference equality since there is no unique event ID
-        setTimeout(() => {
-          setRecentGifts(prev => prev.filter(g => g !== newGift));
-        }, 5000);
+        const gift = lastMessage.payload;
+        const messageId = String(lastMessage.id || `${gift?.sender_id || gift?.senderId}-${Date.now()}`);
+        setMessages((current) => current.some((message) => message.id === messageId)
+          ? current
+          : [...current, {
+              id: messageId,
+              senderId: gift?.sender_id || gift?.senderId || '',
+              senderName: gift?.sender_name || gift?.senderName || gift?.sender_username || gift?.senderUsername || 'Viewer',
+              avatarUrl: gift?.sender_avatar_url || gift?.senderAvatarUrl || '',
+              text: gift?.message || '',
+              gift: {
+                name: gift?.gift_name || gift?.giftName || 'Gift',
+                icon: gift?.gift_icon || gift?.giftIcon || '',
+                coins: Number(gift?.coins || 0),
+              },
+            }]);
         break;
       }
 
@@ -58,6 +112,19 @@ export const useLiveStreamRoom = (roomId: string | undefined) => {
         if (newBalance !== undefined) {
           updateBalanceLocally(Number(newBalance));
         }
+        setIsGiftPending(false);
+        break;
+      }
+
+      case 'message_retracted': {
+        const messageId = lastMessage.payload?.message_id || lastMessage.payload?.messageId;
+        if (messageId) setMessages((current) => current.filter((message) => message.id !== messageId));
+        break;
+      }
+
+      case 'stream_ended': {
+        setIsStreamEnded(true);
+        setIsGiftPending(false);
         break;
       }
     }
@@ -65,7 +132,7 @@ export const useLiveStreamRoom = (roomId: string | undefined) => {
 
   // 3. Send a gift
   const sendGift = useCallback((giftId: number, message: string = "") => {
-    if (!roomId) return;
+    if (!roomId || isGiftPending || isStreamEnded) return;
 
     // Truncate message defensively as per backend spec (max 200 chars)
     const safeMessage = message.substring(0, 200);
@@ -75,14 +142,39 @@ export const useLiveStreamRoom = (roomId: string | undefined) => {
       message: safeMessage
     };
 
-    // The WebSocketContext handles JSON encoding automatically if it's an object
-    sendMessage('gift', payload, roomId);
-    
-  }, [roomId, sendMessage]);
+    setSendError(null);
+    setIsGiftPending(true);
+    if (!sendMessage('gift', payload, roomId)) {
+      setIsGiftPending(false);
+      setSendError('Unable to send gift.');
+    }
+  }, [roomId, sendMessage, isGiftPending, isStreamEnded]);
+
+  const sendChat = useCallback((text: string) => {
+    const safeText = text.trim();
+    if (!roomId || !safeText || isStreamEnded) return;
+
+    setSendError(null);
+    if (!sendMessage('chat_message', { text: safeText }, roomId)) {
+      setSendError('Unable to send message.');
+    }
+  }, [roomId, sendMessage, isStreamEnded]);
+
+  const retractMessage = useCallback((messageId: string) => {
+    if (!roomId || !messageId || isStreamEnded) return;
+    if (!sendMessage('retract_message', { message_id: messageId }, roomId)) {
+      setSendError('Unable to retract message.');
+    }
+  }, [roomId, sendMessage, isStreamEnded]);
 
   return {
     viewerCount,
-    recentGifts,
-    sendGift
+    messages,
+    isGiftPending,
+    sendError,
+    isStreamEnded,
+    sendChat,
+    sendGift,
+    retractMessage,
   };
 };
