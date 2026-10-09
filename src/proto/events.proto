@@ -59,6 +59,12 @@ message PhotoReady {
     int64  expires_at = 4; // epoch ms when the URL/object expires
 }
 
+// MsgType "gift" — viewer request
+message GiftRequest {
+    int32  gift_id = 1;
+    string message = 2;
+}
+
 // MsgType "gift_sent" — broadcast to entire stream room
 message GiftSentEvent {
     string sender_id           = 1;

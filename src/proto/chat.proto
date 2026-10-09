@@ -9,6 +9,7 @@ message Envelope {
     bytes  payload  = 5;
     int64  ts       = 6;
     string id       = 7;
+    string from_name = 9;
 }
 
 // 🛠️ NEW: Define the nested reply object

@@ -11,6 +11,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string) 
   const [sendError, setSendError] = useState<string | null>(null);
   const [isStreamEnded, setIsStreamEnded] = useState(false);
   const hasConnectedRef = useRef(false);
+  const pendingChatRef = useRef(new Map<string, string>());
   
   const { updateBalanceLocally } = useWallet();
   const { isConnected, sendMessage, lastMessage } = useWebSocket();
@@ -56,7 +57,24 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string) 
     const msgRoomId = lastMessage.room_id || lastMessage.roomId;
     if (lastMessage.type === 'error') {
       if (isGiftPending) setIsGiftPending(false);
+      pendingChatRef.current.clear();
       setSendError(lastMessage.payload?.message || 'Unable to send message.');
+      return;
+    }
+    if (lastMessage.type === 'send_confirm') {
+      const messageId = String(lastMessage.id || '');
+      const text = pendingChatRef.current.get(messageId);
+      if (!text) return;
+      pendingChatRef.current.delete(messageId);
+      setMessages((current) => current.some((message) => message.id === messageId)
+        ? current
+        : [...current, {
+            id: messageId,
+            senderId: '',
+            senderName: 'You',
+            avatarUrl: '',
+            text,
+          }]);
       return;
     }
     if (msgRoomId !== roomId) return;
@@ -78,7 +96,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string) 
           : [...current, {
               id: messageId,
               senderId: lastMessage.from || '',
-              senderName: lastMessage.from || 'Viewer',
+              senderName: lastMessage.from_name || lastMessage.fromName || 'Viewer',
               avatarUrl: '',
               text: lastMessage.payload?.text || '',
             }]);
@@ -155,9 +173,12 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string) 
     if (!roomId || !safeText || isStreamEnded) return;
 
     setSendError(null);
-    if (!sendMessage('chat_message', { text: safeText }, roomId)) {
+    const messageId = sendMessage('chat_message', { text: safeText }, roomId);
+    if (!messageId) {
       setSendError('Unable to send message.');
+      return;
     }
+    pendingChatRef.current.set(messageId, safeText);
   }, [roomId, sendMessage, isStreamEnded]);
 
   const retractMessage = useCallback((messageId: string) => {
