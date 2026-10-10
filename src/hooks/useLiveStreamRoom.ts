@@ -13,7 +13,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
   const hasConnectedRef = useRef(false);
   const pendingChatRef = useRef(new Map<string, string>());
   
-  const { updateBalanceLocally } = useWallet();
+  const { updateBalanceLocally, refreshBalance } = useWallet();
   const { isConnected, sendMessage, lastMessage } = useWebSocket();
 
   useEffect(() => {
@@ -77,6 +77,19 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
           }]);
       return;
     }
+    if (lastMessage.type === 'gift_confirm') {
+      const confirm = lastMessage.payload;
+      const newBalance = confirm?.balance_coins ?? confirm?.balanceCoins;
+      if (newBalance !== undefined) {
+        updateBalanceLocally(Number(newBalance));
+      }
+      setIsGiftPending(false);
+      return;
+    }
+    if (lastMessage.type === 'stream_earnings') {
+      void refreshBalance();
+      return;
+    }
     if (msgRoomId !== roomId) return;
   	const metaData = lastMessage.meta_data || lastMessage.metaData;
 
@@ -128,17 +141,6 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
         break;
       }
 
-      case 'gift_confirm': {
-        // Private ack just for the sender
-        const confirm = lastMessage.payload;
-        const newBalance = confirm?.balance_coins || confirm?.balanceCoins;
-        if (newBalance !== undefined) {
-          updateBalanceLocally(Number(newBalance));
-        }
-        setIsGiftPending(false);
-        break;
-      }
-
       case 'message_retracted': {
         const messageId = lastMessage.payload?.message_id || lastMessage.payload?.messageId;
         if (messageId) setMessages((current) => current.filter((message) => message.id !== messageId));
@@ -151,7 +153,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
         break;
       }
     }
-  }, [lastMessage, roomId, creatorUsername, updateBalanceLocally]);
+  }, [lastMessage, roomId, creatorUsername, refreshBalance, updateBalanceLocally]);
 
   // 3. Send a gift
   const sendGift = useCallback((giftId: number, message: string = "") => {
