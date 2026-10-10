@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWallet } from '../context/WalletContext';
 import { useWebSocket } from '../context/WebSocketContext';
+import { useAuth } from '../context/AuthContext';
 import { streamService } from '../services/streamService';
 import type { LiveChatMessage } from '../types/streamEvents';
 
@@ -14,7 +15,10 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
   const pendingChatRef = useRef(new Map<string, string>());
   
   const { updateBalanceLocally, refreshBalance } = useWallet();
+  const { user } = useAuth();
   const { isConnected, sendMessage, lastMessage } = useWebSocket();
+  const ownUserID = user?.user_id;
+  const ownAvatarURL = user?.avatar_url || '';
 
   useEffect(() => {
     if (!isConnected) return;
@@ -72,7 +76,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
             id: messageId,
             senderId: '',
             senderName: 'You',
-            avatarUrl: '',
+            avatarUrl: ownAvatarURL,
             text,
           }]);
       return;
@@ -122,14 +126,16 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
       case 'gift_sent': {
         const gift = lastMessage.payload;
         const messageId = String(lastMessage.id || `${gift?.sender_id || gift?.senderId}-${Date.now()}`);
+        const senderID = gift?.sender_id || gift?.senderId || '';
+        const isOwnGift = senderID === ownUserID;
         const senderUsername = gift?.sender_username || gift?.senderUsername || '';
         setMessages((current) => current.some((message) => message.id === messageId)
           ? current
           : [...current, {
               id: messageId,
-              senderId: gift?.sender_id || gift?.senderId || '',
-              senderName: gift?.sender_name || gift?.senderName || senderUsername || 'Viewer',
-              avatarUrl: gift?.sender_avatar_url || gift?.senderAvatarUrl || '',
+              senderId: senderID,
+              senderName: isOwnGift ? 'You' : gift?.sender_name || gift?.senderName || senderUsername || 'Viewer',
+              avatarUrl: isOwnGift ? ownAvatarURL : gift?.sender_avatar_url || gift?.senderAvatarUrl || '',
               isCreator: senderUsername === creatorUsername,
               text: gift?.message || '',
               gift: {
@@ -153,7 +159,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
         break;
       }
     }
-  }, [lastMessage, roomId, creatorUsername, refreshBalance, updateBalanceLocally]);
+  }, [lastMessage, roomId, creatorUsername, ownAvatarURL, ownUserID, refreshBalance, updateBalanceLocally]);
 
   // 3. Send a gift
   const sendGift = useCallback((giftId: number, message: string = "") => {
