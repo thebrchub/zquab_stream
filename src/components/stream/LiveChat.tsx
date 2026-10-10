@@ -8,7 +8,7 @@ interface LiveChatProps {
   onSpendCoins: (amount: number, giftId?: number, message?: string) => void;
   onTopUpClick?: () => void;
   role: 'viewer' | 'creator';
-  recentGifts?: any[]; // 🚀 Added to receive WebSocket events
+  recentGifts?: any[];
 }
 
 export const LiveChat: React.FC<LiveChatProps> = ({
@@ -16,7 +16,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   onSpendCoins,
   onTopUpClick,
   role,
-  recentGifts = [], // 🚀 Destructured here
+  recentGifts = [],
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES);
   const [inputText, setInputText] = useState<string>('');
@@ -24,19 +24,17 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   const [insufficientFundsGift, setInsufficientFundsGift] = useState<string | null>(null);
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
-  const processedGifts = useRef<Set<any>>(new Set()); // 🚀 Prevents duplicate chat injections
+  const processedGifts = useRef<Set<any>>(new Set());
   const { gifts } = useWallet();
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 🚀 THE MAGIC: Listen for incoming WebSocket gifts and push to chat
   useEffect(() => {
     if (!recentGifts || recentGifts.length === 0) return;
 
     recentGifts.forEach((gift) => {
-      // If we haven't seen this specific event object yet, add it to chat
       if (!processedGifts.current.has(gift)) {
         processedGifts.current.add(gift);
         
@@ -131,15 +129,17 @@ export const LiveChat: React.FC<LiveChatProps> = ({
               
               <div className="min-w-0">
                 {item.gift ? (
-                  /* Bespoke, High-End Gift Card */
-                  <div className="relative bg-[#0c0c0e] border border-zinc-800/80 rounded-lg p-2.5 mt-0.5 shadow-sm ring-1 ring-amber-500/10 overflow-hidden">
+                  /* 🛠️ Claymorphic High-End Gift Card */
+                  <div className="relative bg-[#0c0c0e] border border-zinc-800/50 rounded-xl p-2.5 mt-0.5 shadow-[4px_4px_10px_rgba(0,0,0,0.5),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.05),inset_-1px_-1px_2px_rgba(0,0,0,0.3)] overflow-hidden group-hover:border-amber-500/30 transition-colors">
                     <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-amber-500/0 via-amber-500/40 to-amber-500/0" />
                     
                     <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-1.5">
                       <span className="text-[13px] font-extrabold text-amber-500 drop-shadow-sm">{item.userName}</span>
                       <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Sent</span>
                       <span className="text-[13px] font-bold text-zinc-200">{item.gift.name}</span>
-                      <div className="ml-auto flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md">
+                      
+                      {/* 🛠️ Claymorphic Coin Badge */}
+                      <div className="ml-auto flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md shadow-[inset_1px_1px_2px_rgba(0,0,0,0.3),inset_-1px_-1px_2px_rgba(255,255,255,0.05)]">
                         <span className="text-sm leading-none drop-shadow-md">{item.gift.icon}</span>
                         <span className="text-[11px] font-black text-amber-400">{item.gift.coins}</span>
                       </div>
@@ -165,34 +165,36 @@ export const LiveChat: React.FC<LiveChatProps> = ({
       </div>
 
       {/* --- Unified Input Action Bar --- */}
-      <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#09090b] via-[#09090b] to-transparent pt-8 pb-4 px-4 z-30">
+      <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#09090b] via-[#09090b] to-transparent pt-8 pb-4 px-4 z-30 pointer-events-none">
         
         {showGiftDrawer && (
-          <div className="mb-3 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-3 animate-in slide-in-from-bottom-2 fade-in duration-200">
+          /* 🛠️ Claymorphic Gift Drawer */
+          <div className="mb-3 bg-zinc-900 border border-white/5 rounded-2xl p-3 animate-in slide-in-from-bottom-2 fade-in duration-200 shadow-[0_-8px_20px_rgba(0,0,0,0.5),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.4)] pointer-events-auto">
             <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Select Gift</span>
-              <button onClick={() => setShowGiftDrawer(false)} className="text-zinc-500 hover:text-white transition-colors">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest drop-shadow-sm">Select Gift</span>
+              <button onClick={() => setShowGiftDrawer(false)} className="text-zinc-500 hover:text-white transition-colors active:scale-95">
                 <X className="w-4 h-4" />
               </button>
             </div>
             
             {insufficientFundsGift && (
-              <div className="mb-3 p-2 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-between">
-                <span className="text-xs text-red-400 font-medium">Need coins for {insufficientFundsGift}</span>
-                <button onClick={onTopUpClick} className="text-[10px] font-bold uppercase tracking-wider text-white bg-red-600 hover:bg-red-500 px-2 py-1 rounded">Top Up</button>
+              <div className="mb-3 p-2 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-between shadow-[inset_1px_1px_3px_rgba(0,0,0,0.3)]">
+                <span className="text-xs text-red-400 font-medium drop-shadow-sm">Need coins for {insufficientFundsGift}</span>
+                <button onClick={onTopUpClick} className="text-[10px] font-bold uppercase tracking-wider text-white bg-red-600 hover:bg-red-500 px-2 py-1 rounded shadow-md active:scale-95 transition-all">Top Up</button>
               </div>
             )}
 
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
               {gifts.map((gift) => (
+                /* 🛠️ Tactile Claymorphic Gift Buttons */
                 <button
                   key={gift.id}
                   onClick={() => handleSendGift(gift)}
-                  className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] transition-colors group"
+                  className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.02] hover:bg-white/[0.04] transition-all duration-200 group shadow-[2px_2px_6px_rgba(0,0,0,0.4),-1px_-1px_4px_rgba(255,255,255,0.02)] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.5),-2px_-2px_6px_rgba(255,255,255,0.04)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]"
                 >
                   <span className="text-2xl mb-1 group-hover:scale-110 transition-transform">{gift.icon}</span>
-                  <span className="text-[10px] text-zinc-400 font-medium truncate w-full text-center">{gift.name}</span>
-                  <span className="text-[10px] text-amber-400 font-bold mt-0.5">{gift.cost_coins}</span>
+                  <span className="text-[10px] text-zinc-400 font-medium truncate w-full text-center drop-shadow-sm">{gift.name}</span>
+                  <span className="text-[10px] text-amber-400 font-bold mt-0.5 drop-shadow-sm">{gift.cost_coins}</span>
                 </button>
               ))}
             </div>
@@ -200,12 +202,15 @@ export const LiveChat: React.FC<LiveChatProps> = ({
         )}
 
         {role === 'viewer' && (
-          <form onSubmit={handleSendMessage} className="flex items-center gap-2 p-1.5 bg-white/[0.03] border border-white/10 hover:border-white/20 focus-within:border-indigo-500/50 focus-within:bg-white/[0.05] rounded-2xl transition-all shadow-lg">
+          /* 🛠️ Claymorphic Inset Input Well */
+          <form onSubmit={handleSendMessage} className="flex items-center gap-2 p-1.5 bg-white/[0.02] border border-white/5 hover:border-white/10 focus-within:border-indigo-500/30 focus-within:bg-white/[0.04] rounded-2xl transition-all pointer-events-auto shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3),inset_-1px_-1px_3px_rgba(255,255,255,0.03)]">
             <button
               type="button"
               onClick={() => setShowGiftDrawer((prev) => !prev)}
-              className={`p-2 rounded-xl transition-all shrink-0 ${
-                showGiftDrawer ? 'bg-amber-500/20 text-amber-400' : 'text-zinc-400 hover:text-amber-400 hover:bg-white/5'
+              className={`p-2 rounded-xl transition-all shrink-0 active:scale-95 ${
+                showGiftDrawer 
+                  ? 'bg-amber-500/20 text-amber-400 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.2)]' 
+                  : 'text-zinc-400 hover:text-amber-400 hover:bg-white/5 shadow-[2px_2px_4px_rgba(0,0,0,0.2),-1px_-1px_2px_rgba(255,255,255,0.02)] hover:shadow-[3px_3px_6px_rgba(0,0,0,0.3),-1px_-1px_3px_rgba(255,255,255,0.03)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]'
               }`}
             >
               <Gift className="w-4 h-4" />
@@ -216,13 +221,13 @@ export const LiveChat: React.FC<LiveChatProps> = ({
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder="Send a message..."
-              className="flex-1 bg-transparent py-1.5 px-1 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none"
+              className="flex-1 bg-transparent py-1.5 px-1 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none drop-shadow-sm"
             />
             
             <button
               type="submit"
               disabled={!inputText.trim()}
-              className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-transparent disabled:text-zinc-600 text-white transition-colors shrink-0"
+              className="p-2 rounded-xl bg-[#4F46E5] hover:brightness-110 disabled:bg-white/5 disabled:text-zinc-600 text-white transition-all shrink-0 active:scale-95 disabled:shadow-none shadow-[2px_2px_5px_rgba(0,0,0,0.4),-1px_-1px_3px_rgba(255,255,255,0.05),inset_1px_1px_2px_rgba(255,255,255,0.2),inset_-1px_-1px_2px_rgba(0,0,0,0.3)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.4)] border-none"
             >
               <Send className="w-4 h-4" />
             </button>

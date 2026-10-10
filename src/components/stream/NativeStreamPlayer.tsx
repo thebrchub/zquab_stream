@@ -7,6 +7,8 @@ interface NativeStreamPlayerProps {
   isMuted: boolean;
   videoRef: React.RefObject<HTMLVideoElement | null>; // 🚀 Added "| null" here
   onLiveEdgeChange: (isLive: boolean) => void;
+  quality?: string;
+  isLowLatency?: boolean;
 }
 
 export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({

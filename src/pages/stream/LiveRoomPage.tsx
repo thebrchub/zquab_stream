@@ -7,10 +7,11 @@ import { useWallet } from '../../context/WalletContext';
 import { NativeStreamPlayer } from '../../components/stream/NativeStreamPlayer';
 import { streamService, type StreamMetadata } from '../../services/streamService';
 import { creatorService, type CreatorProfile } from '../../services/creatorService';
+import { StreamSettingsMenu } from '../../components/stream/StreamSettingsMenu';
 import { 
   Loader2, AlertCircle, ArrowLeft, 
   Eye, Heart, Share2, Activity, StopCircle, BadgeCheck,
-  Play, Pause, Volume2, VolumeX, Settings, Maximize, Minimize, MessageSquare,
+  Play, Pause, Volume1, Volume2, VolumeX, Settings, Maximize, Minimize, MessageSquare,
   X, Users, Lock, Coins
 } from 'lucide-react';
 
@@ -36,13 +37,21 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
 
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
+  const [volume, setVolume] = useState(1);
+  const [prevVolume, setPrevVolume] = useState(1);
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   
   const [showProfileOverlay, setShowProfileOverlay] = useState(false);
   const [isAtLiveEdge, setIsAtLiveEdge] = useState(true);
-  
   const [isUserActive, setIsUserActive] = useState(true);
+  
+  // 🛠️ Settings Menu State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [streamQuality, setStreamQuality] = useState('Auto');
+  const [isLowLatency, setIsLowLatency] = useState(true);
+
   const [stream, setStream] = useState<StreamMetadata | null>(null);
   const [isLoadingStream, setIsLoadingStream] = useState(true);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -51,8 +60,27 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
   const activityTimeoutRef = useRef<number | null>(null);
 
-  const playerContainerRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const videoColumnRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = volume;
+      videoRef.current.muted = isMuted || volume === 0;
+    }
+  }, [volume, isMuted]);
+
+  const handleMuteToggle = () => {
+    if (isMuted || volume === 0) {
+      setIsMuted(false);
+      setVolume(prevVolume > 0 ? prevVolume : 1);
+    } else {
+      setIsMuted(true);
+      setPrevVolume(volume);
+      setVolume(0);
+    }
+  };
 
   const handleInteraction = () => {
     setIsUserActive(true);
@@ -134,10 +162,26 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   }, []);
 
   const toggleFullscreen = async () => {
+    const isMobile = window.innerWidth < 1024;
+    const targetRef = isMobile ? videoColumnRef : rootRef;
+
     if (!document.fullscreenElement) {
-      await playerContainerRef.current?.requestFullscreen();
+      await targetRef.current?.requestFullscreen().catch(() => {});
     } else {
-      await document.exitFullscreen();
+      await document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  // 🛠️ Picture-in-Picture Logic
+  const handleTogglePiP = async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (document.pictureInPictureEnabled && videoRef.current) {
+        await videoRef.current.requestPictureInPicture();
+      }
+    } catch (err) {
+      console.error("PiP failed to initialize", err);
     }
   };
 
@@ -158,8 +202,9 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const activeIsLoading = streamMode === 'mock' ? false : apiIsLoading;
   const activeError = streamMode === 'mock' ? null : apiError;
 
-  const showMobileUI = isChatCollapsed || isUserActive || !isPlaying || showProfileOverlay;
-  const showDesktopUI = isHoveringPlayer || !isPlaying || showProfileOverlay;
+  // 🛠️ Keep UI visible if the settings menu is open
+  const showMobileUI = isChatCollapsed || isUserActive || !isPlaying || showProfileOverlay || isSettingsOpen;
+  const showDesktopUI = isHoveringPlayer || !isPlaying || showProfileOverlay || isSettingsOpen;
   const uiVisibilityClasses = `transition-opacity duration-300 pointer-events-none ${showMobileUI ? 'opacity-100' : 'opacity-0'} ${showDesktopUI ? 'lg:opacity-100' : 'lg:opacity-0'}`;
 
   const handleLeaveRoom = () => {
@@ -172,7 +217,6 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
 
   const handleFollow = async () => {
     if (isFollowActionLoading) return;
-
     setIsFollowActionLoading(true);
     try {
       if (isFollowing) {
@@ -196,18 +240,15 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-[100dvh] w-full bg-[#0e0e10] text-gray-100 overflow-hidden font-sans">
+    <div ref={rootRef} className="flex flex-col lg:flex-row h-[100dvh] w-full bg-[#0e0e10] text-gray-100 overflow-hidden font-sans">
       
       {/* --- LEFT COLUMN: Video & Meta --- */}
       <div 
-        ref={playerContainerRef}
+        ref={videoColumnRef}
         className={`
-          relative bg-black flex flex-col justify-between overflow-hidden group shrink-0
+          relative bg-black flex flex-col justify-between overflow-hidden group/player shrink-0
           transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]
-          ${isFullscreen ? 'w-full h-full' : ''}
-          ${!isFullscreen ? 'lg:flex-1' : ''}
-          ${!isFullscreen && isChatCollapsed ? 'h-full' : ''}
-          ${!isFullscreen && !isChatCollapsed ? 'h-[40vh] lg:h-auto' : ''}
+          ${isChatCollapsed ? 'h-full lg:flex-1 w-full' : 'h-[40vh] lg:h-auto lg:flex-1 w-full'}
         `}
         onMouseEnter={() => { setIsHoveringPlayer(true); handleInteraction(); }}
         onMouseLeave={() => setIsHoveringPlayer(false)}
@@ -215,7 +256,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
         onTouchStart={handleInteraction}
         onClick={() => {
           const isMobile = window.innerWidth < 1024;
-          const areControlsHidden = !isChatCollapsed && !isUserActive && isPlaying && !showProfileOverlay;
+          const areControlsHidden = !isChatCollapsed && !isUserActive && isPlaying && !showProfileOverlay && !isSettingsOpen;
           
           handleInteraction();
           
@@ -236,7 +277,6 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
             </div>
           ) : isPaywall ? (
-            // 🚀 NEW PAYWALL OVERLAY
             <div className="flex flex-col items-center max-w-sm text-center p-8 z-20 bg-zinc-950/90 backdrop-blur-md border border-amber-500/20 rounded-[2rem] shadow-2xl pointer-events-auto">
               <div className="w-16 h-16 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mb-4">
                 <Lock className="w-8 h-8" />
@@ -279,9 +319,12 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             <NativeStreamPlayer 
               streamUrl={activePlaybackUrl} 
               isPlaying={isPlaying} 
-              isMuted={isMuted} 
+              isMuted={isMuted || volume === 0} 
               videoRef={videoRef}               
               onLiveEdgeChange={setIsAtLiveEdge} 
+              // Passing settings down (NativeStreamPlayer needs to handle these eventually)
+              quality={streamQuality}
+              isLowLatency={isLowLatency}
             />
           )}
           {!activePlaybackUrl && (
@@ -406,9 +449,37 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               <button onClick={() => setIsPlaying(!isPlaying)} className="p-1 hover:bg-white/20 rounded transition-colors text-white">
                 {isPlaying ? <Pause className="w-4 h-4 lg:w-5 lg:h-5 fill-current" /> : <Play className="w-4 h-4 lg:w-5 lg:h-5 fill-current" />}
               </button>
-              <button onClick={() => setIsMuted(!isMuted)} className="p-1 hover:bg-white/20 rounded transition-colors text-white">
-                {isMuted ? <VolumeX className="w-4 h-4 lg:w-5 lg:h-5" /> : <Volume2 className="w-4 h-4 lg:w-5 lg:h-5" />}
-              </button>
+              
+              <div className="flex items-center group relative h-full">
+                <button 
+                  onClick={handleMuteToggle} 
+                  className="p-1 hover:bg-white/20 rounded transition-colors text-white z-10"
+                >
+                  {isMuted || volume === 0 
+                    ? <VolumeX className="w-4 h-4 lg:w-5 lg:h-5" /> 
+                    : volume < 0.5 
+                      ? <Volume1 className="w-4 h-4 lg:w-5 lg:h-5" /> 
+                      : <Volume2 className="w-4 h-4 lg:w-5 lg:h-5" />
+                  }
+                </button>
+                
+                <div className="hidden lg:flex items-center w-0 overflow-hidden group-hover:w-24 opacity-0 group-hover:opacity-100 transition-all duration-300 origin-left ml-1">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={isMuted ? 0 : volume}
+                    onChange={(e) => {
+                      const newVol = parseFloat(e.target.value);
+                      setVolume(newVol);
+                      if (newVol > 0 && isMuted) setIsMuted(false);
+                      if (newVol === 0 && !isMuted) setIsMuted(true);
+                    }}
+                    className="w-20 h-1 bg-white/30 rounded-full appearance-none cursor-pointer accent-white"
+                  />
+                </div>
+              </div>
               
               <button 
                 onClick={!isAtLiveEdge ? seekToLive : undefined}
@@ -440,9 +511,9 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                 <Eye className="w-3.5 h-3.5 lg:w-4 lg:h-4" /> {viewerCount.toLocaleString()}
               </span>
             </div>
-            <div className="flex items-center gap-1 lg:gap-2">
+            <div className="flex items-center gap-1 lg:gap-2 h-full">
               
-              {isChatCollapsed && (
+              {(isChatCollapsed || isFullscreen) && (
                 <button 
                   onClick={async (e) => { 
                     e.stopPropagation(); 
@@ -451,14 +522,35 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                     }
                     setIsChatCollapsed(false); 
                   }} 
-                  className="p-1 hover:bg-white/20 rounded transition-colors text-white relative group"
-                  title="Expand Chat"
+                  className={`p-1 hover:bg-white/20 rounded transition-colors text-white relative group ${!isChatCollapsed ? 'lg:hidden' : ''}`}
+                  title={isFullscreen ? "Exit Fullscreen & Open Chat" : "Expand Chat"}
                 >
                   <MessageSquare className="w-4 h-4 lg:w-5 lg:h-5" />
                 </button>
               )}
 
-              <button className="p-1 hover:bg-white/20 rounded transition-colors text-white"><Settings className="w-4 h-4 lg:w-5 lg:h-5" /></button>
+              {/* 🛠️ Integrated StreamSettingsMenu Component */}
+              <div className="relative flex items-center h-full">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setIsSettingsOpen(!isSettingsOpen); }} 
+                  className={`p-1 rounded transition-colors text-white ${isSettingsOpen ? 'bg-white/20' : 'hover:bg-white/20'}`}
+                >
+                  <Settings className="w-4 h-4 lg:w-5 lg:h-5" />
+                </button>
+
+                <StreamSettingsMenu 
+                  isOpen={isSettingsOpen}
+                  onClose={() => setIsSettingsOpen(false)}
+                  quality={streamQuality}
+                  setQuality={setStreamQuality}
+                  isLowLatency={isLowLatency}
+                  setIsLowLatency={setIsLowLatency}
+                  onPiP={handleTogglePiP}
+                  onReport={() => alert("Report dialog opened. Trust & Safety team notified.")}
+                  // onBlock={() => alert("Creator blocked. They will be hidden from your feed.")}
+                />
+              </div>
+
               <button onClick={toggleFullscreen} className="p-1 hover:bg-white/20 rounded transition-colors text-white">
                 {isFullscreen ? <Minimize className="w-4 h-4 lg:w-5 lg:h-5" /> : <Maximize className="w-4 h-4 lg:w-5 lg:h-5" />}
               </button>
@@ -472,7 +564,6 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
         className={`
           flex flex-col bg-[#09090b] shrink-0 z-40 relative
           transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]
-          ${isFullscreen ? 'hidden' : 'flex'}
           ${isChatCollapsed 
             ? 'h-0 w-full lg:h-full lg:w-0 opacity-0 overflow-hidden border-none' 
             : 'flex-1 lg:flex-none lg:h-full lg:w-[350px] opacity-100 border-t lg:border-t-0 lg:border-l border-white/5'
@@ -484,7 +575,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             role={role}
             balanceCoins={balanceCoins}
             viewerCount={viewerCount}
-            recentGifts={recentGifts} // 🚀 ADD THIS ONE LINE
+            recentGifts={recentGifts}
             onSpendCoins={(_amount, giftId, message) => { if (giftId) sendGift(giftId, message); }}
             onOpenPurchase={openPurchaseModal}
             onToggleCollapse={() => setIsChatCollapsed(true)} 
