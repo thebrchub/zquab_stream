@@ -145,7 +145,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, retryEnter } = useStreamEntry(resolvedStreamId);
 
   const roomId = stream?.room_id;
-  const { viewerCount, messages, isGiftPending, sendError, isStreamEnded, sendChat, sendGift, retractMessage } = useLiveStreamRoom(roomId, resolvedStreamId);
+  const { viewerCount, messages, isGiftPending, sendError, isStreamEnded, sendChat, sendGift, retractMessage } = useLiveStreamRoom(roomId, resolvedStreamId, stream?.creator.username);
 
   const [isHoveringPlayer, setIsHoveringPlayer] = useState(false);
 

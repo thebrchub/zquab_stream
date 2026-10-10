@@ -28,6 +28,7 @@ export interface LiveChatMessage {
   senderId: string;
   senderName: string;
   avatarUrl: string;
+  isCreator?: boolean;
   text?: string;
   gift?: {
     name: string;

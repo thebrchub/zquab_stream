@@ -4,7 +4,7 @@ import { useWebSocket } from '../context/WebSocketContext';
 import { streamService } from '../services/streamService';
 import type { LiveChatMessage } from '../types/streamEvents';
 
-export const useLiveStreamRoom = (roomId: string | undefined, streamId: string) => {
+export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, creatorUsername?: string) => {
   const [viewerCount, setViewerCount] = useState<number>(0);
   const [messages, setMessages] = useState<LiveChatMessage[]>([]);
   const [isGiftPending, setIsGiftPending] = useState(false);
@@ -91,13 +91,15 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string) 
       case 'chat_message': {
         const messageId = String(lastMessage.id || '');
         if (!messageId) break;
+        const senderName = lastMessage.from_name || lastMessage.fromName || 'Viewer';
         setMessages((current) => current.some((message) => message.id === messageId)
           ? current
           : [...current, {
               id: messageId,
               senderId: lastMessage.from || '',
-              senderName: lastMessage.from_name || lastMessage.fromName || 'Viewer',
+              senderName,
               avatarUrl: '',
+              isCreator: senderName === creatorUsername,
               text: lastMessage.payload?.text || '',
             }]);
         break;
@@ -106,13 +108,15 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string) 
       case 'gift_sent': {
         const gift = lastMessage.payload;
         const messageId = String(lastMessage.id || `${gift?.sender_id || gift?.senderId}-${Date.now()}`);
+        const senderUsername = gift?.sender_username || gift?.senderUsername || '';
         setMessages((current) => current.some((message) => message.id === messageId)
           ? current
           : [...current, {
               id: messageId,
               senderId: gift?.sender_id || gift?.senderId || '',
-              senderName: gift?.sender_name || gift?.senderName || gift?.sender_username || gift?.senderUsername || 'Viewer',
+              senderName: gift?.sender_name || gift?.senderName || senderUsername || 'Viewer',
               avatarUrl: gift?.sender_avatar_url || gift?.senderAvatarUrl || '',
+              isCreator: senderUsername === creatorUsername,
               text: gift?.message || '',
               gift: {
                 name: gift?.gift_name || gift?.giftName || 'Gift',
@@ -146,7 +150,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string) 
         break;
       }
     }
-  }, [lastMessage, roomId, updateBalanceLocally]);
+  }, [lastMessage, roomId, creatorUsername, updateBalanceLocally]);
 
   // 3. Send a gift
   const sendGift = useCallback((giftId: number, message: string = "") => {

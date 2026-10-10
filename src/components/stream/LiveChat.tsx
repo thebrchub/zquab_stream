@@ -1,7 +1,19 @@
 import React, { useState, useRef } from 'react';
 import type { LiveChatMessage } from '../../types/streamEvents';
 import { useWallet, type GiftItem } from '../../context/WalletContext'; 
-import { Send, Gift, X, Trash2, Ban } from 'lucide-react';
+import { Send, Gift, X, Trash2, Ban, BadgeCheck, Crown, Flame, Heart, Rocket } from 'lucide-react';
+
+const giftIcons = {
+  heart_icon: Heart,
+  fire_icon: Flame,
+  rocket_icon: Rocket,
+  crown_icon: Crown,
+};
+
+const GiftCatalogIcon: React.FC<{ icon: string; className: string }> = ({ icon, className }) => {
+  const Icon = giftIcons[icon as keyof typeof giftIcons] || Gift;
+  return <Icon aria-hidden="true" className={className} />;
+};
 
 interface LiveChatProps {
   userBalance: number;
@@ -91,11 +103,14 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                     <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-amber-500/0 via-amber-500/40 to-amber-500/0" />
                     
                     <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-1.5">
-                      <span className="text-[13px] font-extrabold text-amber-500 drop-shadow-sm">{item.senderName}</span>
+                      <span className="inline-flex items-center gap-1 text-[13px] font-extrabold text-amber-500 drop-shadow-sm">
+                        {item.senderName}
+                        {item.isCreator && <span title="Stream creator"><BadgeCheck className="w-3.5 h-3.5" /></span>}
+                      </span>
                       <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Sent</span>
                       <span className="text-[13px] font-bold text-zinc-200">{item.gift.name}</span>
                       <div className="ml-auto flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md">
-                        <span className="text-sm leading-none drop-shadow-md">{item.gift.icon}</span>
+                        <GiftCatalogIcon icon={item.gift.icon} className="w-4 h-4 text-amber-400" />
                         <span className="text-[11px] font-black text-amber-400">{item.gift.coins}</span>
                       </div>
                     </div>
@@ -108,7 +123,10 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                 ) : (
                   /* Standard Text Layout */
                   <div className="leading-snug mt-1">
-                    <span className="text-[13px] font-bold text-zinc-400 mr-2.5 align-baseline">{item.senderName}</span>
+                    <span className="inline-flex items-center gap-1 text-[13px] font-bold text-zinc-400 mr-2.5 align-baseline">
+                      {item.senderName}
+                      {item.isCreator && <span title="Stream creator"><BadgeCheck className="w-3.5 h-3.5 text-amber-400" /></span>}
+                    </span>
                     <span className="text-[13px] text-zinc-200 break-words break-all whitespace-pre-wrap align-baseline">{item.text}</span>
                   </div>
                 )}
@@ -148,7 +166,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                   disabled={isGiftPending || isStreamEnded}
                   className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] disabled:opacity-50 transition-colors group"
                 >
-                  <span className="text-2xl mb-1 group-hover:scale-110 transition-transform">{gift.icon}</span>
+                  <GiftCatalogIcon icon={gift.icon} className="w-6 h-6 mb-1 text-amber-400 group-hover:scale-110 transition-transform" />
                   <span className="text-[10px] text-zinc-400 font-medium truncate w-full text-center">{gift.name}</span>
                   <span className="text-[10px] text-amber-400 font-bold mt-0.5">{gift.cost_coins}</span>
                 </button>
