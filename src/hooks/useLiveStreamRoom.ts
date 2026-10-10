@@ -18,6 +18,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
   const { user } = useAuth();
   const { isConnected, sendMessage, lastMessage } = useWebSocket();
   const ownUserID = user?.user_id;
+  const ownUsername = user?.username;
   const ownAvatarURL = user?.avatar_url || '';
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
             senderId: '',
             senderName: 'You',
             avatarUrl: ownAvatarURL,
+            isCreator: ownUsername !== undefined && creatorUsername !== undefined && ownUsername === creatorUsername,
             text,
           }]);
       return;
@@ -159,7 +161,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
         break;
       }
     }
-  }, [lastMessage, roomId, creatorUsername, ownAvatarURL, ownUserID, refreshBalance, updateBalanceLocally]);
+  }, [lastMessage, roomId, creatorUsername, ownAvatarURL, ownUserID, ownUsername, refreshBalance, updateBalanceLocally]);
 
   // 3. Send a gift
   const sendGift = useCallback((giftId: number, message: string = "") => {
