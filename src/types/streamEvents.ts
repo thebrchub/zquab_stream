@@ -23,6 +23,20 @@ export interface GiftConfirmEvent {
   balance_coins: number; // The new wallet balance
 }
 
+export interface LiveChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  avatarUrl: string;
+  isCreator?: boolean;
+  text?: string;
+  gift?: {
+    name: string;
+    icon: string;
+    coins: number;
+  };
+}
+
 // Creator-only events
 export interface StreamEarningsEvent {
   earnings_coins: number;

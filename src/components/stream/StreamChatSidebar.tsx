@@ -1,13 +1,19 @@
 import React from 'react';
 import { Eye, PanelRightClose, Pin } from 'lucide-react';
 import { LiveChat } from './LiveChat';
+import type { LiveChatMessage } from '../../types/streamEvents';
 
 interface StreamChatSidebarProps {
   role: 'viewer' | 'creator';
   balanceCoins: number;
   viewerCount: number;
-  recentGifts: any[]; // 🚀 ADDED THIS
-  onSpendCoins: (amount: number, giftId?: number, message?: string) => void;
+  messages: LiveChatMessage[];
+  onSendChat: (text: string) => void;
+  onSendGift: (giftId: number, message?: string) => void;
+  onRetractMessage: (messageId: string) => void;
+  isGiftPending: boolean;
+  sendError: string | null;
+  isStreamEnded: boolean;
   onOpenPurchase?: () => void;
   onToggleCollapse: () => void;
 }
@@ -16,8 +22,13 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
   role,
   balanceCoins,
   viewerCount,
-  recentGifts, // 🚀 ADDED THIS
-  onSpendCoins,
+  messages,
+  onSendChat,
+  onSendGift,
+  onRetractMessage,
+  isGiftPending,
+  sendError,
+  isStreamEnded,
   onOpenPurchase,
   onToggleCollapse,
 }) => {
@@ -38,7 +49,7 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
         </div>
         <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
           <Eye className="w-3.5 h-3.5" />
-          {viewerCount > 0 ? viewerCount.toLocaleString() : '1,204'}
+          {viewerCount.toLocaleString()}
         </div>
       </div>
       
@@ -54,10 +65,15 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
       <div className="flex-1 overflow-hidden relative">
         <LiveChat 
           role={role}
-          userBalance={balanceCoins} 
-          onSpendCoins={onSpendCoins} 
+          userBalance={balanceCoins}
+          messages={messages}
+          onSendChat={onSendChat}
+          onSendGift={onSendGift}
+          onRetractMessage={onRetractMessage}
+          isGiftPending={isGiftPending}
+          sendError={sendError}
+          isStreamEnded={isStreamEnded}
           onTopUpClick={onOpenPurchase}
-          recentGifts={recentGifts} // 🚀 PASSED IT DOWN
         />
       </div>
     </div>

@@ -59,6 +59,12 @@ message PhotoReady {
     int64  expires_at = 4; // epoch ms when the URL/object expires
 }
 
+// MsgType "gift" — viewer request
+message GiftRequest {
+    int32  gift_id = 1;
+    string message = 2;
+}
+
 // MsgType "gift_sent" — broadcast to entire stream room
 message GiftSentEvent {
     string sender_id           = 1;
@@ -96,8 +102,24 @@ message StreamAutoEndedEvent {
 }
 
 // MsgType "gift_confirm" — sent only to gift sender (private ack)
-message GiftConfirmEvent {
+message GiftConfirm {
     int32 gift_id       = 1;
     int32 coins         = 2;
     int64 balance_coins = 3;
+}
+
+// MsgType "stream_ended" — broadcast to the stream room
+message StreamEnded {
+    string stream_id = 1;
+    string room_id   = 2;
+}
+
+// MsgType "retract_message" — creator request
+message RetractMessageRequest {
+    string message_id = 1;
+}
+
+// MsgType "message_retracted" — broadcast to the stream room
+message MessageRetracted {
+    string message_id = 1;
 }

@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
 import { CreatorApplicationModal } from '../components/studio/CreatorApplicationModal';
+import { createZAvatarURL, MAX_AVATAR_URL_LENGTH, MAX_USERNAME_LENGTH } from '../utils/avatar';
 
 const GENDER_OPTIONS = ['Prefer not to say', 'Male', 'Female', 'Other'];
 type Tab = 'friends' | 'requests' | 'search' | 'blocked';
@@ -193,6 +194,11 @@ export default function Profile() {
   }, []);
 
   const handleSave = async () => {
+    if (username.length > MAX_USERNAME_LENGTH) {
+      setError(`Username must be ${MAX_USERNAME_LENGTH} characters or fewer.`);
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
@@ -201,11 +207,12 @@ export default function Profile() {
       
       let newAvatarUrl = profile?.avatar_url;
       if (zAvatarRequested) {
-        newAvatarUrl = createAvatar(lorelei, {
-          seed: `${username}-${avatarVariant}`,
-          size: 128,
-          backgroundColor: ["b6e3f4", "c0aede", "d1d4f9", "ffd5dc", "ffdfbf"]
-        }).toDataUri();
+        newAvatarUrl = createZAvatarURL(username, avatarVariant);
+        if (newAvatarUrl.length > MAX_AVATAR_URL_LENGTH) {
+          setError(`Avatar URL must be ${MAX_AVATAR_URL_LENGTH} characters or fewer.`);
+          setSaving(false);
+          return;
+        }
         payload.avatar_url = newAvatarUrl;
       }
       
@@ -383,7 +390,7 @@ export default function Profile() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-[var(--text-main)] flex items-center gap-2"><AtSign className="w-4 h-4 text-[#3B82F6]" /> Username</label>
-                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} disabled={hasExistingUsername} className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] outline-none focus:border-[#3B82F6] disabled:opacity-50" placeholder="choose_a_username" />
+                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} disabled={hasExistingUsername} maxLength={MAX_USERNAME_LENGTH} className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] outline-none focus:border-[#3B82F6] disabled:opacity-50" placeholder="choose_a_username" />
                   {hasExistingUsername && (
                     <p className="text-[10px] text-[var(--text-muted)] mt-1 font-medium">Usernames cannot be changed once set.</p>
                   )}

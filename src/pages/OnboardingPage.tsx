@@ -8,6 +8,7 @@ import { ALL_COUNTRIES } from '../constants/countries';
 
 import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
+import { createZAvatarURL, MAX_AVATAR_URL_LENGTH, MAX_USERNAME_LENGTH } from '../utils/avatar';
 
 const GENDER_OPTIONS = ['Prefer not to say', 'Male', 'Female', 'Other'];
 
@@ -144,6 +145,12 @@ export default function OnboardingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null); 
+
+    if (username.length > MAX_USERNAME_LENGTH) {
+      setSubmitError(`Username must be ${MAX_USERNAME_LENGTH} characters or fewer.`);
+      return;
+    }
+
     setIsLoading(true); 
     
     try {
@@ -153,11 +160,12 @@ export default function OnboardingPage() {
       };
 
       if (zAvatarRequested && gender !== 'Prefer not to say') {
-        payload.avatar_url = createAvatar(lorelei, {
-          seed: `${username}-${avatarVariant}`,
-          size: 128,
-          backgroundColor: ["b6e3f4", "c0aede", "d1d4f9", "ffd5dc", "ffdfbf"]
-        }).toDataUri();
+        payload.avatar_url = createZAvatarURL(username, avatarVariant);
+        if (payload.avatar_url.length > MAX_AVATAR_URL_LENGTH) {
+          setSubmitError(`Avatar URL must be ${MAX_AVATAR_URL_LENGTH} characters or fewer.`);
+          setIsLoading(false);
+          return;
+        }
       }
 
       if (bio.trim()) payload.bio = bio.trim();
@@ -329,7 +337,7 @@ export default function OnboardingPage() {
                     'border-[var(--border-color)] focus:ring-[#3B82F6]'
                   } rounded-xl text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 transition-all`}
                   required
-                  maxLength={30}
+                  maxLength={MAX_USERNAME_LENGTH}
                 />
                 <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
                   {usernameStatus === 'checking' && <Loader2 className="w-5 h-5 text-[#3B82F6] animate-spin" />}

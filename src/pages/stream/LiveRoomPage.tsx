@@ -189,7 +189,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, retryEnter } = useStreamEntry(resolvedStreamId);
 
   const roomId = stream?.room_id;
-  const { viewerCount, recentGifts, sendGift } = useLiveStreamRoom(roomId);
+  const { viewerCount, messages, isGiftPending, sendError, isStreamEnded, sendChat, sendGift, retractMessage } = useLiveStreamRoom(roomId, resolvedStreamId, stream?.creator.username);
 
   const [isHoveringPlayer, setIsHoveringPlayer] = useState(false);
 
@@ -275,6 +275,11 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           {activeIsLoading ? (
             <div className="flex flex-col items-center gap-4 z-20 pointer-events-auto">
               <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+            </div>
+          ) : isStreamEnded ? (
+            <div className="flex flex-col items-center gap-3 text-center p-8 z-20 bg-zinc-950/90 backdrop-blur-md border border-white/10 rounded-[2rem] shadow-2xl pointer-events-auto">
+              <h3 className="text-xl font-bold text-white">Stream Ended</h3>
+              <p className="text-sm text-zinc-400">Thanks for watching.</p>
             </div>
           ) : isPaywall ? (
             <div className="flex flex-col items-center max-w-sm text-center p-8 z-20 bg-zinc-950/90 backdrop-blur-md border border-amber-500/20 rounded-[2rem] shadow-2xl pointer-events-auto">
@@ -575,8 +580,13 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             role={role}
             balanceCoins={balanceCoins}
             viewerCount={viewerCount}
-            recentGifts={recentGifts}
-            onSpendCoins={(_amount, giftId, message) => { if (giftId) sendGift(giftId, message); }}
+            messages={messages}
+            onSendChat={sendChat}
+            onSendGift={sendGift}
+            onRetractMessage={retractMessage}
+            isGiftPending={isGiftPending}
+            sendError={sendError}
+            isStreamEnded={isStreamEnded}
             onOpenPurchase={openPurchaseModal}
             onToggleCollapse={() => setIsChatCollapsed(true)} 
           />
