@@ -1,15 +1,21 @@
 syntax = "proto3";
 package chatpb;
 
+message MetaData {
+    string from = 1;
+    string from_name = 2;
+    string from_avatar_url = 3;
+    string conn_id = 4;
+}
+
 message Envelope {
     string type     = 1;
     string room_id  = 2;
-    string from     = 3;
     string to       = 4;
     bytes  payload  = 5;
     int64  ts       = 6;
     string id       = 7;
-    string from_name = 9;
+    MetaData meta_data = 10;
 }
 
 // 🛠️ NEW: Define the nested reply object

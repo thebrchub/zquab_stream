@@ -78,6 +78,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
       return;
     }
     if (msgRoomId !== roomId) return;
+  	const metaData = lastMessage.meta_data || lastMessage.metaData;
 
     switch (lastMessage.type) {
       case 'viewer_count':
@@ -91,14 +92,14 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
       case 'chat_message': {
         const messageId = String(lastMessage.id || '');
         if (!messageId) break;
-        const senderName = lastMessage.from_name || lastMessage.fromName || 'Viewer';
+		const senderName = metaData?.from_name || metaData?.fromName || 'guest';
         setMessages((current) => current.some((message) => message.id === messageId)
           ? current
           : [...current, {
               id: messageId,
-              senderId: lastMessage.from || '',
+			  senderId: metaData?.from || '',
               senderName,
-              avatarUrl: '',
+			  avatarUrl: metaData?.from_avatar_url || metaData?.fromAvatarUrl || '',
               isCreator: senderName === creatorUsername,
               text: lastMessage.payload?.text || '',
             }]);
