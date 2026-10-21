@@ -14,6 +14,8 @@ import {
   Play, Pause, Volume1, Volume2, VolumeX, Settings, Maximize, Minimize, MessageSquare,
   X, Users, Lock, Coins
 } from 'lucide-react';
+import { StreamOverlayAd } from '../../components/stream/StreamOverlayAd';
+import { AnimatePresence } from 'framer-motion';
 
 interface LiveRoomPageProps {
   streamId?: string;
@@ -185,6 +187,22 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
     }
   };
 
+  // 🛠️ In-Video Overlay Ad State
+  const [overlayAd, setOverlayAd] = useState<{
+    brandName: string;
+    message: string;
+    linkUrl: string;
+  } | null>(null);
+
+  // Listen for Overlay Ad trigger
+  useEffect(() => {
+    const handleOverlayAdTrigger = (e: any) => {
+      setOverlayAd(e.detail);
+    };
+    window.addEventListener('dev_overlay_ad_triggered', handleOverlayAdTrigger);
+    return () => window.removeEventListener('dev_overlay_ad_triggered', handleOverlayAdTrigger);
+  }, []);
+
   const { balanceCoins, openPurchaseModal } = useWallet();
   const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, retryEnter } = useStreamEntry(resolvedStreamId);
 
@@ -335,6 +353,18 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           {!activePlaybackUrl && (
             <img src={creator.avatar_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 blur-2xl pointer-events-none" />
           )}
+
+          <AnimatePresence>
+            {overlayAd && (
+              <StreamOverlayAd
+                brandName={overlayAd.brandName}
+                message={overlayAd.message}
+                linkUrl={overlayAd.linkUrl}
+                duration={5}
+                onComplete={() => setOverlayAd(null)}
+              />
+            )}
+          </AnimatePresence>
         </div>
 
         <div className={`relative z-30 p-3 lg:p-4 flex justify-between items-start ${uiVisibilityClasses}`}>

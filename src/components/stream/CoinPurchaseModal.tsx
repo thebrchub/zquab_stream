@@ -103,7 +103,7 @@ export const CoinPurchaseModal: React.FC = () => {
 
         {/* Footer info note */}
         <p className="text-[11px] text-[var(--text-muted)] font-medium text-center leading-relaxed px-4">
-          Payments are securely processed via Razorpay. Coins are credited automatically once confirmed.
+          Payments are securely processed. Coins are credited automatically once confirmed.
         </p>
       </div>
     </div>

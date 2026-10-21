@@ -3,7 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ScrollToTop from '../components/ScrollToTop'; 
-import DevMenu from '../components/DevMenu';
+
 
 
 export default function RootLayout() {
@@ -42,7 +42,7 @@ export default function RootLayout() {
       {/* 🛠️ Hide the footer on the landing page AND app interfaces */}
       {!isLandingPage && !isAppInterface && <Footer />}
 
-      <DevMenu />
+   
    
     </div>
   );

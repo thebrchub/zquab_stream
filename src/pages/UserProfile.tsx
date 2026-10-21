@@ -4,21 +4,43 @@ import { usersApi } from '../api/users';
 import { friendsApi } from '../api/friends';
 import { roomsApi } from '../api/rooms';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, UserPlus, Clock, MessageSquare, UserX, LogIn, Users, MapPin, Calendar, Activity, User, AlertTriangle, X } from 'lucide-react';
+import {
+  Loader2,
+  UserPlus,
+  Clock,
+  MessageSquare,
+  UserX,
+  LogIn,
+  Users,
+  MapPin,
+  Calendar,
+  Activity,
+  User,
+  AlertTriangle,
+  X,
+  ArrowLeft,
+  Sparkles,
+  ShieldCheck,
+  MoreHorizontal,
+  ChevronRight,
+  UserRound,
+  Check,
+  Zap,
+} from 'lucide-react';
 
 export default function UserProfile() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [profile, setProfile] = useState<any>(null);
-  const [friendsList, setFriendsList] = useState<any[]>([]); 
+  const [friendsList, setFriendsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [actionError, setActionError] = useState<string | null>(null);
   const [showUnfriendConfirm, setShowUnfriendConfirm] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   useEffect(() => {
     if (user && user.username === username) {
@@ -27,53 +49,81 @@ export default function UserProfile() {
   }, [user, username, navigate]);
 
   useEffect(() => {
+    let active = true;
+
     const fetchProfileData = async () => {
-      if (!username) return;
+      if (!username) {
+        setError('User not found');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
-        
+
         const [profileData, friendsData] = await Promise.all([
           usersApi.getUserProfile(username),
-          usersApi.getUserFriends(username).catch(() => []) 
+          usersApi.getUserFriends(username).catch(() => []),
         ]);
-        
+
+        if (!active) return;
+
         setProfile(profileData);
         setFriendsList(friendsData);
       } catch (err: any) {
-        setError(err.message || 'User not found');
+        if (active) {
+          setError(err?.message || 'User not found');
+          setProfile(null);
+        }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
-    
+
     fetchProfileData();
+
+    return () => {
+      active = false;
+    };
   }, [username]);
 
   const handleFriendAction = async () => {
     if (!profile || !username) return;
+
     setActionLoading(true);
     setActionError(null);
-    
+
     try {
       if (profile.friend_request_status === 'none') {
         await friendsApi.sendRequest(username);
-        setProfile((prev: any) => ({ ...prev, friend_request_status: 'pending_sent' }));
-      } 
-      else if (profile.friend_request_status === 'pending_sent') {
+        setProfile((prev: any) => ({
+          ...prev,
+          friend_request_status: 'pending_sent',
+        }));
+      } else if (profile.friend_request_status === 'pending_sent') {
         await friendsApi.withdrawRequest(username);
-        setProfile((prev: any) => ({ ...prev, friend_request_status: 'none' }));
-      } 
-      else if (profile.friend_request_status === 'pending_received') {
+        setProfile((prev: any) => ({
+          ...prev,
+          friend_request_status: 'none',
+        }));
+      } else if (profile.friend_request_status === 'pending_received') {
         await friendsApi.acceptRequest(username);
-        setProfile((prev: any) => ({ ...prev, friend_request_status: 'friends', friend_count: prev.friend_count + 1 }));
+        setProfile((prev: any) => ({
+          ...prev,
+          friend_request_status: 'friends',
+          friend_count: (prev.friend_count || 0) + 1,
+        }));
       }
     } catch (err: any) {
       console.error(err);
-      if (err.message && err.message.toLowerCase().includes('no pending')) {
-         setProfile((prev: any) => ({ ...prev, friend_request_status: 'none' }));
+      if (err?.message?.toLowerCase().includes('no pending')) {
+        setProfile((prev: any) => ({
+          ...prev,
+          friend_request_status: 'none',
+        }));
       } else {
-         setActionError(err.message || 'Action failed');
+        setActionError(err?.message || 'Could not complete this action.');
       }
     } finally {
       setActionLoading(false);
@@ -84,13 +134,36 @@ export default function UserProfile() {
     if (!username) return;
     setActionLoading(true);
     setActionError(null);
+
     try {
       await friendsApi.removeFriend(username);
-      setProfile({ ...profile, friend_request_status: 'none', friend_count: Math.max(0, profile.friend_count - 1) });
+      setProfile((prev: any) => ({
+        ...prev,
+        friend_request_status: 'none',
+        friend_count: Math.max(0, (prev.friend_count || 0) - 1),
+      }));
       setShowUnfriendConfirm(false);
     } catch (err: any) {
       console.error(err);
-      setActionError(err.message || 'Failed to remove friend');
+      setActionError(err?.message || 'Failed to remove friend.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectRequest = async () => {
+    if (!username) return;
+    setActionLoading(true);
+    setActionError(null);
+
+    try {
+      await friendsApi.rejectRequest(username);
+      setProfile((prev: any) => ({
+        ...prev,
+        friend_request_status: 'none',
+      }));
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to reject request.');
     } finally {
       setActionLoading(false);
     }
@@ -100,101 +173,86 @@ export default function UserProfile() {
     if (!username) return;
     setActionLoading(true);
     setActionError(null);
+
     try {
       const room = await roomsApi.createRoom(username);
-      navigate(`/home?room=${room.room_id}`, { state: { activeRoomId: room.room_id } });
+      navigate(`/home?room=${room.room_id}`, {
+        state: { activeRoomId: room.room_id },
+      });
     } catch (err: any) {
       const message = err?.message || 'Failed to start conversation';
-      setActionError(message.includes('friends') ? 'You can only message friends. Send a friend request first.' : message);
+      setActionError(
+        message.toLowerCase().includes('friends')
+          ? 'You can only message friends. Send a friend request first.'
+          : message
+      );
     } finally {
       setActionLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="w-8 h-8 text-[#3B82F6] animate-spin" />
-      </div>
-    );
-  }
-
-  if (error || !profile) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh] text-[var(--text-muted)] gap-4">
-        <UserX className="w-16 h-16 opacity-20" />
-        <h2 className="text-xl font-bold">User Not Found</h2>
-        <p className="text-sm">This account doesn't exist or is unavailable.</p>
-        <button aria-label="Go Back" onClick={() => navigate(-1)} className="text-[#3B82F6] hover:underline mt-2 font-bold">Go Back</button>
-      </div>
-    );
-  }
-
   const renderActionButton = () => {
     if (!user || user.is_guest || profile.friend_request_status === undefined) {
       return (
         <button
-        aria-label="LogIn"
           onClick={() => navigate('/auth')}
-          className="w-full sm:w-auto px-8 py-3 bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] rounded-xl font-bold hover:border-[#3B82F6] hover:text-[#3B82F6] transition-colors flex items-center justify-center gap-2"
+          className="group flex w-full items-center justify-center gap-2.5 rounded-xl bg-white/[0.04] px-5 py-3.5 text-sm font-black text-white/90 transition-all hover:bg-white/[0.08] active:scale-[0.98] sm:w-auto border border-white/10 shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.1),inset_-1px_-1px_2px_rgba(0,0,0,0.2)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.4)]"
         >
-          <LogIn className="w-5 h-5" /> Log in to connect
+          <LogIn className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          Log in to connect
         </button>
       );
     }
 
     if (profile.friend_request_status === 'friends') {
       return (
-        <div className="flex gap-3 w-full sm:w-auto">
-          <button 
-          aria-label="Message"
+        <div className="flex w-full gap-2 sm:w-auto">
+          <button
             onClick={handleMessage}
             disabled={actionLoading}
-            className="flex-1 sm:flex-none px-8 py-3 bg-[#3B82F6] text-white rounded-xl font-bold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-blue-500/20"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-500 px-5 py-3.5 text-sm font-black text-white transition-all hover:bg-blue-400 active:scale-[0.98] disabled:opacity-50 sm:flex-none shadow-[4px_4px_10px_rgba(0,0,0,0.4),-2px_-2px_6px_rgba(255,255,255,0.05),inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)] active:shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4)] border-none"
           >
-            {actionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageSquare className="w-5 h-5" />}
+            {actionLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <MessageSquare className="h-4 w-4" />
+            )}
             Message
           </button>
-          <button 
-          aria-label="Confirm Unfriend"
+
+          <button
             onClick={() => setShowUnfriendConfirm(true)}
             disabled={actionLoading}
-            className="flex-none px-4 py-3 bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-muted)] rounded-xl font-bold hover:border-red-500 hover:text-red-500 hover:bg-red-500/10 transition-colors flex items-center justify-center disabled:opacity-50"
-            title="Remove Friend"
+            title="Remove friend"
+            aria-label="Remove friend"
+            className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/60 transition-all hover:border-red-400/30 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50 shadow-[2px_2px_6px_rgba(0,0,0,0.3),-1px_-1px_4px_rgba(255,255,255,0.02)] active:scale-95 active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]"
           >
-            <UserX className="w-5 h-5" />
+            <UserX className="h-4 w-4" />
           </button>
         </div>
       );
     }
-    
+
     if (profile.friend_request_status === 'pending_received') {
       return (
-        <div className="flex gap-3 w-full sm:w-auto">
-          <button 
-          aria-label="Handle Friend"
+        <div className="flex w-full gap-2 sm:w-auto">
+          <button
             onClick={handleFriendAction}
             disabled={actionLoading}
-            className="flex-1 sm:flex-none px-8 py-3 bg-[#3B82F6] text-white rounded-xl font-bold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-blue-500/20"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-500 px-5 py-3.5 text-sm font-black text-white transition-all hover:bg-blue-400 active:scale-[0.98] disabled:opacity-50 sm:flex-none shadow-[4px_4px_10px_rgba(0,0,0,0.4),-2px_-2px_6px_rgba(255,255,255,0.05),inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)] active:shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4)] border-none"
           >
-            {actionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Accept Request'}
+            {actionLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Check className="h-4 w-4" />
+            )}
+            Accept Request
           </button>
-          <button 
-          aria-label="Reject Request"
-            onClick={async () => {
-              setActionLoading(true);
-              setActionError(null);
-              try {
-                 await friendsApi.rejectRequest(username!);
-                 setProfile((prev: any) => ({ ...prev, friend_request_status: 'none' }));
-              } catch (err: any) {
-                 setActionError(err.message || 'Failed to reject request');
-              } finally {
-                 setActionLoading(false);
-              }
-            }}
+
+          <button
+            onClick={handleRejectRequest}
             disabled={actionLoading}
-            className="flex-1 sm:flex-none px-8 py-3 bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] rounded-xl font-bold hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/30 transition-colors disabled:opacity-50"
+            className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-bold text-white/60 transition-all hover:border-red-400/30 hover:text-red-400 disabled:opacity-50 shadow-[2px_2px_6px_rgba(0,0,0,0.3),-1px_-1px_4px_rgba(255,255,255,0.02)] active:scale-95 active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]"
           >
             Reject
           </button>
@@ -202,210 +260,524 @@ export default function UserProfile() {
       );
     }
 
-    const isPendingSent = profile.friend_request_status === 'pending_sent';
-    
+    const pending = profile.friend_request_status === 'pending_sent';
+
     return (
-      <button 
-      aria-label="Handle Friend"
+      <button
         onClick={handleFriendAction}
         disabled={actionLoading}
-        className={`w-full sm:w-auto px-8 py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50
-          ${isPendingSent 
-            ? 'bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10 hover:border-red-500/30' 
-            : 'bg-[#3B82F6] text-white hover:bg-blue-600 shadow-lg shadow-blue-500/20'
-          }`}
+        className={`flex w-full items-center justify-center gap-2.5 rounded-xl px-5 py-3.5 text-sm font-black transition-all active:scale-[0.98] disabled:opacity-50 sm:w-auto ${
+          pending
+            ? 'border border-white/10 bg-white/[0.04] text-white/70 hover:border-red-400/30 hover:text-red-400 shadow-[2px_2px_6px_rgba(0,0,0,0.3),-1px_-1px_4px_rgba(255,255,255,0.02)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]'
+            : 'bg-blue-500 text-white hover:bg-blue-400 border-none shadow-[4px_4px_10px_rgba(0,0,0,0.4),-2px_-2px_6px_rgba(255,255,255,0.05),inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)] active:shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4)]'
+        }`}
       >
         {actionLoading ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
-        ) : isPendingSent ? (
-          <>
-            <Clock className="w-5 h-5" /> Cancel Request
-          </>
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : pending ? (
+          <Clock className="h-4 w-4" />
         ) : (
-          <>
-            <UserPlus className="w-5 h-5" /> Add Friend
-          </>
+          <UserPlus className="h-4 w-4" />
         )}
+        {pending ? 'Request Sent · Cancel' : 'Add Friend'}
       </button>
     );
   };
 
-  // 🎨 UI Logic: Format the date beautifully
-  const joinedDate = profile.doj ? new Date(profile.doj).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Unknown';
+  if (loading) {
+    return (
+      <div className="flex min-h-[65vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-500/10">
+            <Loader2 className="h-7 w-7 animate-spin text-blue-400" />
+            <div className="absolute -inset-2 rounded-3xl border border-blue-400/10" />
+          </div>
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-white/40">
+            Loading profile
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-  // 🎨 UI Logic: Determine gender colors
+  if (error || !profile) {
+    return (
+      <div className="flex min-h-[65vh] flex-col items-center justify-center px-6 text-center">
+        <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-3xl border border-red-400/15 bg-red-500/[0.06]">
+          <UserX className="h-9 w-9 text-red-400/70" />
+        </div>
+        <p className="mb-2 text-[10px] font-black uppercase tracking-[0.3em] text-red-400">
+          Profile unavailable
+        </p>
+        <h2 className="text-2xl font-black tracking-tight text-white">
+          User not found
+        </h2>
+        <p className="mt-2 max-w-sm text-sm leading-6 text-white/45">
+          This account may not exist anymore, or it may be temporarily unavailable.
+        </p>
+        <button
+          onClick={() => navigate(-1)}
+          className="mt-6 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white transition hover:bg-white/[0.08]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Go back
+        </button>
+      </div>
+    );
+  }
+
+  const joinedDate = profile.doj
+    ? new Date(profile.doj).toLocaleDateString('en-US', {
+        month: 'short',
+        year: 'numeric',
+      })
+    : 'Unknown';
+
   const genderLower = profile.gender?.toLowerCase() || '';
   const isMale = genderLower === 'male';
   const isFemale = genderLower === 'female';
 
+  const displayName = profile.name || profile.username || 'User';
+  const initials = displayName.charAt(0).toUpperCase();
+  const friendCount = profile.friend_count || 0;
+
   return (
-    <div className="max-w-4xl mx-auto w-full p-4 md:p-6 lg:p-8 pb-24 relative">
-      
-      {actionError && (
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 mt-4 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
-           <div className="bg-red-500 text-white px-4 py-2 rounded-xl shadow-lg font-semibold flex items-center gap-2">
-             <AlertTriangle className="w-4 h-4" />
-             {actionError}
-             <button aria-label="Close" onClick={() => setActionError(null)} className="ml-2 hover:text-red-200">
-               <X className="w-4 h-4" />
-             </button>
-           </div>
-        </div>
-      )}
+    <main className="relative mx-auto w-full max-w-6xl overflow-hidden px-4 pb-20 pt-5 sm:px-6 sm:pt-8 lg:px-8">
+      {/* Background decoration */}
+      <div className="pointer-events-none absolute left-1/2 top-0 -z-10 h-80 w-[90%] -translate-x-1/2 rounded-full bg-blue-500/[0.07] blur-[100px]" />
+      <div className="pointer-events-none absolute right-[-150px] top-72 -z-10 h-72 w-72 rounded-full bg-indigo-500/[0.06] blur-[100px]" />
 
-      {showUnfriendConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 sm:p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-6 mx-auto border border-red-500/20">
-              <AlertTriangle className="w-8 h-8" />
-            </div>
-            <h3 className="text-2xl font-black text-[var(--text-main)] text-center mb-2">Remove Friend?</h3>
-            <p className="text-[var(--text-muted)] text-center mb-8 leading-relaxed">
-              Are you sure you want to unfriend <strong className="text-[var(--text-main)]">{profile.name}</strong>? Your chat history with them will be permanently wiped out, and you won't be able to message them again unless you reconnect.
-            </p>
-            <div className="flex gap-3">
-              <button 
-              aria-label="Show Cancel"
-                onClick={() => setShowUnfriendConfirm(false)}
-                disabled={actionLoading}
-                className="flex-1 py-3.5 bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] rounded-xl font-bold hover:border-[#3B82F6] transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button 
-              aria-label="Handle Unfriend"
-                onClick={handleUnfriend}
-                disabled={actionLoading}
-                className="flex-1 py-3.5 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-red-500/25"
-              >
-                {actionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Unfriend'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Top navigation */}
+      <div className="mb-6 flex items-center justify-between">
+        <button
+          onClick={() => navigate(-1)}
+          className="group inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.025] px-3.5 py-2.5 text-xs font-bold text-white/60 transition hover:border-white/15 hover:bg-white/[0.05] hover:text-white shadow-[2px_2px_4px_rgba(0,0,0,0.3),-1px_-1px_2px_rgba(255,255,255,0.02)] active:scale-95 active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]"
+        >
+          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+          Back
+        </button>
 
-      {/* --- PROFILE HEADER CARD --- */}
-      <div className="bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] overflow-hidden shadow-sm mb-8 relative z-10">
-        
-        <div className="h-32 sm:h-48 bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-purple-500/20 w-full relative"></div>
-        
-        <div className="px-6 sm:px-10 pb-8 relative">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-16 sm:-mt-20 mb-6 relative z-10">
-            <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-[var(--card)] bg-[var(--border-color)] overflow-hidden flex items-center justify-center shadow-xl">
-              {profile.avatar_url ? (
-                <img src={profile.avatar_url} alt={profile.name} className="w-full h-full object-cover scale-110" />
-              ) : (
-                <span className="text-5xl font-black text-[var(--text-muted)]">{profile.name?.charAt(0)?.toUpperCase()}</span>
-              )}
-            </div>
-            
-            <div className="flex-shrink-0 w-full sm:w-auto">
-              {renderActionButton()}
-            </div>
-          </div>
-          
-          <div>
-            <h1 className="text-3xl font-black text-[var(--text-main)] leading-tight tracking-tight">{profile.name}</h1>
-            <p className="text-base text-[var(--text-muted)] font-medium mb-4">@{profile.username}</p>
-            
-            <div className="flex flex-wrap items-center gap-3 text-sm font-medium mb-6">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] shadow-sm">
-                <Users className="w-4 h-4 text-[#3B82F6]" />
-                <strong>{profile.friend_count || 0}</strong> <span className="text-[var(--text-muted)]">Friends</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] shadow-sm">
-                <Calendar className="w-4 h-4 text-[#3B82F6]" />
-                <span className="text-[var(--text-muted)]">Joined {joinedDate}</span>
-              </div>
-              {profile.country && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] shadow-sm">
-                  <MapPin className="w-4 h-4 text-[#3B82F6]" />
-                  <span className="text-[var(--text-muted)]">{profile.country}</span>
-                </div>
-              )}
-              {profile.age && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--background)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] shadow-sm">
-                  {/* Swapped to Activity for Age */}
-                  <Activity className="w-4 h-4 text-[#3B82F6]" />
-                  <span>{profile.age} <span className="text-[var(--text-muted)] font-medium">Yrs</span></span>
-                </div>
-              )}
-              {/* 🎨 UI FIX: Colored Gender Pills */}
-              {profile.gender && profile.gender !== 'Any' && (
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-xl font-bold shadow-sm ${
-                  isMale ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 
-                  isFemale ? 'bg-pink-500/10 text-pink-500 border-pink-500/20' : 
-                  'bg-purple-500/10 text-purple-500 border-purple-500/20'
-                }`}>
-                  <User className="w-4 h-4" />
-                  <span>{profile.gender}</span>
-                </div>
-              )}
-            </div>
-
-            {profile.bio && (
-              <p className="text-[var(--text-main)] text-base leading-relaxed bg-[var(--background)]/50 p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
-                {profile.bio}
-              </p>
-            )}
-          </div>
+        <div className="flex items-center gap-2 rounded-full border border-blue-400/15 bg-blue-400/[0.06] px-3 py-1.5 shadow-[inset_1px_1px_3px_rgba(0,0,0,0.2)]">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400" />
+          <span className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-300">
+            zQuab profile
+          </span>
         </div>
       </div>
 
-      {/* --- PUBLIC FRIENDS GRID --- */}
-      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center gap-3 px-2">
-          <div className="p-2 bg-[#3B82F6]/10 text-[#3B82F6] rounded-xl">
-            <Users className="w-5 h-5" />
+      {/* 🛠️ Claymorphic Main Profile Card */}
+      <section className="relative mb-8 overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#101115] shadow-[8px_8px_20px_rgba(0,0,0,0.5),-4px_-4px_10px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.05),inset_-1px_-1px_3px_rgba(0,0,0,0.3)]">
+        {/* Cover */}
+        <div className="relative h-40 overflow-hidden sm:h-56 lg:h-64">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-700 to-fuchsia-700" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_20%,rgba(255,255,255,0.22),transparent_40%),radial-gradient(ellipse_at_80%_80%,rgba(0,0,0,0.35),transparent_50%)]" />
+
+          <div className="absolute -right-10 -top-24 h-64 w-64 rotate-12 rounded-[55px] border border-white/15 bg-white/[0.05]" />
+          <div className="absolute -right-2 -top-16 h-64 w-64 rotate-12 rounded-[55px] border border-white/10" />
+          <div className="absolute -bottom-24 left-[35%] h-56 w-56 rotate-45 rounded-[50px] border border-white/10 bg-white/[0.035]" />
+
+          <div className="absolute left-5 top-5 flex items-center gap-2 rounded-full border border-white/15 bg-black/20 px-3 py-1.5 backdrop-blur-md sm:left-7 sm:top-7 shadow-[inset_1px_1px_3px_rgba(0,0,0,0.3)]">
+            <Sparkles className="h-3.5 w-3.5 text-blue-100" />
+            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/90">
+              Community
+            </span>
           </div>
-          <h2 className="text-xl font-bold text-[var(--text-main)]">Friends</h2>
-          <span className="text-sm font-bold text-[var(--text-muted)] bg-[var(--card)] border border-[var(--border-color)] px-2 py-0.5 rounded-full">
-            {profile.friend_count || 0}
-          </span>
+
+          <div className="absolute bottom-4 right-5 hidden items-center gap-1.5 text-white/60 sm:flex drop-shadow-sm">
+            <Zap className="h-3.5 w-3.5" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em]">
+              Meet the community
+            </span>
+          </div>
+        </div>
+
+        {/* Profile body */}
+        <div className="relative px-5 pb-6 sm:px-8 sm:pb-8 lg:px-10">
+          <div className="-mt-14 mb-5 flex flex-col gap-5 sm:-mt-[76px] sm:flex-row sm:items-end sm:justify-between">
+            {/* 🛠️ Claymorphic Avatar Well */}
+            <div className="relative w-fit">
+              <div className="absolute -inset-2 rounded-[29px] bg-blue-500/20 blur-xl" />
+              <div className="relative h-28 w-28 overflow-hidden rounded-[25px] border-[5px] border-[#101115] bg-[#20232d] shadow-[4px_4px_12px_rgba(0,0,0,0.6),-2px_-2px_6px_rgba(255,255,255,0.03),inset_2px_2px_4px_rgba(255,255,255,0.1),inset_-2px_-2px_4px_rgba(0,0,0,0.4)] sm:h-36 sm:w-36 sm:rounded-[30px]">
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={`${displayName}'s avatar`}
+                    className="h-full w-full object-cover scale-105"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-500/30 via-indigo-500/20 to-fuchsia-500/30 text-4xl font-black text-white sm:text-5xl drop-shadow-md">
+                    {initials}
+                  </div>
+                )}
+              </div>
+
+              <div className="absolute -bottom-2 -right-2 flex h-9 w-9 items-center justify-center rounded-xl border-[4px] border-[#101115] bg-blue-500 text-white shadow-[2px_2px_5px_rgba(0,0,0,0.5)]">
+                <UserRound className="h-4 w-4" />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:pb-1 z-10">
+              <div className="min-w-0 flex-1 sm:flex-none">
+                {renderActionButton()}
+              </div>
+
+              <div className="relative">
+                <button
+                  onClick={() => setShowMoreMenu((value) => !value)}
+                  aria-label="More profile options"
+                  aria-expanded={showMoreMenu}
+                  className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/65 transition-all hover:border-white/20 hover:bg-white/[0.08] hover:text-white shadow-[2px_2px_6px_rgba(0,0,0,0.3),-1px_-1px_4px_rgba(255,255,255,0.02)] active:scale-95 active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]"
+                >
+                  <MoreHorizontal className="h-5 w-5" />
+                </button>
+
+                {showMoreMenu && (
+                  <div className="absolute right-0 top-14 z-30 w-48 overflow-hidden rounded-xl border border-white/10 bg-[#191a20] p-1.5 shadow-[4px_4px_15px_rgba(0,0,0,0.5),-1px_-1px_3px_rgba(255,255,255,0.05)] animate-in fade-in slide-in-from-top-2 duration-200">
+                    <button
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        setActionError('Profile reporting is not available yet.');
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-white/70 transition hover:bg-white/[0.06] hover:text-white"
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                      Report profile
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Identity */}
+          <div className="max-w-3xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="break-words text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-[42px] drop-shadow-sm">
+                {displayName}
+              </h1>
+              <span
+                title="zQuab community member"
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-blue-400/20 bg-blue-400/10 text-blue-300 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.3)]"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </span>
+            </div>
+
+            <p className="mt-1 text-sm font-medium text-white/40 drop-shadow-sm">
+              @{profile.username}
+            </p>
+
+            {/* 🛠️ Claymorphic Recessed Stat Pills */}
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+              <div className="flex items-center gap-3 rounded-[1.25rem] border border-white/[0.04] bg-[#14151a] px-3.5 py-3 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.4),inset_-1px_-1px_3px_rgba(255,255,255,0.02)]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.3)]">
+                  <Users className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-lg font-black leading-tight text-white drop-shadow-sm">
+                    {friendCount}
+                  </p>
+                  <p className="mt-0.5 text-[10px] font-semibold text-white/40">
+                    Friends
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-[1.25rem] border border-white/[0.04] bg-[#14151a] px-3.5 py-3 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.4),inset_-1px_-1px_3px_rgba(255,255,255,0.02)]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.3)]">
+                  <Calendar className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-extrabold leading-tight text-white drop-shadow-sm">
+                    {joinedDate}
+                  </p>
+                  <p className="mt-0.5 text-[10px] font-semibold text-white/40">
+                    Joined zQuab
+                  </p>
+                </div>
+              </div>
+
+              {profile.country && (
+                <div className="flex items-center gap-3 rounded-[1.25rem] border border-white/[0.04] bg-[#14151a] px-3.5 py-3 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.4),inset_-1px_-1px_3px_rgba(255,255,255,0.02)]">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.3)]">
+                    <MapPin className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="max-w-32 truncate text-sm font-extrabold text-white drop-shadow-sm">
+                      {profile.country}
+                    </p>
+                    <p className="mt-0.5 text-[10px] font-semibold text-white/40">
+                      Location
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {profile.age && (
+                <div className="flex items-center gap-3 rounded-[1.25rem] border border-white/[0.04] bg-[#14151a] px-3.5 py-3 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.4),inset_-1px_-1px_3px_rgba(255,255,255,0.02)]">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-300 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.3)]">
+                    <Activity className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-black leading-tight text-white drop-shadow-sm">
+                      {profile.age}
+                    </p>
+                    <p className="mt-0.5 text-[10px] font-semibold text-white/40">
+                      Years old
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {profile.gender && profile.gender !== 'Any' && (
+                <div className="flex items-center gap-3 rounded-[1.25rem] border border-white/[0.04] bg-[#14151a] px-3.5 py-3 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.4),inset_-1px_-1px_3px_rgba(255,255,255,0.02)]">
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl shadow-[inset_1px_1px_2px_rgba(0,0,0,0.3)] ${
+                      isMale
+                        ? 'bg-sky-500/10 text-sky-300'
+                        : isFemale
+                          ? 'bg-pink-500/10 text-pink-300'
+                          : 'bg-violet-500/10 text-violet-300'
+                    }`}
+                  >
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-extrabold text-white drop-shadow-sm">
+                      {profile.gender}
+                    </p>
+                    <p className="mt-0.5 text-[10px] font-semibold text-white/40">
+                      Gender
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 🛠️ Claymorphic Recessed Bio */}
+          <div className="mt-6">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="h-4 w-1 rounded-full bg-blue-400" />
+              <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
+                About me
+              </h2>
+            </div>
+
+            <div className="relative overflow-hidden rounded-[1.5rem] border border-white/[0.04] bg-[#0b0c0f] p-5 sm:p-6 shadow-[inset_2px_2px_6px_rgba(0,0,0,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.02)]">
+              <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-blue-500/[0.04] blur-2xl" />
+              <p className="relative whitespace-pre-wrap break-words text-sm leading-7 text-white/80">
+                {profile.bio || 'This user has not added a bio yet.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Friends section */}
+      <section>
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.8)]" />
+              <span className="text-[9px] font-black uppercase tracking-[0.25em] text-blue-300">
+                Social network
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl drop-shadow-sm">
+                Friends
+              </h2>
+              <span className="rounded-[10px] border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs font-black tabular-nums text-white/70 shadow-[inset_1px_1px_3px_rgba(0,0,0,0.3)]">
+                {friendCount}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-white/40">
+              A peek at {displayName}'s circle.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/30">
+            <Users className="h-3.5 w-3.5" />
+            Community
+          </div>
         </div>
 
         {friendsList.length === 0 ? (
-          <div className="text-center py-16 px-4 bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] border-dashed">
-            <div className="w-16 h-16 rounded-full bg-[var(--background)] mx-auto flex items-center justify-center mb-4">
-              <Users className="w-8 h-8 text-[var(--text-muted)] opacity-50" />
+          <div className="relative overflow-hidden rounded-[24px] border border-white/[0.04] bg-[#0b0c0f] px-5 py-12 text-center sm:py-16 shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4),inset_-2px_-2px_6px_rgba(255,255,255,0.02)]">
+            <div className="pointer-events-none absolute -left-12 -top-16 h-40 w-40 rounded-full bg-blue-500/[0.07] blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-16 -right-12 h-40 w-40 rounded-full bg-indigo-500/[0.07] blur-3xl" />
+
+            <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-[25px] border border-white/[0.08] bg-[#191a20] shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02)]">
+              <Users className="h-8 w-8 text-white/30 drop-shadow-sm" />
+              <span className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-xl border-4 border-[#0b0c0f] bg-blue-500 text-white shadow-md">
+                <Sparkles className="h-3 w-3" />
+              </span>
             </div>
-            <h3 className="text-lg font-bold text-[var(--text-main)] mb-1">No friends to show</h3>
-            <p className="text-[var(--text-muted)] text-sm">
-              {profile.name} hasn't added any friends to their network yet.
+
+            <p className="relative mb-2 text-[9px] font-black uppercase tracking-[0.25em] text-blue-300/80">
+              The circle starts here
             </p>
+
+            <h3 className="relative text-xl font-black tracking-tight text-white drop-shadow-sm">
+              No friends to show
+            </h3>
+
+            <p className="relative mx-auto mt-2 max-w-xs text-sm leading-6 text-white/40">
+              {displayName} hasn't added any friends to their network yet.
+            </p>
+
+            <Link
+              to="/discover"
+              className="relative mt-6 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-bold text-white/70 transition-all hover:border-blue-400/30 hover:bg-blue-500/10 hover:text-white shadow-[2px_2px_5px_rgba(0,0,0,0.2),-1px_-1px_3px_rgba(255,255,255,0.02)] active:scale-95 active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]"
+            >
+              Explore zQuab
+              <ChevronRight className="h-4 w-4" />
+            </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
             {friendsList.map((friend) => (
-              <Link 
+              // 🛠️ Claymorphic Friend Card Grid
+              <Link
                 key={friend.username}
                 to={`/user/${friend.username}`}
-                aria-label="User Friend"
-                className="bg-[var(--card)] border border-[var(--border-color)] rounded-2xl p-4 flex flex-col items-center text-center hover:border-[#3B82F6] transition-all hover:shadow-md group"
+                aria-label={`View ${friend.name}'s profile`}
+                className="group relative overflow-hidden rounded-[1.5rem] border border-white/[0.08] bg-[#101115] p-4 transition-all duration-200 hover:-translate-y-1 hover:border-blue-400/30 hover:bg-[#151720] shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.05)] hover:shadow-[6px_6px_15px_rgba(0,0,0,0.4),-2px_-2px_8px_rgba(255,255,255,0.03)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.4)]"
               >
-                <div className="relative mb-3">
-                  <div className="w-16 h-16 rounded-full bg-[var(--background)] border border-[var(--border-color)] overflow-hidden group-hover:scale-105 transition-transform">
+                <div className="absolute right-0 top-0 h-20 w-20 rounded-full bg-blue-500/[0.06] blur-2xl transition group-hover:bg-blue-500/10" />
+
+                <div className="relative mb-4 flex items-center justify-center">
+                  <div className="absolute h-20 w-20 rounded-[25px] bg-blue-500/10 blur-lg transition group-hover:bg-blue-500/20" />
+
+                  <div className="relative h-20 w-20 overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#20232d] transition-transform duration-200 group-hover:scale-[1.04] shadow-[inset_2px_2px_4px_rgba(0,0,0,0.4),inset_-1px_-1px_3px_rgba(255,255,255,0.05)]">
                     {friend.avatar_url ? (
-                      <img src={friend.avatar_url} alt={friend.name} className="w-full h-full object-cover scale-110" />
+                      <img
+                        src={friend.avatar_url}
+                        alt={`${friend.name}'s avatar`}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center font-bold text-xl text-[var(--text-muted)]">
-                        {friend.name.charAt(0).toUpperCase()}
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-500/30 to-indigo-500/30 text-2xl font-black text-white drop-shadow-md">
+                        {friend.name?.charAt(0)?.toUpperCase() || '?'}
                       </div>
                     )}
                   </div>
+
                   {friend.is_online && (
-                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-[var(--card)] rounded-full animate-pulse"></div>
+                    <span className="absolute bottom-0 right-[calc(50%-34px)] h-4 w-4 rounded-full border-[3px] border-[#101115] bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.5)]" />
                   )}
                 </div>
-                <h3 className="font-bold text-[var(--text-main)] text-sm w-full truncate">{friend.name}</h3>
-                <p className="text-[11px] text-[var(--text-muted)] w-full truncate">@{friend.username}</p>
+
+                <div className="relative text-center">
+                  <h3 className="truncate text-sm font-black text-white/90 transition-colors group-hover:text-blue-300 drop-shadow-sm">
+                    {friend.name}
+                  </h3>
+                  <p className="mt-1 truncate text-[10px] font-medium text-white/35">
+                    @{friend.username}
+                  </p>
+
+                  <div className="mt-4 flex items-center justify-center gap-1 text-[9px] font-black uppercase tracking-wider text-white/35 transition-colors group-hover:text-blue-300">
+                    View profile
+                    <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </div>
               </Link>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-    </div>
+      {/* Action error toast */}
+      {actionError && (
+        <div
+          role="alert"
+          className="fixed bottom-5 left-4 right-4 z-[100] mx-auto flex max-w-md items-start gap-3 rounded-[1.25rem] border border-red-400/20 bg-[#1b1013] p-4 shadow-[0_15px_40px_rgba(239,68,68,0.15)] sm:bottom-6 animate-in slide-in-from-bottom-4"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+
+          <p className="flex-1 text-sm leading-6 text-white/85">
+            {actionError}
+          </p>
+
+          <button
+            onClick={() => setActionError(null)}
+            aria-label="Dismiss error"
+            className="rounded-lg p-1 text-white/40 transition hover:bg-white/5 hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 🛠️ Claymorphic Unfriend confirmation */}
+      {showUnfriendConfirm && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !actionLoading) {
+              setShowUnfriendConfirm(false);
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unfriend-title"
+            className="w-full max-w-md overflow-hidden rounded-[26px] border border-white/10 bg-[#131419] shadow-[8px_8px_20px_rgba(0,0,0,0.5),-4px_-4px_10px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.05),inset_-1px_-1px_3px_rgba(0,0,0,0.3)] animate-in zoom-in-95 duration-200"
+          >
+            <div className="h-1.5 bg-gradient-to-r from-red-500 via-orange-500 to-red-500 shadow-[0_2px_10px_rgba(239,68,68,0.5)]" />
+
+            <div className="p-6 sm:p-8">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-red-400/15 bg-red-500/10 text-red-400 shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2),inset_-1px_-1px_3px_rgba(255,255,255,0.02)]">
+                <UserX className="h-7 w-7 drop-shadow-sm" />
+              </div>
+
+              <p className="mb-2 text-center text-[9px] font-black uppercase tracking-[0.25em] text-red-400">
+                Relationship settings
+              </p>
+
+              <h3
+                id="unfriend-title"
+                className="text-center text-2xl font-black tracking-tight text-white drop-shadow-sm"
+              >
+                Remove friend?
+              </h3>
+
+              <p className="mt-3 text-center text-sm leading-7 text-white/50">
+                Are you sure you want to remove{' '}
+                <strong className="text-white">{displayName}</strong> from your
+                friends? You may need to reconnect before messaging them again.
+              </p>
+
+              <div className="mt-7 flex gap-3">
+                <button
+                  onClick={() => setShowUnfriendConfirm(false)}
+                  disabled={actionLoading}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-sm font-bold text-white/70 transition-all hover:bg-white/[0.08] hover:text-white disabled:opacity-50 shadow-[4px_4px_10px_rgba(0,0,0,0.2),-2px_-2px_6px_rgba(255,255,255,0.02)] active:scale-95"
+                >
+                  Keep friend
+                </button>
+
+                <button
+                  onClick={handleUnfriend}
+                  disabled={actionLoading}
+                  className="flex-1 rounded-xl bg-red-500 px-4 py-3.5 text-sm font-black text-white transition-all hover:bg-red-400 disabled:opacity-50 shadow-[4px_4px_10px_rgba(0,0,0,0.4),-2px_-2px_6px_rgba(255,255,255,0.05),inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)] active:scale-95 active:shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4)] border-none"
+                >
+                  {actionLoading ? (
+                    <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+                  ) : (
+                    'Remove friend'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }

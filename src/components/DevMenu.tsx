@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Bug, ChevronDown, Rocket, UserCheck, UserX, Eye, Video, Server, PlayCircle } from 'lucide-react';
+import { Bug, ChevronDown, Rocket, UserCheck, UserX, Eye, Video, Server, PlayCircle, Megaphone, MonitorPlay } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext'; 
 
@@ -39,16 +39,40 @@ export default function DevMenu() {
     window.dispatchEvent(new CustomEvent('dev_stream_mode_changed', { detail: { mode: newMode } }));
   };
 
+  const triggerMockAd = () => {
+    const mockAdEvent = new CustomEvent('dev_ad_triggered', {
+      detail: {
+        brandName: "Razer",
+        brandIcon: "🐍",
+        message: "Upgrade your aim. Get 20% off the new DeathAdder V3 Pro this weekend only.",
+        rewardCoins: 50,
+        linkUrl: "https://razer.com"
+      }
+    });
+    window.dispatchEvent(mockAdEvent);
+    setIsOpen(false);
+  };
+
+  const triggerOverlayAd = () => {
+    const mockOverlayEvent = new CustomEvent('dev_overlay_ad_triggered', {
+      detail: {
+        brandName: "GFUEL",
+        message: "Stay focused. Get 30% off all energy tubs with code ZQUAB30 during this stream.",
+        linkUrl: "https://gfuel.com"
+      }
+    });
+    window.dispatchEvent(mockOverlayEvent);
+    setIsOpen(false);
+  };
+
   return (
     <>
-      {/* 🛠️ Safe bounding box with a 1rem (16px) margin inside the screen */}
       <div className="fixed inset-4 z-[9998] pointer-events-none" ref={constraintsRef} />
 
       <motion.div 
         drag 
         dragMomentum={false}
         dragConstraints={constraintsRef} 
-        // 🛠️ Restored standard CSS positioning so it spawns safely in the corner
         className="fixed bottom-4 right-4 z-[9999] flex flex-col items-end gap-2"
         style={{ touchAction: 'none', pointerEvents: 'auto' }} 
       >
@@ -63,6 +87,12 @@ export default function DevMenu() {
               <Link to="/dev/onboarding" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-md transition-colors">🎨 UI: Onboarding</Link>
               <Link to="/dev/auth" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-md transition-colors">🔐 UI: Auth</Link>
               <Link to="/dev/home" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-md transition-colors">📥 UI: Inbox</Link>
+              <Link to="/dev/profile" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-md transition-colors">👤 UI: Profile</Link>
+              
+              {/* 🚀 New Public Profile Testing Route */}
+              <Link to="/user/shadow_ninja" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-md transition-colors">👥 UI: View Public User</Link>
+              
+              <Link to="/waitlist" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-amber-400 hover:text-amber-300 hover:bg-gray-800 p-2 rounded-md transition-colors">⏳ UI: Waitlist Preview</Link>
             </div>
 
             <div className="mt-1 pt-1 space-y-2">
@@ -90,7 +120,28 @@ export default function DevMenu() {
                 <span className="text-[9px] uppercase bg-black px-1.5 py-0.5 rounded text-gray-400">Swap</span>
               </button>
 
-              <Link to="/discover" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 p-2 rounded-md transition-colors">📡 Stream: Discovery</Link>
+              <div className="pt-2">
+                <div className="text-[10px] font-bold text-gray-500 uppercase px-2 tracking-wider mb-2">Ad Testing</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    onClick={triggerMockAd}
+                    className="flex flex-col items-center justify-center p-2 rounded-md transition-colors font-semibold text-xs bg-indigo-900/40 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-500/30 text-center"
+                  >
+                    <Megaphone className="w-4 h-4 mb-1" />
+                    Chat Ad
+                  </button>
+
+                  <button 
+                    onClick={triggerOverlayAd}
+                    className="flex flex-col items-center justify-center p-2 rounded-md transition-colors font-semibold text-xs bg-blue-900/40 hover:bg-blue-900/60 text-blue-300 border border-blue-500/30 text-center"
+                  >
+                    <MonitorPlay className="w-4 h-4 mb-1" />
+                    Overlay Ad
+                  </button>
+                </div>
+              </div>
+
+              <Link to="/discover" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 p-2 rounded-md transition-colors mt-2">📡 Stream: Discovery</Link>
               <Link to="/live/stream-1" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 p-2 rounded-md transition-colors">🔴 Stream: Live Room</Link>
               <Link to="/creator/dashboard" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 p-2 rounded-md transition-colors">🎛️ Stream: Dashboard</Link>
             </div>

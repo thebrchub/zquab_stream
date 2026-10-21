@@ -12,7 +12,8 @@ import { CoinPurchaseModal } from './components/stream/CoinPurchaseModal';
 
 import SocialPromoBanner from './components/SocialPromoBanner';
 import DevMenu from './components/DevMenu';
-
+import WaitlistPage from './pages/WaitlistPage';
+ // <-- ADDED: Waitlist Page
 // Route-level code splitting
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
@@ -225,6 +226,7 @@ function App() {
               <Route path="/dev/home" element={<HomePage />} />
               <Route path="/dev/chat" element={<ChatRoom />} />
               <Route path="/dev/profile" element={<Profile />} />
+              <Route path="/dev/waitlist" element={<WaitlistPage />} />
               <Route path="/dev/stream/discovery" element={<LiveDiscoveryPage />} />
               <Route path="/dev/stream/live" element={<LiveRoomPage />} />
               <Route path="/dev/stream/1on1" element={<OneOnOneRoomPage />} />
