@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, X, CheckCircle2, Copy, ShieldCheck, ArrowRight, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiClient } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { creatorService, type CreatorApplication } from '../../services/creatorService';
 
 // --- Custom SVG Brand Icons ---
 const InstagramIcon = ({ className }: { className?: string }) => (
@@ -56,8 +56,31 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [application, setApplication] = useState<CreatorApplication | null>(null);
+  const [applicationError, setApplicationError] = useState<string | null>(null);
 
-  const verificationCode = `zQuab-${username}`;
+  const verificationCode = application?.verification_code || `zQuab-${username}`;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    creatorService.getMyApplication()
+    .then((current) => {
+      if (!active || !current) return;
+      setApplication(current);
+      setLinks({
+      instagram: current.social_links.find((link) => link.platform === 'instagram')?.url || '',
+      youtube: current.social_links.find((link) => link.platform === 'youtube')?.url || '',
+      twitter: current.social_links.find((link) => link.platform === 'x')?.url || '',
+      other: current.social_links.find((link) => link.platform === 'other')?.url || '',
+      });
+      if (current.approval_status === 'pending' || current.approval_status === 'approved') setStep(3);
+    })
+    .catch((error: Error) => {
+      if (active) setApplicationError(error.message || 'Failed to load your creator application.');
+    });
+    return () => { active = false; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -78,9 +101,12 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
     if (!canSubmit) return;
     
     setIsSubmitting(true);
+	setApplicationError(null);
     try {
-      await apiClient.post('/users/me/creator', {
-        social_links: Object.values(links).filter(link => link.trim().length > 0),
+	  const response = await creatorService.applyAsCreator({
+		social_links: Object.entries(links)
+		  .filter(([, link]) => link.trim().length > 0)
+		  .map(([platform, url]) => ({ platform: platform === 'twitter' ? 'x' : platform, url })) as CreatorApplication['social_links'],
         category: 'other',
         headline: 'zQuab Creator', 
         one_on_one_enabled: false,
@@ -89,10 +115,18 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
       });
       
       await refreshSession();
+    setApplication({
+    approval_status: response.approval_status,
+    is_creator: response.is_creator,
+    social_links: [],
+    rejection_reason: '',
+    application_submitted_at: new Date().toISOString(),
+    verification_code: response.verification_code,
+    });
       setDirection(1);
       setStep(3); // Success Step
     } catch (err: any) {
-      alert(err?.response?.data?.error || err.message || 'Failed to submit application');
+      setApplicationError(err.message || 'Failed to submit application.');
     } finally {
       setIsSubmitting(false);
     }
@@ -110,6 +144,7 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
       setStep(1);
       setDirection(0);
       setLinks({ instagram: '', youtube: '', twitter: '', other: '' });
+		setApplicationError(null);
     }, 300);
   };
 
@@ -208,6 +243,12 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
                 <p className="text-[var(--text-muted)] text-xs font-medium mb-6">
                   Connect at least <strong className="text-[var(--text-main)]">two</strong> accounts below.
                 </p>
+        {application?.approval_status === 'rejected' && (
+          <p className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs leading-relaxed text-red-400">
+          Your last application was declined: {application.rejection_reason}
+          </p>
+        )}
+        {applicationError && <p className="mb-4 text-xs text-red-400">{applicationError}</p>}
 
                 {/* Verification Code Block */}
                 <div className="flex items-center justify-between bg-[var(--card)] border border-[#3B82F6]/30 rounded-[1rem] p-3 mb-4 shadow-[inset_2px_2px_4px_rgba(0,0,0,0.05)] w-full overflow-hidden">
@@ -301,8 +342,9 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
                 </div>
                 <h4 className="text-2xl font-black text-[var(--text-main)] mb-3">Verification Pending</h4>
                 <p className="text-[var(--text-muted)] text-sm leading-relaxed mb-8 max-w-[280px]">
-                  Our team is reviewing your connected profiles. <br/><br/>
-                  <span className="text-[var(--text-main)] font-bold">Do not remove the code from your bios</span> until you are officially approved.
+				  {application?.approval_status === 'approved'
+					? 'Your creator application is approved. You can now use creator tools.'
+					: <>Our team is reviewing your connected profiles. <br/><br/><span className="text-[var(--text-main)] font-bold">Do not remove the code from your bios</span> until you are officially approved.</>}
                 </p>
               </motion.div>
             )}

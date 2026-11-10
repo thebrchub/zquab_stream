@@ -19,7 +19,11 @@ export interface CreatorProfile {
   headline: string;
   verified: boolean;
   follower_count: number;
+  stream_count: number;
   is_following: boolean;
+  one_on_one_enabled: boolean;
+  one_on_one_price_coins: number;
+  one_on_one_duration_mins: number;
 }
 
 export interface DiscoverCreator {
@@ -47,6 +51,7 @@ export interface CreatorEarnings {
 }
 
 export interface ApplyCreatorPayload {
+	 social_links: SocialLink[];
   category: string;
   headline: string;
   one_on_one_enabled: boolean;
@@ -58,6 +63,26 @@ export interface ApplyCreatorResponse {
   status: string;
   is_creator: boolean;
   approval_status: 'pending' | 'approved' | 'rejected';
+	 verification_code: string;
+}
+
+export interface SocialLink {
+  platform: string;
+  url: string;
+}
+
+export interface CreatorApplication {
+  approval_status: 'pending' | 'approved' | 'rejected';
+  is_creator: boolean;
+  social_links: SocialLink[];
+  rejection_reason: string;
+  application_submitted_at: string;
+  verification_code: string;
+}
+
+interface CreatorAvatarUpload {
+  url: string;
+  object_key: string;
 }
 
 export interface Follower {
@@ -104,7 +129,11 @@ export const creatorService = {
         headline: 'Pro grinds and viewer games.',
         verified: mockC.verified || false,
         follower_count: 12500,
-        is_following: false
+    		stream_count: 42,
+        is_following: false,
+    		one_on_one_enabled: false,
+    		one_on_one_price_coins: 0,
+    		one_on_one_duration_mins: 0,
       };
     }
     const res = await apiClient.get(`/creators/${username}`);
@@ -184,11 +213,33 @@ export const creatorService = {
       return {
         status: 'ok',
         is_creator: true,
-        approval_status: 'pending'
+    approval_status: 'pending',
+    verification_code: 'zQuab-creator',
       };
     }
     const res = await apiClient.post('/users/me/creator', payload);
     return res.data;
+  },
+
+  async getMyApplication(): Promise<CreatorApplication | null> {
+  if (isMockMode()) return null;
+  try {
+    const res = await apiClient.get('/users/me/creator');
+    return res.data;
+  } catch (error: any) {
+    if (error?.status === 404) return null;
+    throw error;
+  }
+  },
+
+  async presignAvatar(contentType: string): Promise<CreatorAvatarUpload> {
+  const res = await apiClient.post('/users/me/creator/avatar/presign', { content_type: contentType });
+  return res.data;
+  },
+
+  async completeAvatar(objectKey: string): Promise<{ avatar_url: string }> {
+  const res = await apiClient.post('/users/me/creator/avatar/complete', { object_key: objectKey });
+  return res.data;
   },
 
   // --- Follower System ---
