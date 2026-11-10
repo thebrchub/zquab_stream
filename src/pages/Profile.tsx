@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
 import { CreatorApplicationModal } from '../components/studio/CreatorApplicationModal';
+import { creatorService } from '../services/creatorService';
 import { createZAvatarURL, MAX_AVATAR_URL_LENGTH, MAX_USERNAME_LENGTH } from '../utils/avatar';
 
 const GENDER_OPTIONS = ['Prefer not to say', 'Male', 'Female', 'Other'];
@@ -55,6 +56,8 @@ export default function Profile() {
 
   const [zAvatarRequested, setZAvatarRequested] = useState(false);
   const [avatarVariant, setAvatarVariant] = useState(0);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const creatorAvatarInputRef = useRef<HTMLInputElement>(null);
 
   const avatarPreview = useMemo(() => {
     if (!zAvatarRequested) return profile?.avatar_url || null;
@@ -231,6 +234,38 @@ export default function Profile() {
     }
   };
 
+  const handleCreatorAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Choose an image file.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setError(null);
+    try {
+      const { url, object_key } = await creatorService.presignAvatar(file.type);
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+      if (!response.ok) throw new Error('Failed to upload avatar.');
+
+      const { avatar_url } = await creatorService.completeAvatar(object_key);
+      setProfile((current: any) => ({ ...current, avatar_url }));
+      setZAvatarRequested(false);
+      await refreshSession();
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload avatar.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   const handleRequestCountryChange = async () => {
     setIsDetectingCountry(true);
     try {
@@ -377,9 +412,13 @@ export default function Profile() {
                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[2rem] bg-[#0b0c0f] border-2 border-[#101115] flex items-center justify-center overflow-hidden shadow-[inset_2px_2px_6px_rgba(0,0,0,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.02)] transition-all duration-300">
                   {avatarPreview ? <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover scale-110" /> : <User className="w-12 h-12 text-zinc-600 drop-shadow-sm" />}
                 </div>
-                <div className="mt-4 h-10 flex items-center justify-center">
+                <input ref={creatorAvatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleCreatorAvatarUpload} />
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                   {!zAvatarRequested ? (
-                    <button aria-label="New Avatar" type="button" onClick={() => { setZAvatarRequested(true); setAvatarVariant(0); }} disabled={!username} className="px-5 py-2.5 bg-[#3B82F6]/10 text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 shadow-[2px_2px_5px_rgba(0,0,0,0.2),inset_1px_1px_2px_rgba(255,255,255,0.05)] active:scale-95 border border-[#3B82F6]/20">Generate New zAvatar</button>
+                    <>
+                      <button aria-label="New Avatar" type="button" onClick={() => { setZAvatarRequested(true); setAvatarVariant(0); }} disabled={!username || isUploadingAvatar} className="px-5 py-2.5 bg-[#3B82F6]/10 text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 shadow-[2px_2px_5px_rgba(0,0,0,0.2),inset_1px_1px_2px_rgba(255,255,255,0.05)] active:scale-95 border border-[#3B82F6]/20">Generate New zAvatar</button>
+                      {creatorApprovalStatus === 'approved' && <button type="button" onClick={() => creatorAvatarInputRef.current?.click()} disabled={isUploadingAvatar} className="px-5 py-2.5 bg-white/[0.04] text-white hover:border-[#3B82F6] hover:text-[#3B82F6] rounded-xl text-xs font-bold transition-all disabled:opacity-50 shadow-[2px_2px_5px_rgba(0,0,0,0.2),inset_1px_1px_2px_rgba(255,255,255,0.02)] active:scale-95 border border-white/10">{isUploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Upload Creator Avatar'}</button>}
+                    </>
                   ) : (
                     <div className="flex items-center gap-4 bg-[#0b0c0f] px-3 py-1.5 rounded-xl border border-white/[0.04] shadow-[inset_1px_1px_3px_rgba(0,0,0,0.3)]">
                       <button aria-label="Reroll" type="button" onClick={() => setAvatarVariant(v => v + 1)} className="flex items-center gap-1.5 text-xs font-bold text-[#3B82F6] hover:text-blue-400 transition-colors"><RefreshCw className="w-3.5 h-3.5" /> Reroll</button>
