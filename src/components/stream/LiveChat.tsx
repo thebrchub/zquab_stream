@@ -31,6 +31,26 @@ const PINNED_AD_MS = 8000;
 // How close to the bottom (px) still counts as "reading the latest messages".
 const NEAR_BOTTOM_PX = 80;
 
+// The gift catalog stores icon names like "heart_icon"; show them as emoji.
+const GIFT_ICON_EMOJI: Record<string, string> = {
+  heart: '❤️',
+  fire: '🔥',
+  rocket: '🚀',
+  crown: '👑',
+  diamond: '💎',
+};
+
+const GiftIcon: React.FC<{ icon: string; className?: string }> = ({ icon, className }) => {
+  const value = (icon || '').trim();
+  if (/^https?:\/\//i.test(value)) {
+    return <img src={value} alt="" className={`inline-block w-[1em] h-[1em] object-contain ${className ?? ''}`} />;
+  }
+  const key = value.toLowerCase().replace(/_icon$/, '');
+  // Names we don't know, or plain words, fall back to a gift box; real emoji pass through.
+  const emoji = GIFT_ICON_EMOJI[key] ?? (value && !/^[\w\s-]+$/.test(value) ? value : '🎁');
+  return <span className={className}>{emoji}</span>;
+};
+
 export const LiveChat: React.FC<LiveChatProps> = ({
   role,
   userBalance,
@@ -188,7 +208,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                         <span className="text-[13px] font-bold text-zinc-200">{item.gift.name}</span>
                         
                         <div className="ml-auto flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md shadow-[inset_1px_1px_2px_rgba(0,0,0,0.3),inset_-1px_-1px_2px_rgba(255,255,255,0.05)]">
-                          <span className="text-sm leading-none drop-shadow-md">{item.gift.icon}</span>
+                          <GiftIcon icon={item.gift.icon} className="text-sm leading-none drop-shadow-md" />
                           <span className="text-[11px] font-black text-amber-400">{item.gift.coins}</span>
                         </div>
                       </div>
@@ -251,7 +271,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                   onClick={() => handleSendGift(gift)}
                   className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.02] hover:bg-white/[0.04] transition-all duration-200 group shadow-[2px_2px_6px_rgba(0,0,0,0.4),-1px_-1px_4px_rgba(255,255,255,0.02)] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.5),-2px_-2px_6px_rgba(255,255,255,0.04)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]"
                 >
-                  <span className="text-2xl mb-1 group-hover:scale-110 transition-transform">{gift.icon}</span>
+                  <GiftIcon icon={gift.icon} className="text-2xl mb-1 group-hover:scale-110 transition-transform" />
                   <span className="text-[10px] text-zinc-400 font-medium truncate w-full text-center drop-shadow-sm">{gift.name}</span>
                   <span className="text-[10px] text-amber-400 font-bold mt-0.5 drop-shadow-sm">{gift.cost_coins}</span>
                 </button>
@@ -278,12 +298,14 @@ export const LiveChat: React.FC<LiveChatProps> = ({
           </div>
         )}
 
-        {role === 'viewer' && !isGuest && isStreamEnded && (
+        {!isGuest && isStreamEnded && (
           <p className="text-center text-xs text-zinc-500 font-medium py-2 pointer-events-auto">Chat is closed — the stream has ended.</p>
         )}
 
-        {role === 'viewer' && !isGuest && !isStreamEnded && (
+        {!isGuest && !isStreamEnded && (
           <form onSubmit={handleSendMessage} className="flex items-center gap-2 p-1.5 bg-white/[0.02] border border-white/5 hover:border-white/10 focus-within:border-indigo-500/30 focus-within:bg-white/[0.04] rounded-2xl transition-all pointer-events-auto shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3),inset_-1px_-1px_3px_rgba(255,255,255,0.03)]">
+            {/* A creator can't gift their own stream. */}
+            {role === 'viewer' && (
             <button
               type="button"
               onClick={() => setShowGiftDrawer((prev) => !prev)}
@@ -295,6 +317,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
             >
               <Gift className="w-4 h-4" />
             </button>
+            )}
 
             <input
               type="text"
