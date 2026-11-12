@@ -11,6 +11,7 @@ interface LiveChatProps {
   onSendChat: (text: string) => void;
   onSendGift: (giftId: number, message?: string) => void;
   onRetractMessage: (messageId: string) => void;
+  onMuteUser: (userId: string, minutes: number) => void;
   isGiftPending: boolean;
   sendError: string | null;
   isStreamEnded: boolean;
@@ -28,6 +29,14 @@ interface PinnedAd {
 }
 
 const PINNED_AD_MS = 8000;
+
+// Mute choices; 0 means the rest of the stream.
+const MUTE_OPTIONS: { label: string; minutes: number }[] = [
+  { label: '10 min', minutes: 10 },
+  { label: '30 min', minutes: 30 },
+  { label: '60 min', minutes: 60 },
+  { label: 'Rest of stream', minutes: 0 },
+];
 // How close to the bottom (px) still counts as "reading the latest messages".
 const NEAR_BOTTOM_PX = 80;
 
@@ -58,6 +67,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   onSendChat,
   onSendGift,
   onRetractMessage,
+  onMuteUser,
   isGiftPending,
   sendError,
   isStreamEnded,
@@ -70,6 +80,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   const [insufficientFundsGift, setInsufficientFundsGift] = useState<string | null>(null);
   const [pinnedAd, setPinnedAd] = useState<PinnedAd | null>(null);
   const [hasNewBelow, setHasNewBelow] = useState(false);
+  const [muteTarget, setMuteTarget] = useState<{ userId: string; name: string } | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
@@ -147,6 +158,12 @@ export const LiveChat: React.FC<LiveChatProps> = ({
     setShowGiftDrawer(false);
   };
 
+  const handleMute = (minutes: number) => {
+    if (!muteTarget) return;
+    onMuteUser(muteTarget.userId, minutes);
+    setMuteTarget(null);
+  };
+
   return (
     <div className="flex flex-col h-full bg-[#09090b] relative">
 
@@ -186,9 +203,11 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                   <button onClick={() => onRetractMessage(item.id)} className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors rounded hover:bg-white/5" title="Delete">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                  <button className="p-1.5 text-zinc-500 hover:text-orange-400 transition-colors rounded hover:bg-white/5" title="Timeout">
-                    <Ban className="w-3.5 h-3.5" />
-                  </button>
+                  {!item.isCreator && item.senderId && (
+                    <button onClick={() => setMuteTarget({ userId: item.senderId, name: item.senderName })} className="p-1.5 text-zinc-500 hover:text-orange-400 transition-colors rounded hover:bg-white/5" title="Mute">
+                      <Ban className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -254,6 +273,30 @@ export const LiveChat: React.FC<LiveChatProps> = ({
           <p className="mb-2 text-xs text-red-400 font-medium pointer-events-auto">{sendError}</p>
         )}
         
+        {role === 'creator' && muteTarget && !isStreamEnded && (
+          <div className="mb-3 bg-zinc-900 border border-white/5 rounded-2xl p-3 animate-in slide-in-from-bottom-2 fade-in duration-200 shadow-[0_-8px_20px_rgba(0,0,0,0.5),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.4)] pointer-events-auto">
+            <div className="flex items-center justify-between mb-1 px-1">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest drop-shadow-sm truncate">Mute {muteTarget.name}</span>
+              <button onClick={() => setMuteTarget(null)} className="text-zinc-500 hover:text-white transition-colors active:scale-95" title="Cancel">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="mb-3 px-1 text-[11px] text-zinc-500">They can't chat or send gifts. This can't be undone early.</p>
+
+            <div className="grid grid-cols-2 gap-2">
+              {MUTE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.minutes}
+                  onClick={() => handleMute(opt.minutes)}
+                  className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.02] hover:bg-white/[0.04] hover:text-orange-400 text-[12px] font-semibold text-zinc-300 transition-all duration-200 shadow-[2px_2px_6px_rgba(0,0,0,0.4),-1px_-1px_4px_rgba(255,255,255,0.02)] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.5),-2px_-2px_6px_rgba(255,255,255,0.04)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]"
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {showGiftDrawer && (
           <div className="mb-3 bg-zinc-900 border border-white/5 rounded-2xl p-3 animate-in slide-in-from-bottom-2 fade-in duration-200 shadow-[0_-8px_20px_rgba(0,0,0,0.5),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.4)] pointer-events-auto">
             <div className="flex items-center justify-between mb-3 px-1">

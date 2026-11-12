@@ -172,3 +172,9 @@ message RetractMessageRequest {
 message MessageRetracted {
     string message_id = 1;
 }
+
+// MsgType "mute_user" — creator request; minutes 0 means rest of the stream
+message MuteUserRequest {
+    string user_id = 1;
+    int32  minutes = 2;
+}

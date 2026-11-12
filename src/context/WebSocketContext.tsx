@@ -36,6 +36,7 @@ const GiftConfirmProto = safeLookup('eventspb.GiftConfirm', 'GiftConfirm');
 const StreamEndedProto = safeLookup('eventspb.StreamEnded', 'StreamEnded');
 const RetractMessageRequestProto = safeLookup('eventspb.RetractMessageRequest', 'RetractMessageRequest');
 const MessageRetractedProto = safeLookup('eventspb.MessageRetracted', 'MessageRetracted');
+const MuteUserRequestProto = safeLookup('eventspb.MuteUserRequest', 'MuteUserRequest');
 const RecentMessagesProto = safeLookup('chatpb.RecentMessages', 'RecentMessages');
 const StreamPausedProto = safeLookup('eventspb.StreamPaused', 'StreamPaused');
 const StreamResumedProto = safeLookup('eventspb.StreamResumed', 'StreamResumed');
@@ -268,6 +269,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       } else if (type === 'retract_message' && payload && RetractMessageRequestProto) {
         payloadBytes = RetractMessageRequestProto.encode(RetractMessageRequestProto.create({
           messageId: payload.message_id || payload.messageId,
+        })).finish();
+      } else if (type === 'mute_user' && payload && MuteUserRequestProto) {
+        payloadBytes = MuteUserRequestProto.encode(MuteUserRequestProto.create({
+          userId: payload.user_id || payload.userId,
+          minutes: payload.minutes || 0,
         })).finish();
       }
       // Handle raw JSON payloads sent from the client just in case

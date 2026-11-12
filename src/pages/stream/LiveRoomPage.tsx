@@ -213,7 +213,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, isLoginRequired, retryEnter, refreshPlaybackUrl } = useStreamEntry(resolvedStreamId);
 
   const roomId = stream?.room_id;
-  const { viewerCount, messages, isGiftPending, sendError, isStreamEnded, isPaused, streamEarnings, sendChat, sendGift, retractMessage } = useLiveStreamRoom(roomId, resolvedStreamId, stream?.creator.username, stream?.is_paused ?? false);
+  const { viewerCount, messages, isGiftPending, sendError, isStreamEnded, isPaused, streamEarnings, sendChat, sendGift, retractMessage, muteUser } = useLiveStreamRoom(roomId, resolvedStreamId, stream?.creator.username, stream?.is_paused ?? false);
 
   const isReconnecting = streamMode !== 'mock' && !isStreamEnded && (isPaused || isStalled);
 
@@ -713,6 +713,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             onSendChat={sendChat}
             onSendGift={sendGift}
             onRetractMessage={retractMessage}
+            onMuteUser={muteUser}
             isGiftPending={isGiftPending}
             sendError={sendError}
             isStreamEnded={isStreamEnded}

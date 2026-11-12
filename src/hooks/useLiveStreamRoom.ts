@@ -276,6 +276,14 @@ export const useLiveStreamRoom = (
     }
   }, [roomId, sendMessage, isStreamEnded]);
 
+  // minutes: 10, 30, 60, or 0 for the rest of the stream.
+  const muteUser = useCallback((userId: string, minutes: number) => {
+    if (!roomId || !userId || isStreamEnded) return;
+    if (!sendMessage('mute_user', { user_id: userId, minutes }, roomId)) {
+      setSendError('Unable to mute viewer.');
+    }
+  }, [roomId, sendMessage, isStreamEnded]);
+
   return {
     viewerCount,
     messages,
@@ -287,5 +295,6 @@ export const useLiveStreamRoom = (
     sendChat,
     sendGift,
     retractMessage,
+    muteUser,
   };
 };

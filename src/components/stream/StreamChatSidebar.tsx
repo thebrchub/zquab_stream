@@ -11,6 +11,7 @@ interface StreamChatSidebarProps {
   onSendChat: (text: string) => void;
   onSendGift: (giftId: number, message?: string) => void;
   onRetractMessage: (messageId: string) => void;
+  onMuteUser: (userId: string, minutes: number) => void;
   isGiftPending: boolean;
   sendError: string | null;
   isStreamEnded: boolean;
@@ -28,6 +29,7 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
   onSendChat,
   onSendGift,
   onRetractMessage,
+  onMuteUser,
   isGiftPending,
   sendError,
   isStreamEnded,
@@ -74,6 +76,7 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
           onSendChat={onSendChat}
           onSendGift={onSendGift}
           onRetractMessage={onRetractMessage}
+          onMuteUser={onMuteUser}
           isGiftPending={isGiftPending}
           sendError={sendError}
           isStreamEnded={isStreamEnded}
