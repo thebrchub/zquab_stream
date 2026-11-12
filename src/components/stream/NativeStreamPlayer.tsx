@@ -3,6 +3,8 @@ import Hls from 'hls.js';
 
 // Video stuck this long counts as "stream is reconnecting".
 const STALL_MS = 10000;
+// Shortest gap between two fresh-session restarts, so a down stream isn't hammered.
+const FRESH_SESSION_GAP_MS = 5000;
 
 interface NativeStreamPlayerProps {
   streamUrl: string;
@@ -49,6 +51,8 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
     if (!video) return;
 
     let hls: Hls;
+    let lastFreshSessionAt = 0;
+    let freshSessionTimer: number | undefined;
     if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
@@ -76,7 +80,17 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
 
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+          const status = data.response?.code;
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && (status === 401 || status === 404)) {
+            // Session or pieces gone from MediaMTX; reload index.m3u8 for a fresh session.
+            const wait = Math.max(0, lastFreshSessionAt + FRESH_SESSION_GAP_MS - Date.now());
+            window.clearTimeout(freshSessionTimer);
+            freshSessionTimer = window.setTimeout(() => {
+              lastFreshSessionAt = Date.now();
+              hls.loadSource(streamUrl);
+            }, wait);
+          }
+          else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
           else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
           else hls.destroy();
         }
@@ -89,6 +103,7 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
     }
 
     return () => {
+      window.clearTimeout(freshSessionTimer);
       if (hls) hls.destroy();
     };
   }, [streamUrl]);
