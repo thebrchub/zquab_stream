@@ -21,6 +21,7 @@ export interface CreatorProfile {
   follower_count: number;
   stream_count: number;
   is_following: boolean;
+  live_alerts?: boolean;
   one_on_one_enabled: boolean;
   one_on_one_price_coins: number;
   one_on_one_duration_mins: number;
@@ -154,6 +155,14 @@ export const creatorService = {
       return;
     }
     await apiClient.delete(`/creators/${username}/follow`);
+  },
+
+  async setLiveAlerts(username: string, enabled: boolean): Promise<void> {
+    if (isMockMode()) {
+      await delay(300);
+      return;
+    }
+    await apiClient.put(`/creators/${username}/live-alerts`, { enabled });
   },
 
   // --- Discovery ---

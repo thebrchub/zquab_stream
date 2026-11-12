@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Hls from 'hls.js';
+
+// Video stuck this long counts as "stream is reconnecting".
+const STALL_MS = 10000;
 
 interface NativeStreamPlayerProps {
   streamUrl: string;
@@ -7,6 +10,7 @@ interface NativeStreamPlayerProps {
   isMuted: boolean;
   videoRef: React.RefObject<HTMLVideoElement | null>; // 🚀 Added "| null" here
   onLiveEdgeChange: (isLive: boolean) => void;
+  onStalledChange?: (isStalled: boolean) => void;
   quality?: string;
   isLowLatency?: boolean;
 }
@@ -17,8 +21,27 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
   isMuted,
   videoRef,
   onLiveEdgeChange,
+  onStalledChange,
 }) => {
   const [isBuffering, setIsBuffering] = useState(true);
+  const stallTimerRef = useRef<number | null>(null);
+
+  const clearStallTimer = () => {
+    if (stallTimerRef.current) window.clearTimeout(stallTimerRef.current);
+    stallTimerRef.current = null;
+  };
+
+  const startStallTimer = () => {
+    if (stallTimerRef.current) return;
+    stallTimerRef.current = window.setTimeout(() => onStalledChange?.(true), STALL_MS);
+  };
+
+  // A fresh player starts out "waiting" until the first frames play.
+  useEffect(() => {
+    startStallTimer();
+    return clearStallTimer;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamUrl]);
 
   // --- HLS Setup ---
   useEffect(() => {
@@ -79,6 +102,7 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
       video.play().catch((e) => console.log("Play prevented by browser:", e));
     } else {
       video.pause();
+      clearStallTimer(); // paused on purpose, not stuck
     }
   }, [isPlaying]);
 
@@ -96,8 +120,15 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
         ref={videoRef}
         className="w-full h-full object-contain"
         playsInline
-        onWaiting={() => setIsBuffering(true)}
-        onPlaying={() => setIsBuffering(false)}
+        onWaiting={() => {
+          setIsBuffering(true);
+          if (isPlaying) startStallTimer();
+        }}
+        onPlaying={() => {
+          setIsBuffering(false);
+          clearStallTimer();
+          onStalledChange?.(false);
+        }}
         onTimeUpdate={() => {
           // 🚀 Calculates latency every time the video frame updates
           const video = videoRef.current;

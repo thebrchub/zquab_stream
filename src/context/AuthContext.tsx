@@ -15,6 +15,8 @@ interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
+  // True when the session check failed for a reason other than "not logged in" (network, server error).
+  sessionError: boolean;
   loginAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
   devMockLogin: () => void; 
@@ -26,6 +28,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionError, setSessionError] = useState(false);
 
   // 🛠️ NEW: Extracted this so it can be called from anywhere
   const refreshSession = async () => {
@@ -43,9 +46,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         is_creator: userData.is_creator || false,
         approval_status: userData.approval_status || 'none',
       });
+      setSessionError(false);
     } catch (error: any) {
-      console.log('No active full user session found on load.');
-      setUser(null);
+      const status = error?.status;
+      if (status === 401 || status === 403) {
+        // No session, or a guest cookie (guests can't load /users/me).
+        console.log('No active full user session found on load.');
+        setUser(null);
+        setSessionError(false);
+      } else {
+        // Network or server trouble: keep whoever is logged in instead of dropping them.
+        console.error('Session check failed:', error);
+        setSessionError(true);
+      }
     }
   };
 
@@ -83,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, loginAsGuest, logout, devMockLogin, refreshSession }}>
+    <AuthContext.Provider value={{ user, isLoading, sessionError, loginAsGuest, logout, devMockLogin, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

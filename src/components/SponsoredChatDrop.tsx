@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, Sparkles, Megaphone } from 'lucide-react';
+import { ExternalLink, Sparkles } from 'lucide-react';
 
 interface SponsoredChatDropProps {
   brandName: string;

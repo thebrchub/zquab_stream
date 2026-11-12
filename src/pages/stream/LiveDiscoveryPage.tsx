@@ -38,7 +38,7 @@ export const LiveDiscoveryPage: React.FC = () => {
 
   const handleProtectedAction = (path: string) => {
     if (!user || user.is_guest) {
-      navigate('/auth');
+      navigate(`/auth?next=${encodeURIComponent(path)}`);
       return;
     }
     navigate(path);
@@ -185,7 +185,9 @@ export const LiveDiscoveryPage: React.FC = () => {
                   {displayedStreams.map((stream) => (
                     <div
                       key={stream.stream_id}
-                      onClick={() => handleProtectedAction(`/live/${stream.stream_id}`)} 
+                      onClick={() => stream.is_premium
+                        ? handleProtectedAction(`/live/${stream.stream_id}`)
+                        : navigate(`/live/${stream.stream_id}`)} 
                       className={`group cursor-pointer flex flex-col overflow-hidden ${CLEAN_CARD} hover:-translate-y-1`}
                     >
                       <div className="relative aspect-video w-full bg-black overflow-hidden rounded-t-[1.9rem]">

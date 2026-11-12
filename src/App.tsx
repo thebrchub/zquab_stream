@@ -1,11 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { ThemeProvider } from './hooks/useTheme';
 import RootLayout from './layout/RootLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletProvider } from './context/WalletContext';
 import { WebSocketProvider } from './context/WebSocketContext';
 import { RoomsProvider } from './context/RoomsContext';
+import { NotificationPrefsProvider } from './context/NotificationPrefsContext';
+import { CreatorLiveAlerts } from './components/stream/CreatorLiveAlerts';
 import { Loader2 } from 'lucide-react';
 import BlogPost from './pages/BlogPost';
 import { CoinPurchaseModal } from './components/stream/CoinPurchaseModal'; 
@@ -105,7 +107,10 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   
   if (user && !user.is_guest) {
     if (!user.username) return <Navigate to="/onboarding" replace />;
-    return <Navigate to="/home" replace />;
+    // Same safe in-app check as AuthPage, so login can return to e.g. a live stream.
+    const next = new URLSearchParams(window.location.search).get('next') || '';
+    const isSafeNext = next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\');
+    return <Navigate to={isSafeNext ? next : '/home'} replace />;
   }
   
   return <>{children}</>;
@@ -120,6 +125,65 @@ function OnboardingRoute({ children }: { children: React.ReactNode }) {
   if (user.username) return <Navigate to="/home" replace />;
   
   return <>{children}</>;
+}
+
+// 4. Live Stream Route Wrapper: anyone can watch; logged-out visitors get a silent guest login.
+function LiveRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading, sessionError, loginAsGuest, refreshSession } = useAuth();
+  const [hasFailed, setHasFailed] = useState(false);
+  const [attemptKey, setAttemptKey] = useState(0);
+  const startedRef = useRef(-1);
+
+  useEffect(() => {
+    // sessionError: we don't know yet if they're logged in, so never fall back to guest.
+    if (isLoading || user || sessionError || startedRef.current === attemptKey) return;
+    startedRef.current = attemptKey;
+    let cancelled = false;
+
+    (async () => {
+      // Retry a few times: guest login is rate-limited per network.
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+        try {
+          await loginAsGuest();
+          return;
+        } catch {
+          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        }
+      }
+      if (!cancelled) setHasFailed(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [isLoading, user, sessionError, loginAsGuest, attemptKey]);
+
+  if (user) return <>{children}</>;
+
+  if (hasFailed || (!isLoading && sessionError)) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 min-h-[100dvh] bg-[#0e0e10] text-center px-6">
+        <p className="text-white font-semibold">Couldn't open the stream right now.</p>
+        <button
+          onClick={() => {
+            if (sessionError) {
+              void refreshSession();
+              return;
+            }
+            setHasFailed(false);
+            setAttemptKey((k) => k + 1);
+          }}
+          className="px-5 py-2.5 rounded-full bg-white text-black text-sm font-bold hover:bg-zinc-200 transition-colors"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex items-center justify-center min-h-[100dvh] bg-[#0e0e10]">
+      <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+    </div>
+  );
 }
 
 // Global Tab Blinker Hook
@@ -175,8 +239,10 @@ function App() {
       <AuthProvider>
         <WalletProvider>
         <WebSocketProvider>
+          <NotificationPrefsProvider>
           <RoomsProvider>
           <BrowserRouter>
+            <CreatorLiveAlerts />
             <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route element={<RootLayout />}>
@@ -217,7 +283,7 @@ function App() {
               </Route>
 
               {/* EDGE-TO-EDGE STREAM ROUTES (Outside RootLayout = No Navbar) */}
-              <Route path="/live/:streamId" element={<ProtectedRoute><LiveRoomPage /></ProtectedRoute>} />
+              <Route path="/live/:streamId" element={<LiveRoute><LiveRoomPage /></LiveRoute>} />
               <Route path="/stream/1on1/:creatorId" element={<ProtectedRoute><OneOnOneRoomPage /></ProtectedRoute>} />
 
               {/* 🚀 RESTORED DEV UI TESTING ROUTES */}
@@ -241,6 +307,7 @@ function App() {
 
           </BrowserRouter>
           </RoomsProvider>
+          </NotificationPrefsProvider>
         </WebSocketProvider>
         </WalletProvider>
       </AuthProvider>

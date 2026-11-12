@@ -16,6 +16,8 @@ interface StreamChatSidebarProps {
   isStreamEnded: boolean;
   onOpenPurchase?: () => void;
   onToggleCollapse: () => void;
+  isGuest?: boolean;
+  onLoginClick?: () => void;
 }
 
 export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
@@ -31,6 +33,8 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
   isStreamEnded,
   onOpenPurchase,
   onToggleCollapse,
+  isGuest,
+  onLoginClick,
 }) => {
   return (
     <div className="w-full h-full flex flex-col bg-[#09090b] relative">
@@ -74,6 +78,8 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
           sendError={sendError}
           isStreamEnded={isStreamEnded}
           onTopUpClick={onOpenPurchase}
+          isGuest={isGuest}
+          onLoginClick={onLoginClick}
         />
       </div>
     </div>

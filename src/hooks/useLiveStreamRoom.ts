@@ -1,25 +1,95 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWallet } from '../context/WalletContext';
-import { useWebSocket } from '../context/WebSocketContext';
+import { useWebSocket, wsEvents } from '../context/WebSocketContext';
 import { useAuth } from '../context/AuthContext';
 import { streamService } from '../services/streamService';
 import type { LiveChatMessage } from '../types/streamEvents';
 
-export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, creatorUsername?: string) => {
+interface MessageContext {
+  ownUserID?: string;
+  ownAvatarURL: string;
+  creatorUsername?: string;
+}
+
+// Long busy streams would otherwise keep every message in memory and on screen.
+const MAX_CHAT_MESSAGES = 500;
+
+const keepLatest = (list: LiveChatMessage[]) =>
+  list.length > MAX_CHAT_MESSAGES ? list.slice(-MAX_CHAT_MESSAGES) : list;
+
+// Turns a chat_message or gift_sent envelope (live or from history) into a chat row.
+const toLiveChatMessage = (env: any, ctx: MessageContext): LiveChatMessage | null => {
+  const messageId = String(env?.id || '');
+  if (!messageId) return null;
+
+  if (env.type === 'chat_message') {
+    const metaData = env.meta_data || env.metaData;
+    const senderID = metaData?.from || '';
+    const isOwn = !!ctx.ownUserID && senderID === ctx.ownUserID;
+    const senderName = metaData?.from_name || metaData?.fromName || 'guest';
+    return {
+      id: messageId,
+      senderId: senderID,
+      senderName: isOwn ? 'You' : senderName,
+      avatarUrl: isOwn ? ctx.ownAvatarURL : metaData?.from_avatar_url || metaData?.fromAvatarUrl || '',
+      isCreator: senderName === ctx.creatorUsername,
+      isOwn,
+      text: env.payload?.text || '',
+    };
+  }
+
+  if (env.type === 'gift_sent') {
+    const gift = env.payload;
+    const senderID = gift?.sender_id || gift?.senderId || '';
+    const isOwn = !!ctx.ownUserID && senderID === ctx.ownUserID;
+    const senderUsername = gift?.sender_username || gift?.senderUsername || '';
+    return {
+      id: messageId,
+      senderId: senderID,
+      senderName: isOwn ? 'You' : gift?.sender_name || gift?.senderName || senderUsername || 'Viewer',
+      avatarUrl: isOwn ? ctx.ownAvatarURL : gift?.sender_avatar_url || gift?.senderAvatarUrl || '',
+      isCreator: senderUsername === ctx.creatorUsername,
+      isOwn,
+      text: gift?.message || '',
+      gift: {
+        name: gift?.gift_name || gift?.giftName || 'Gift',
+        icon: gift?.gift_icon || gift?.giftIcon || '',
+        coins: Number(gift?.coins || 0),
+      },
+    };
+  }
+  return null;
+};
+
+export const useLiveStreamRoom = (
+  roomId: string | undefined,
+  streamId: string,
+  creatorUsername?: string,
+  initialPaused = false,
+) => {
   const [viewerCount, setViewerCount] = useState<number>(0);
   const [messages, setMessages] = useState<LiveChatMessage[]>([]);
   const [isGiftPending, setIsGiftPending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [isStreamEnded, setIsStreamEnded] = useState(false);
+  const [isPaused, setIsPaused] = useState(initialPaused);
   const hasConnectedRef = useRef(false);
   const pendingChatRef = useRef(new Map<string, string>());
   
   const { updateBalanceLocally, refreshBalance } = useWallet();
   const { user } = useAuth();
-  const { isConnected, sendMessage, lastMessage } = useWebSocket();
+  const { isConnected, sendMessage } = useWebSocket();
   const ownUserID = user?.user_id;
   const ownUsername = user?.username;
   const ownAvatarURL = user?.avatar_url || '';
+
+  useEffect(() => {
+    setIsPaused(initialPaused);
+  }, [initialPaused]);
+
+  // Latest values for the socket listener, which is subscribed once per room.
+  const latestRef = useRef({ ownUserID, ownUsername, ownAvatarURL, creatorUsername, refreshBalance, updateBalanceLocally });
+  latestRef.current = { ownUserID, ownUsername, ownAvatarURL, creatorUsername, refreshBalance, updateBalanceLocally };
 
   useEffect(() => {
     if (!isConnected) return;
@@ -31,10 +101,13 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
     let isCurrent = true;
     streamService.getStreamMetadata(streamId)
       .then((stream) => {
-        if (isCurrent && stream.status !== 'live') {
+        if (!isCurrent) return;
+        if (stream.status !== 'live') {
           setIsStreamEnded(true);
           setIsGiftPending(false);
         }
+        // Pause/resume events may have been missed while the socket was down.
+        setIsPaused(stream.status === 'live' && !!stream.is_paused);
       })
       .catch(() => undefined);
 
@@ -54,114 +127,111 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
     };
   }, [roomId, isConnected, sendMessage]);
 
-  // 2. Listen for incoming WebSocket messages
+  // 2. Listen to every socket message (not just the latest one, which can skip messages in busy chats)
   useEffect(() => {
-    if (!lastMessage) return;
+    if (!roomId) return;
 
-    // Protobufjs might expose this as camelCase or snake_case depending on your options
-    const msgRoomId = lastMessage.room_id || lastMessage.roomId;
-    if (lastMessage.type === 'error') {
-      if (isGiftPending) setIsGiftPending(false);
-      pendingChatRef.current.clear();
-      setSendError(lastMessage.payload?.message || 'Unable to send message.');
-      return;
-    }
-    if (lastMessage.type === 'send_confirm') {
-      const messageId = String(lastMessage.id || '');
-      const text = pendingChatRef.current.get(messageId);
-      if (!text) return;
-      pendingChatRef.current.delete(messageId);
-      setMessages((current) => current.some((message) => message.id === messageId)
-        ? current
-        : [...current, {
-            id: messageId,
-            senderId: '',
-            senderName: 'You',
-            avatarUrl: ownAvatarURL,
-            isCreator: ownUsername !== undefined && creatorUsername !== undefined && ownUsername === creatorUsername,
-            text,
-          }]);
-      return;
-    }
-    if (lastMessage.type === 'gift_confirm') {
-      const confirm = lastMessage.payload;
-      const newBalance = confirm?.balance_coins ?? confirm?.balanceCoins;
-      if (newBalance !== undefined) {
-        updateBalanceLocally(Number(newBalance));
-      }
-      setIsGiftPending(false);
-      return;
-    }
-    if (lastMessage.type === 'stream_earnings') {
-      void refreshBalance();
-      return;
-    }
-    if (msgRoomId !== roomId) return;
-  	const metaData = lastMessage.meta_data || lastMessage.metaData;
+    return wsEvents.subscribe((msg: any) => {
+      const latest = latestRef.current;
+      const msgRoomId = msg.room_id || msg.roomId;
 
-    switch (lastMessage.type) {
-      case 'viewer_count':
-      case 'viewer_count_updated': { 
-        // Handles both the API spec ('viewer_count') and the proto lookup string
-        const count = lastMessage.payload?.viewer_count || lastMessage.payload?.viewerCount || 0;
-        setViewerCount(Number(count));
-        break;
-      }
-
-      case 'chat_message': {
-        const messageId = String(lastMessage.id || '');
-        if (!messageId) break;
-		const senderName = metaData?.from_name || metaData?.fromName || 'guest';
-        setMessages((current) => current.some((message) => message.id === messageId)
-          ? current
-          : [...current, {
-              id: messageId,
-			  senderId: metaData?.from || '',
-              senderName,
-			  avatarUrl: metaData?.from_avatar_url || metaData?.fromAvatarUrl || '',
-              isCreator: senderName === creatorUsername,
-              text: lastMessage.payload?.text || '',
-            }]);
-        break;
-      }
-
-      case 'gift_sent': {
-        const gift = lastMessage.payload;
-        const messageId = String(lastMessage.id || `${gift?.sender_id || gift?.senderId}-${Date.now()}`);
-        const senderID = gift?.sender_id || gift?.senderId || '';
-        const isOwnGift = senderID === ownUserID;
-        const senderUsername = gift?.sender_username || gift?.senderUsername || '';
-        setMessages((current) => current.some((message) => message.id === messageId)
-          ? current
-          : [...current, {
-              id: messageId,
-              senderId: senderID,
-              senderName: isOwnGift ? 'You' : gift?.sender_name || gift?.senderName || senderUsername || 'Viewer',
-              avatarUrl: isOwnGift ? ownAvatarURL : gift?.sender_avatar_url || gift?.senderAvatarUrl || '',
-              isCreator: senderUsername === creatorUsername,
-              text: gift?.message || '',
-              gift: {
-                name: gift?.gift_name || gift?.giftName || 'Gift',
-                icon: gift?.gift_icon || gift?.giftIcon || '',
-                coins: Number(gift?.coins || 0),
-              },
-            }]);
-        break;
-      }
-
-      case 'message_retracted': {
-        const messageId = lastMessage.payload?.message_id || lastMessage.payload?.messageId;
-        if (messageId) setMessages((current) => current.filter((message) => message.id !== messageId));
-        break;
-      }
-
-      case 'stream_ended': {
-        setIsStreamEnded(true);
+      if (msg.type === 'error') {
         setIsGiftPending(false);
-        break;
+        pendingChatRef.current.clear();
+        setSendError(msg.payload?.message || 'Unable to send message.');
+        return;
       }
-    }
-  }, [lastMessage, roomId, creatorUsername, ownAvatarURL, ownUserID, ownUsername, refreshBalance, updateBalanceLocally]);
+      if (msg.type === 'send_confirm') {
+        const messageId = String(msg.id || '');
+        const text = pendingChatRef.current.get(messageId);
+        if (!text) return;
+        pendingChatRef.current.delete(messageId);
+        setMessages((current) => current.some((message) => message.id === messageId)
+          ? current
+          : keepLatest([...current, {
+              id: messageId,
+              senderId: latest.ownUserID || '',
+              senderName: 'You',
+              avatarUrl: latest.ownAvatarURL,
+              isCreator: latest.ownUsername !== undefined && latest.creatorUsername !== undefined && latest.ownUsername === latest.creatorUsername,
+              isOwn: true,
+              text,
+            }]));
+        return;
+      }
+      if (msg.type === 'gift_confirm') {
+        const confirm = msg.payload;
+        const newBalance = confirm?.balance_coins ?? confirm?.balanceCoins;
+        if (newBalance !== undefined) {
+          latest.updateBalanceLocally(Number(newBalance));
+        }
+        setIsGiftPending(false);
+        return;
+      }
+      if (msg.type === 'stream_earnings') {
+        void latest.refreshBalance();
+        return;
+      }
+      if (msgRoomId !== roomId) return;
+
+      const ctx: MessageContext = {
+        ownUserID: latest.ownUserID,
+        ownAvatarURL: latest.ownAvatarURL,
+        creatorUsername: latest.creatorUsername,
+      };
+
+      switch (msg.type) {
+        case 'viewer_count':
+        case 'viewer_count_updated': {
+          const count = msg.payload?.viewer_count || msg.payload?.viewerCount || 0;
+          setViewerCount(Number(count));
+          break;
+        }
+
+        case 'recent_messages': {
+          const history = ((msg.payload?.messages || []) as any[])
+            .map((env) => toLiveChatMessage(env, ctx))
+            .filter((m): m is LiveChatMessage => m !== null);
+          if (history.length === 0) break;
+          const historyIds = new Set(history.map((m) => m.id));
+          // Rows not in history are older than it (or local-only), so they stay on top.
+          setMessages((current) => keepLatest([...current.filter((m) => !historyIds.has(m.id)), ...history]));
+          break;
+        }
+
+        case 'chat_message':
+        case 'gift_sent': {
+          const row = toLiveChatMessage(msg, ctx);
+          if (!row) break;
+          setMessages((current) => current.some((message) => message.id === row.id) ? current : keepLatest([...current, row]));
+          break;
+        }
+
+        case 'message_retracted': {
+          const messageId = msg.payload?.message_id || msg.payload?.messageId;
+          if (messageId) setMessages((current) => current.filter((message) => message.id !== messageId));
+          break;
+        }
+
+        case 'stream_paused': {
+          setIsPaused(true);
+          break;
+        }
+
+        case 'stream_resumed': {
+          setIsPaused(false);
+          break;
+        }
+
+        case 'stream_ended': {
+          setIsStreamEnded(true);
+          setIsPaused(false);
+          setIsGiftPending(false);
+          break;
+        }
+      }
+    });
+  }, [roomId]);
 
   // 3. Send a gift
   const sendGift = useCallback((giftId: number, message: string = "") => {
@@ -209,6 +279,7 @@ export const useLiveStreamRoom = (roomId: string | undefined, streamId: string, 
     isGiftPending,
     sendError,
     isStreamEnded,
+    isPaused,
     sendChat,
     sendGift,
     retractMessage,

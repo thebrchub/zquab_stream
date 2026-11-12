@@ -83,6 +83,7 @@ export interface StreamMetadata {
   is_premium: boolean;
   entry_price_coins: number;
   viewer_count: number;
+  is_paused?: boolean;
   creator: {
     username: string;
     name: string;

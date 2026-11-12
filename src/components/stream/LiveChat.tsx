@@ -1,170 +1,169 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { type ChatMessage, MOCK_CHAT_MESSAGES } from '../../constants/streamMockData';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useWallet, type GiftItem } from '../../context/WalletContext'; 
-import { Send, Gift, X, Trash2, Ban } from 'lucide-react';
-import { SponsoredChatDrop } from '../../components/SponsoredChatDrop'; // 🚀 Added Import
+import { Send, Gift, X, Trash2, Ban, ArrowDown, LogIn } from 'lucide-react';
+import { SponsoredChatDrop } from '../../components/SponsoredChatDrop';
+import type { LiveChatMessage } from '../../types/streamEvents';
 
 interface LiveChatProps {
-  userBalance: number;
-  onSpendCoins: (amount: number, giftId?: number, message?: string) => void;
-  onTopUpClick?: () => void;
   role: 'viewer' | 'creator';
-  recentGifts?: any[];
+  userBalance: number;
+  messages: LiveChatMessage[];
+  onSendChat: (text: string) => void;
+  onSendGift: (giftId: number, message?: string) => void;
+  onRetractMessage: (messageId: string) => void;
+  isGiftPending: boolean;
+  sendError: string | null;
+  isStreamEnded: boolean;
+  onTopUpClick?: () => void;
+  isGuest?: boolean;
+  onLoginClick?: () => void;
 }
 
-// 🚀 Extend ChatMessage locally so TypeScript accepts adData
-interface ExtendedChatMessage extends Omit<ChatMessage, 'id'> {
-  id: string;
-  adData?: {
-    brandName: string;
-    brandIcon: string;
-    message: string;
-    rewardCoins: number;
-    linkUrl: string;
-  };
+interface PinnedAd {
+  brandName: string;
+  brandIcon: string;
+  message: string;
+  rewardCoins: number;
+  linkUrl: string;
 }
+
+const PINNED_AD_MS = 8000;
+// How close to the bottom (px) still counts as "reading the latest messages".
+const NEAR_BOTTOM_PX = 80;
 
 export const LiveChat: React.FC<LiveChatProps> = ({
-  userBalance,
-  onSpendCoins,
-  onTopUpClick,
   role,
-  recentGifts = [],
+  userBalance,
+  messages,
+  onSendChat,
+  onSendGift,
+  onRetractMessage,
+  isGiftPending,
+  sendError,
+  isStreamEnded,
+  onTopUpClick,
+  isGuest = false,
+  onLoginClick,
 }) => {
-  const [messages, setMessages] = useState<ExtendedChatMessage[]>(MOCK_CHAT_MESSAGES as ExtendedChatMessage[]);
   const [inputText, setInputText] = useState<string>('');
   const [showGiftDrawer, setShowGiftDrawer] = useState<boolean>(false);
   const [insufficientFundsGift, setInsufficientFundsGift] = useState<string | null>(null);
+  const [pinnedAd, setPinnedAd] = useState<PinnedAd | null>(null);
+  const [hasNewBelow, setHasNewBelow] = useState(false);
 
-  const chatBottomRef = useRef<HTMLDivElement>(null);
-  const processedGifts = useRef<Set<any>>(new Set());
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+  const prevLastIdRef = useRef<string | null>(null);
   const { gifts } = useWallet();
 
-  useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = () => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    isNearBottomRef.current = true;
+    setHasNewBelow(false);
+  };
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
+    if (isNearBottomRef.current) setHasNewBelow(false);
+  };
+
+  // Jump (no animation) to the newest message, unless the user scrolled up to read.
+  // Uses the last message id, not the count: the list is capped, so its length stops growing.
+  useLayoutEffect(() => {
+    const lastId = messages.length > 0 ? messages[messages.length - 1].id : null;
+    const prevLastId = prevLastIdRef.current;
+    prevLastIdRef.current = lastId;
+    if (!lastId || lastId === prevLastId) return;
+
+    // Something was added below the old last message (a retract of the last one doesn't count).
+    let appended = prevLastId === null;
+    for (let i = messages.length - 2; !appended && i >= 0; i--) {
+      if (messages[i].id === prevLastId) appended = true;
+    }
+    if (!appended) return;
+
+    if (prevLastId === null || isNearBottomRef.current) {
+      scrollToBottom();
+    } else {
+      setHasNewBelow(true);
+    }
   }, [messages]);
 
-  // 🚀 Listen for incoming WebSocket gifts
+  // Ads from the Dev Menu show as one pinned card that hides itself after a few seconds.
   useEffect(() => {
-    if (!recentGifts || recentGifts.length === 0) return;
-
-    recentGifts.forEach((gift) => {
-      if (!processedGifts.current.has(gift)) {
-        processedGifts.current.add(gift);
-        
-        const wsGiftMessage: ExtendedChatMessage = {
-          id: `ws-gift-${Date.now()}-${Math.random()}`,
-          userId: gift.sender_id || 'unknown',
-          userName: gift.sender_name || gift.sender_username || 'User',
-          avatar: gift.sender_avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
-          message: gift.message || undefined,
-          gift: { 
-            name: gift.gift_name, 
-            icon: gift.gift_icon, 
-            coins: gift.coins 
-          },
-          timestamp: 'Just now',
-        };
-
-        setMessages((prev) => [...prev, wsGiftMessage]);
-      }
-    });
-  }, [recentGifts]);
-
-  // 🚀 Listen for Mock Ads from the Dev Menu
-  useEffect(() => {
-    const handleAdTrigger = (e: any) => {
-      const adMessage: ExtendedChatMessage = {
-        id: `ad-${Date.now()}`,
-        userId: 'system-ad',
-        userName: 'System',
-        avatar: '',
-        message: 'ad-placeholder', 
-        timestamp: 'Just now',
-        adData: e.detail // Attach the ad payload
-      };
-      setMessages((prev) => [...prev, adMessage]);
-    };
-
+    const handleAdTrigger = (e: Event) => setPinnedAd((e as CustomEvent<PinnedAd>).detail);
     window.addEventListener('dev_ad_triggered', handleAdTrigger);
     return () => window.removeEventListener('dev_ad_triggered', handleAdTrigger);
   }, []);
 
+  useEffect(() => {
+    if (!pinnedAd) return;
+    const timer = window.setTimeout(() => setPinnedAd(null), PINNED_AD_MS);
+    return () => window.clearTimeout(timer);
+  }, [pinnedAd]);
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
-
-    const newMessage: ExtendedChatMessage = {
-      id: `chat-${Date.now()}`,
-      userId: 'current-user',
-      userName: 'You',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
-      message: inputText.trim(),
-      timestamp: 'Just now',
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
+    const text = inputText.trim();
+    if (!text || isGuest || isStreamEnded) return;
+    onSendChat(text);
     setInputText('');
+    scrollToBottom();
   };
 
   const handleSendGift = (gift: GiftItem) => {
+    if (isGuest || isGiftPending || isStreamEnded) return;
     if (userBalance < gift.cost_coins) {
       setInsufficientFundsGift(gift.name);
       setTimeout(() => setInsufficientFundsGift(null), 3000);
       return;
     }
 
-    const attachedMessage = inputText.trim();
-    onSpendCoins(gift.cost_coins, gift.id, attachedMessage);
-
-    const giftMessage: ExtendedChatMessage = {
-      id: `chat-gift-${Date.now()}`,
-      userId: 'current-user',
-      userName: 'You',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
-      message: attachedMessage || undefined,
-      gift: { name: gift.name, icon: gift.icon, coins: gift.cost_coins },
-      timestamp: 'Just now',
-    };
-
-    setMessages((prev) => [...prev, giftMessage]);
+    onSendGift(gift.id, inputText.trim());
     setInputText('');
     setShowGiftDrawer(false);
   };
 
-  const deleteMessage = (id: string) => {
-    setMessages((prev) => prev.filter((msg) => msg.id !== id));
-  };
-
   return (
     <div className="flex flex-col h-full bg-[#09090b] relative">
+
+      {/* --- Pinned sponsored card (stays put while chat scrolls) --- */}
+      {pinnedAd && (
+        <div className="relative shrink-0 border-b border-white/[0.03]">
+          <SponsoredChatDrop
+            brandName={pinnedAd.brandName}
+            brandIcon={pinnedAd.brandIcon}
+            message={pinnedAd.message}
+            rewardCoins={pinnedAd.rewardCoins}
+            linkUrl={pinnedAd.linkUrl}
+          />
+          <button
+            onClick={() => setPinnedAd(null)}
+            className="absolute top-3 right-5 p-1 text-zinc-500 hover:text-white transition-colors"
+            title="Close"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
       
       {/* --- Chat Scroll Area --- */}
-      <div className="flex-1 overflow-y-auto pt-2 pb-24 space-y-1.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto pt-2 pb-24 space-y-1.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+      >
         {messages.map((item) => {
-          
-          // 🚀 IF IT'S AN AD, RENDER THE SPONSORED DROP COMPONENT
-          if (item.adData) {
-            return (
-              <SponsoredChatDrop 
-                key={item.id} 
-                brandName={item.adData.brandName}
-                brandIcon={item.adData.brandIcon}
-                message={item.adData.message}
-                rewardCoins={item.adData.rewardCoins}
-                linkUrl={item.adData.linkUrl}
-              />
-            );
-          }
-
-          // OTHERWISE, RENDER STANDARD CHAT OR GIFTS
           return (
             <div key={item.id} className="relative group px-4 py-1 hover:bg-white/[0.02] transition-colors">
               
               {/* Creator Mod Tools */}
-              {role === 'creator' && (
+              {role === 'creator' && !isStreamEnded && (
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-[#09090b]/90 backdrop-blur-sm p-1 rounded-md border border-white/5 shadow-lg z-10">
-                  <button onClick={() => deleteMessage(item.id)} className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors rounded hover:bg-white/5" title="Delete">
+                  <button onClick={() => onRetractMessage(item.id)} className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors rounded hover:bg-white/5" title="Delete">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                   <button className="p-1.5 text-zinc-500 hover:text-orange-400 transition-colors rounded hover:bg-white/5" title="Timeout">
@@ -175,7 +174,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
 
               {/* Layout Grid */}
               <div className="grid grid-cols-[24px_1fr] gap-3 items-start">
-                <img src={item.avatar} alt={item.userName} className="w-6 h-6 rounded-full object-cover mt-0.5 opacity-90 border border-zinc-800" />
+                <img src={item.avatarUrl || '/logo.webp'} alt={item.senderName} className="w-6 h-6 rounded-full object-cover mt-0.5 opacity-90 border border-zinc-800" />
                 
                 <div className="min-w-0">
                   {item.gift ? (
@@ -184,7 +183,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                       <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-amber-500/0 via-amber-500/40 to-amber-500/0" />
                       
                       <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-1.5">
-                        <span className="text-[13px] font-extrabold text-amber-500 drop-shadow-sm">{item.userName}</span>
+                        <span className="text-[13px] font-extrabold text-amber-500 drop-shadow-sm">{item.senderName}</span>
                         <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Sent</span>
                         <span className="text-[13px] font-bold text-zinc-200">{item.gift.name}</span>
                         
@@ -193,17 +192,17 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                           <span className="text-[11px] font-black text-amber-400">{item.gift.coins}</span>
                         </div>
                       </div>
-                      {item.message && (
+                      {item.text && (
                         <p className="text-[13px] text-zinc-300 font-medium break-words break-all whitespace-pre-wrap leading-snug">
-                          {item.message}
+                          {item.text}
                         </p>
                       )}
                     </div>
                   ) : (
                     /* Standard Text Layout */
                     <div className="leading-snug mt-1">
-                      <span className="text-[13px] font-bold text-zinc-400 mr-2.5 align-baseline">{item.userName}</span>
-                      <span className="text-[13px] text-zinc-200 break-words break-all whitespace-pre-wrap align-baseline">{item.message}</span>
+                      <span className={`text-[13px] font-bold mr-2.5 align-baseline ${item.isCreator ? 'text-indigo-400' : 'text-zinc-400'}`}>{item.senderName}</span>
+                      <span className="text-[13px] text-zinc-200 break-words break-all whitespace-pre-wrap align-baseline">{item.text}</span>
                     </div>
                   )}
                 </div>
@@ -211,11 +210,23 @@ export const LiveChat: React.FC<LiveChatProps> = ({
             </div>
           );
         })}
-        <div ref={chatBottomRef} className="h-4" />
       </div>
+
+      {hasNewBelow && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute left-1/2 -translate-x-1/2 bottom-24 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg transition-colors"
+        >
+          New messages <ArrowDown className="w-3.5 h-3.5" />
+        </button>
+      )}
 
       {/* --- Unified Input Action Bar --- */}
       <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#09090b] via-[#09090b] to-transparent pt-8 pb-4 px-4 z-30 pointer-events-none">
+
+        {sendError && !isGuest && (
+          <p className="mb-2 text-xs text-red-400 font-medium pointer-events-auto">{sendError}</p>
+        )}
         
         {showGiftDrawer && (
           <div className="mb-3 bg-zinc-900 border border-white/5 rounded-2xl p-3 animate-in slide-in-from-bottom-2 fade-in duration-200 shadow-[0_-8px_20px_rgba(0,0,0,0.5),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.4)] pointer-events-auto">
@@ -249,7 +260,29 @@ export const LiveChat: React.FC<LiveChatProps> = ({
           </div>
         )}
 
-        {role === 'viewer' && (
+        {role === 'viewer' && isGuest && (
+          <div className="flex items-center gap-2 p-1.5 bg-white/[0.02] border border-white/5 rounded-2xl pointer-events-auto">
+            <input
+              type="text"
+              disabled
+              placeholder="Log in to chat"
+              className="flex-1 bg-transparent py-1.5 px-2 text-sm text-zinc-500 placeholder-zinc-500 cursor-not-allowed focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={onLoginClick}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#4F46E5] hover:brightness-110 text-white text-xs font-bold transition-all shrink-0 active:scale-95"
+            >
+              <LogIn className="w-3.5 h-3.5" /> Log in
+            </button>
+          </div>
+        )}
+
+        {role === 'viewer' && !isGuest && isStreamEnded && (
+          <p className="text-center text-xs text-zinc-500 font-medium py-2 pointer-events-auto">Chat is closed — the stream has ended.</p>
+        )}
+
+        {role === 'viewer' && !isGuest && !isStreamEnded && (
           <form onSubmit={handleSendMessage} className="flex items-center gap-2 p-1.5 bg-white/[0.02] border border-white/5 hover:border-white/10 focus-within:border-indigo-500/30 focus-within:bg-white/[0.04] rounded-2xl transition-all pointer-events-auto shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3),inset_-1px_-1px_3px_rgba(255,255,255,0.03)]">
             <button
               type="button"

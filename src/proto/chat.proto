@@ -50,3 +50,8 @@ message SystemEvent {
     string code    = 1;
     string message = 2;
 }
+
+// MsgType "recent_messages" — live-stream chat history sent after join_room
+message RecentMessages {
+    repeated bytes envelopes = 1; // oldest first; each is a full Envelope
+}

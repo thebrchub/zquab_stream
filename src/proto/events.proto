@@ -14,19 +14,47 @@ message StrangerDisconnected {
     string room_id = 1;
 }
 
-// MsgType "friend_accepted" — sent to both users when a mutual add-friend
-// during a stranger match succeeds; dm_room_id is the new permanent DM room.
+// MsgType "friend_accepted" — sent to both users when a friend request is accepted
+// (room_id set when it came from a stranger match); dm_room_id is the new DM room.
 message FriendAccepted {
     string room_id    = 1;
     string dm_room_id = 2;
+    string user_id    = 3; // the other (new) friend's userID
+    string username   = 4;
+    string name       = 5;
+    string avatar_url = 6;
 }
 
-// MsgType "friend_request" — one-sided: partner wants to be friends, waiting
-// on you to reciprocate (room_id set when this originates from a stranger match).
+// MsgType "friend_request" — someone sent you a friend request
+// (room_id set when this originates from a stranger match).
 message FriendRequest {
-    string from     = 1;
-    string room_id  = 2;
-    string username = 3;
+    string from       = 1; // sender userID
+    string room_id    = 2;
+    string username   = 3;
+    int64  request_id = 4; // needed for accept/reject
+    string name       = 5;
+    string avatar_url = 6;
+}
+
+// MsgType "friend_request_withdrawn"
+message FriendRequestWithdrawn {
+    string from = 1;
+}
+
+// MsgType "friend_request_rejected"
+message FriendRequestRejected {
+    string from = 1; // the user who rejected the request
+}
+
+// MsgType "unfriend"
+message Unfriended {
+    string user_id = 1; // the user who removed the friendship
+    string room_id = 2; // the deleted DM room, if one existed
+}
+
+// MsgType "room_closed"
+message RoomClosed {
+    string room_id = 1;
 }
 
 // MsgType "stream_live" (server -> streamer only)
@@ -112,6 +140,27 @@ message GiftConfirm {
 message StreamEnded {
     string stream_id = 1;
     string room_id   = 2;
+}
+
+// MsgType "stream_paused" — the streamer's video dropped (stream room)
+message StreamPaused {
+    string stream_id = 1;
+}
+
+// MsgType "stream_resumed" — the streamer is back (stream room)
+message StreamResumed {
+    string stream_id = 1;
+}
+
+// MsgType "creator_live" — to followers, once when a stream goes live
+message CreatorLive {
+    string creator_id = 1;
+    string username   = 2;
+    string name       = 3;
+    string avatar_url = 4;
+    string stream_id  = 5;
+    string room_id    = 6;
+    string title      = 7;
 }
 
 // MsgType "retract_message" — creator request

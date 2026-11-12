@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
 import protobuf from 'protobufjs';
+import { useAuth } from './AuthContext';
 import chatProtoSrc from '../proto/chat.proto?raw';
 import eventsProtoSrc from '../proto/events.proto?raw';
 
@@ -22,7 +23,6 @@ const SystemEventProto = safeLookup('chatpb.SystemEvent', 'SystemEvent');
 const PhotoRequestProto = safeLookup('eventspb.PhotoRequest', 'PhotoRequest');
 const PhotoResponseProto = safeLookup('eventspb.PhotoResponse', 'PhotoResponse');
 const PhotoReadyProto = safeLookup('eventspb.PhotoReady', 'PhotoReady');
-const UnfriendedProto = safeLookup('eventspb.Unfriended', 'Unfriended');
 
 // 🚀 NEW: Stream & Creator Event Protos
 const GiftSentEventProto = safeLookup('eventspb.GiftSentEvent', 'GiftSentEvent');
@@ -36,6 +36,97 @@ const GiftConfirmProto = safeLookup('eventspb.GiftConfirm', 'GiftConfirm');
 const StreamEndedProto = safeLookup('eventspb.StreamEnded', 'StreamEnded');
 const RetractMessageRequestProto = safeLookup('eventspb.RetractMessageRequest', 'RetractMessageRequest');
 const MessageRetractedProto = safeLookup('eventspb.MessageRetracted', 'MessageRetracted');
+const RecentMessagesProto = safeLookup('chatpb.RecentMessages', 'RecentMessages');
+const StreamPausedProto = safeLookup('eventspb.StreamPaused', 'StreamPaused');
+const StreamResumedProto = safeLookup('eventspb.StreamResumed', 'StreamResumed');
+
+// These events are read with snake_case keys (e.g. avatar_url), so they get both spellings.
+const plainEventProtos: Record<string, protobuf.Type | null> = {
+  creator_live: safeLookup('eventspb.CreatorLive', 'CreatorLive'),
+  friend_request: safeLookup('eventspb.FriendRequest', 'FriendRequest'),
+  friend_accepted: safeLookup('eventspb.FriendAccepted', 'FriendAccepted'),
+  friend_request_withdrawn: safeLookup('eventspb.FriendRequestWithdrawn', 'FriendRequestWithdrawn'),
+  friend_request_rejected: safeLookup('eventspb.FriendRequestRejected', 'FriendRequestRejected'),
+  room_closed: safeLookup('eventspb.RoomClosed', 'RoomClosed'),
+  unfriend: safeLookup('eventspb.Unfriended', 'Unfriended'),
+};
+
+const toSnake = (key: string) => key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+
+const withSnakeKeys = (obj: Record<string, any>) => {
+  const out: Record<string, any> = { ...obj };
+  for (const [key, value] of Object.entries(obj)) out[toSnake(key)] = value;
+  return out;
+};
+
+// Turns one envelope payload into a JS object based on the envelope type.
+const decodePayload = (t: string, payload: Uint8Array): any => {
+  if (!payload || payload.length === 0) return payload;
+  try {
+    // Chat & System Events
+    if (t === 'message_delivered' || t === 'message_sent_confirm' || t === 'chat_message') {
+      const decoded: any = ChatMessageProto.decode(payload);
+      if (decoded.mediaUrl) decoded.media_url = decoded.mediaUrl;
+      if (decoded.mediaType) decoded.media_type = decoded.mediaType;
+      if (decoded.replyTo) decoded.reply_to = decoded.replyTo;
+      return decoded;
+    }
+    if (t === 'photo_request' && PhotoRequestProto) return PhotoRequestProto.decode(payload);
+    if (t === 'photo_response' && PhotoResponseProto) return PhotoResponseProto.decode(payload);
+    if (t === 'photo_ready' && PhotoReadyProto) return PhotoReadyProto.decode(payload);
+    if (t === 'error' && SystemEventProto) return SystemEventProto.decode(payload);
+    if (t === 'message_read' || t === 'message_delivered_receipt' || t === 'message_receipt' || t === 'receipt') {
+      if (!ReceiptProto) return payload;
+      try {
+        return ReceiptProto.decode(payload);
+      } catch {
+        return payload;
+      }
+    }
+
+    // Stream events
+    if (t === 'gift_sent' && GiftSentEventProto) return GiftSentEventProto.decode(payload);
+    if ((t === 'viewer_count' || t === 'viewer_count_updated') && ViewerCountEventProto) return ViewerCountEventProto.decode(payload);
+    if (t === 'stream_earnings' && StreamEarningsEventProto) return StreamEarningsEventProto.decode(payload);
+    if (t === 'stream_ending_soon' && StreamEndingSoonEventProto) return StreamEndingSoonEventProto.decode(payload);
+    if (t === 'stream_auto_ended' && StreamAutoEndedEventProto) return StreamAutoEndedEventProto.decode(payload);
+    if (t === 'stream_live' && StreamLiveEventProto) return StreamLiveEventProto.decode(payload);
+    if (t === 'gift_confirm' && GiftConfirmProto) return GiftConfirmProto.decode(payload);
+    if (t === 'stream_ended' && StreamEndedProto) return StreamEndedProto.decode(payload);
+    if (t === 'message_retracted' && MessageRetractedProto) return MessageRetractedProto.decode(payload);
+    if (t === 'stream_paused' && StreamPausedProto) return StreamPausedProto.decode(payload);
+    if (t === 'stream_resumed' && StreamResumedProto) return StreamResumedProto.decode(payload);
+    if (t === 'recent_messages' && RecentMessagesProto) {
+      const history: any = RecentMessagesProto.decode(payload);
+      const messages = (history.envelopes || []).map((raw: Uint8Array) => {
+        const inner = Envelope.decode(raw) as any;
+        return { ...inner, payload: decodePayload(inner.type || '', inner.payload) };
+      });
+      return { messages };
+    }
+
+    const plainProto = plainEventProtos[t];
+    if (plainProto) {
+      return withSnakeKeys(plainProto.toObject(plainProto.decode(payload), { longs: Number, defaults: true }));
+    }
+  } catch (e) {
+    console.warn('Could not decode inner payload', e);
+    return payload;
+  }
+
+  // Fallbacks
+  try {
+    // First try standard chat message
+    return ChatMessageProto.decode(payload);
+  } catch {
+    try {
+      // JSON fallback, in case the backend sends temporary JSON payloads
+      return JSON.parse(new TextDecoder().decode(payload));
+    } catch {
+      return payload;
+    }
+  }
+};
 
 type WSListener = (message: any) => void;
 class WSEmitter {
@@ -101,84 +192,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         const bytes = new Uint8Array(event.data);
         const envelope = Envelope.decode(bytes) as any;
 
-        let decodedPayload: any = envelope.payload;
-
-        if (envelope.payload && envelope.payload.length > 0) {
-          try {
-            const t: string = envelope.type || '';
-
-            // Chat & System Events
-            if (t === 'message_delivered' || t === 'message_sent_confirm' || t === 'chat_message') {
-              decodedPayload = ChatMessageProto.decode(envelope.payload);
-              if (decodedPayload.mediaUrl) decodedPayload.media_url = decodedPayload.mediaUrl;
-              if (decodedPayload.mediaType) decodedPayload.media_type = decodedPayload.mediaType;
-              if (decodedPayload.replyTo) decodedPayload.reply_to = decodedPayload.replyTo;
-            } else if (t === 'photo_request' && PhotoRequestProto) {
-              decodedPayload = PhotoRequestProto.decode(envelope.payload);
-            } else if (t === 'photo_response' && PhotoResponseProto) {
-              decodedPayload = PhotoResponseProto.decode(envelope.payload);
-            } else if (t === 'photo_ready' && PhotoReadyProto) {
-              decodedPayload = PhotoReadyProto.decode(envelope.payload);
-            } else if (t === 'unfriend' && UnfriendedProto) {
-              decodedPayload = UnfriendedProto.decode(envelope.payload);
-            } else if (t === 'error' && SystemEventProto) {
-              decodedPayload = SystemEventProto.decode(envelope.payload);
-            } else if (t === 'message_read' || t === 'message_delivered_receipt' || t === 'message_receipt' || t === 'receipt') {
-              if (ReceiptProto) {
-                try {
-                  decodedPayload = ReceiptProto.decode(envelope.payload);
-                } catch (e) {
-                  decodedPayload = envelope.payload;
-                }
-              }
-            } 
-            
-            // 🚀 NEW: Stream Event Decoders
-            else if (t === 'gift_sent' && GiftSentEventProto) {
-              decodedPayload = GiftSentEventProto.decode(envelope.payload);
-            } else if ((t === 'viewer_count' || t === 'viewer_count_updated') && ViewerCountEventProto) {
-              decodedPayload = ViewerCountEventProto.decode(envelope.payload);
-            } else if (t === 'stream_earnings' && StreamEarningsEventProto) {
-              decodedPayload = StreamEarningsEventProto.decode(envelope.payload);
-            } else if (t === 'stream_ending_soon' && StreamEndingSoonEventProto) {
-              decodedPayload = StreamEndingSoonEventProto.decode(envelope.payload);
-            } else if (t === 'stream_auto_ended' && StreamAutoEndedEventProto) {
-              decodedPayload = StreamAutoEndedEventProto.decode(envelope.payload);
-            } else if (t === 'stream_live' && StreamLiveEventProto) {
-              decodedPayload = StreamLiveEventProto.decode(envelope.payload);
-            } else if (t === 'gift_confirm' && GiftConfirmProto) {
-              decodedPayload = GiftConfirmProto.decode(envelope.payload);
-            } else if (t === 'stream_ended' && StreamEndedProto) {
-              decodedPayload = StreamEndedProto.decode(envelope.payload);
-            } else if (t === 'message_retracted' && MessageRetractedProto) {
-              decodedPayload = MessageRetractedProto.decode(envelope.payload);
-            } 
-            
-            // Fallbacks
-            else {
-              try {
-                // First try standard chat message
-                decodedPayload = ChatMessageProto.decode(envelope.payload);
-              } catch (e) {
-                try {
-                  // 🚀 NEW: JSON Fallback! 
-                  // If backend sends temporary JSON strings before updating protos
-                  const text = new TextDecoder().decode(envelope.payload);
-                  decodedPayload = JSON.parse(text);
-                } catch (jsonErr) {
-                  decodedPayload = envelope.payload;
-                }
-              }
-            }
-          } catch (e) {
-            console.warn('Could not decode inner payload', e);
-            decodedPayload = envelope.payload;
-          }
-        }
-
         const finalMessage = {
           ...envelope,
-          payload: decodedPayload,
+          payload: decodePayload(envelope.type || '', envelope.payload),
         };
 
         wsEvents.emit(finalMessage);
@@ -213,6 +229,19 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
     };
   }, []);
+
+  // The socket is logged in as whoever the cookie was for when it opened, so reopen it after a login switch.
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const userKey = user ? `${user.user_id}:${user.is_guest}` : '';
+  const prevUserKeyRef = useRef(userKey);
+  useEffect(() => {
+    if (isAuthLoading || prevUserKeyRef.current === userKey) {
+      prevUserKeyRef.current = userKey;
+      return;
+    }
+    prevUserKeyRef.current = userKey;
+    wsRef.current?.close();
+  }, [userKey, isAuthLoading]);
 
   const sendMessage = useCallback((type: string, payload?: any, roomId?: string, to?: string, id?: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {

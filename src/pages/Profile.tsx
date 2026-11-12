@@ -19,6 +19,7 @@ import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
 import { CreatorApplicationModal } from '../components/studio/CreatorApplicationModal';
 import { creatorService } from '../services/creatorService';
+import { LiveAlertsSetting } from '../components/stream/LiveAlertsSetting';
 import { createZAvatarURL, MAX_AVATAR_URL_LENGTH, MAX_USERNAME_LENGTH } from '../utils/avatar';
 
 const GENDER_OPTIONS = ['Prefer not to say', 'Male', 'Female', 'Other'];
@@ -565,6 +566,8 @@ export default function Profile() {
               <button aria-label="Start Chat" onClick={() => navigate('/chat')} className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-black text-indigo-600 shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.1),inset_1px_1px_2px_rgba(255,255,255,0.8),inset_-1px_-1px_2px_rgba(0,0,0,0.1)] transition-all hover:brightness-110 active:scale-95 border-none"><MessageSquare className="h-4 w-4" /> Start Chat</button>
             </div>
           </section>
+
+          <LiveAlertsSetting />
 
           {/* 🛠️ Claymorphic Social Space Panel */}
           <section className="flex min-h-[520px] flex-col overflow-hidden rounded-[2rem] border border-white/[0.09] bg-[#101115] shadow-[8px_8px_20px_rgba(0,0,0,0.5),-4px_-4px_10px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.05),inset_-1px_-1px_3px_rgba(0,0,0,0.3)]">

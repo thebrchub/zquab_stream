@@ -1,18 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { StreamChatSidebar } from '../../components/stream/StreamChatSidebar'; 
 import { useStreamEntry } from '../../hooks/useStreamEntry';
 import { useLiveStreamRoom } from '../../hooks/useLiveStreamRoom';
 import { useWallet } from '../../context/WalletContext';
+import { useAuth } from '../../context/AuthContext';
 import { NativeStreamPlayer } from '../../components/stream/NativeStreamPlayer';
+import { FollowButton, type FollowState } from '../../components/stream/FollowButton';
 import { streamService, type StreamMetadata } from '../../services/streamService';
 import { creatorService, type CreatorProfile } from '../../services/creatorService';
 import { StreamSettingsMenu } from '../../components/stream/StreamSettingsMenu';
 import { 
   Loader2, AlertCircle, ArrowLeft, 
-  Eye, Heart, Share2, Activity, StopCircle, BadgeCheck,
+  Eye, Share2, Activity, StopCircle, BadgeCheck,
   Play, Pause, Volume1, Volume2, VolumeX, Settings, Maximize, Minimize, MessageSquare,
-  X, Users, Lock, Coins
+  X, Users, Lock, Coins, LogIn
 } from 'lucide-react';
 import { StreamOverlayAd } from '../../components/stream/StreamOverlayAd';
 import { AnimatePresence } from 'framer-motion';
@@ -30,8 +33,8 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const { streamId: routeStreamId } = useParams<{ streamId: string }>();
   const resolvedStreamId = routeStreamId || streamId;
 
-  const [role, setRole] = useState<'viewer' | 'creator'>(
-    (sessionStorage.getItem('dev_stream_role') as 'viewer' | 'creator') || 'viewer'
+  const [devRole, setDevRole] = useState<'viewer' | 'creator' | null>(
+    (sessionStorage.getItem('dev_stream_role') as 'viewer' | 'creator' | null) || null
   );
   const [streamMode, setStreamMode] = useState<'api' | 'mock'>(
     (sessionStorage.getItem('dev_stream_mode') as 'api' | 'mock') || 'api'
@@ -58,9 +61,12 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const [isLoadingStream, setIsLoadingStream] = useState(true);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
+  const [followState, setFollowState] = useState<FollowState>({ isFollowing: false, liveAlerts: true });
+  const [isStalled, setIsStalled] = useState(false);
+  const [playerKey, setPlayerKey] = useState(0);
   const activityTimeoutRef = useRef<number | null>(null);
+  const { user } = useAuth();
+  const isGuest = !user || user.is_guest;
 
   const rootRef = useRef<HTMLDivElement>(null);
   const videoColumnRef = useRef<HTMLDivElement>(null);
@@ -127,7 +133,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
       .then((profile) => {
         if (!isCurrent) return;
         setCreatorProfile(profile);
-        setIsFollowing(profile.is_following);
+        setFollowState({ isFollowing: profile.is_following, liveAlerts: profile.live_alerts ?? true });
       })
       .catch(() => {
         if (isCurrent) setCreatorProfile(null);
@@ -147,7 +153,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   };
 
   useEffect(() => {
-    const handleRoleChange = (e: any) => setRole(e.detail.role);
+    const handleRoleChange = (e: any) => setDevRole(e.detail.role);
     const handleModeChange = (e: any) => setStreamMode(e.detail.mode);
     window.addEventListener('dev_role_changed', handleRoleChange);
     window.addEventListener('dev_stream_mode_changed', handleModeChange);
@@ -204,10 +210,36 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   }, []);
 
   const { balanceCoins, openPurchaseModal } = useWallet();
-  const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, retryEnter } = useStreamEntry(resolvedStreamId);
+  const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, isLoginRequired, retryEnter, refreshPlaybackUrl } = useStreamEntry(resolvedStreamId);
 
   const roomId = stream?.room_id;
-  const { viewerCount, messages, isGiftPending, sendError, isStreamEnded, sendChat, sendGift, retractMessage } = useLiveStreamRoom(roomId, resolvedStreamId, stream?.creator.username);
+  const { viewerCount, messages, isGiftPending, sendError, isStreamEnded, isPaused, sendChat, sendGift, retractMessage } = useLiveStreamRoom(roomId, resolvedStreamId, stream?.creator.username, stream?.is_paused ?? false);
+
+  const isReconnecting = streamMode !== 'mock' && !isStreamEnded && (isPaused || isStalled);
+
+  // A fresh signed link plus a brand-new player: the streamer's new session restarts the video.
+  const restartPlayer = useCallback(async () => {
+    await refreshPlaybackUrl();
+    setPlayerKey((k) => k + 1);
+  }, [refreshPlaybackUrl]);
+
+  // Streamer is back: restart straight away instead of waiting for the next retry.
+  const wasPausedRef = useRef(isPaused);
+  useEffect(() => {
+    if (wasPausedRef.current && !isPaused && !isStreamEnded) void restartPlayer();
+    wasPausedRef.current = isPaused;
+  }, [isPaused, isStreamEnded, restartPlayer]);
+
+  // Keep retrying while reconnecting, in case the "resumed" event was missed.
+  useEffect(() => {
+    if (!isReconnecting) return;
+    const timer = window.setInterval(() => void restartPlayer(), 10000);
+    return () => window.clearInterval(timer);
+  }, [isReconnecting, restartPlayer]);
+
+  useEffect(() => {
+    if (isStreamEnded) setIsStalled(false);
+  }, [isStreamEnded]);
 
   const [isHoveringPlayer, setIsHoveringPlayer] = useState(false);
 
@@ -215,6 +247,17 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   if (!stream) return <div className="text-white p-10 bg-[#0e0e10] min-h-screen">{streamError || 'Stream not found.'}</div>;
 
   const creator = stream.creator;
+  const isOwnStream = !!user?.username && user.username === creator.username;
+  const role: 'viewer' | 'creator' = devRole ?? (isOwnStream ? 'creator' : 'viewer');
+
+  const goToLogin = () => navigate(`/auth?next=${encodeURIComponent(`/live/${resolvedStreamId}`)}`);
+
+  const handleFollowChange = (next: FollowState) => {
+    if (next.isFollowing !== followState.isFollowing) {
+      setCreatorProfile((p) => p ? { ...p, follower_count: Math.max(0, p.follower_count + (next.isFollowing ? 1 : -1)) } : p);
+    }
+    setFollowState(next);
+  };
 
   const activePlaybackUrl = streamMode === 'mock' ? "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" : apiPlaybackUrl;
   const activeIsLoading = streamMode === 'mock' ? false : apiIsLoading;
@@ -233,21 +276,6 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
     }
   };
 
-  const handleFollow = async () => {
-    if (isFollowActionLoading) return;
-    setIsFollowActionLoading(true);
-    try {
-      if (isFollowing) {
-        await creatorService.unfollowCreator(creator.username);
-      } else {
-        await creatorService.followCreator(creator.username);
-      }
-      setIsFollowing(!isFollowing);
-    } finally {
-      setIsFollowActionLoading(false);
-    }
-  };
-
   const handleShare = async () => {
     const shareData = { title: stream.title, url: window.location.href };
     if (navigator.share) {
@@ -259,6 +287,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
 
   return (
     <div ref={rootRef} className="flex flex-col lg:flex-row h-[100dvh] w-full bg-[#0e0e10] text-gray-100 overflow-hidden font-sans">
+      <Toaster position="top-center" />
       
       {/* --- LEFT COLUMN: Video & Meta --- */}
       <div 
@@ -298,6 +327,20 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             <div className="flex flex-col items-center gap-3 text-center p-8 z-20 bg-zinc-950/90 backdrop-blur-md border border-white/10 rounded-[2rem] shadow-2xl pointer-events-auto">
               <h3 className="text-xl font-bold text-white">Stream Ended</h3>
               <p className="text-sm text-zinc-400">Thanks for watching.</p>
+            </div>
+          ) : isLoginRequired ? (
+            <div className="flex flex-col items-center max-w-sm text-center p-8 z-20 bg-zinc-950/90 backdrop-blur-md border border-amber-500/20 rounded-[2rem] shadow-2xl pointer-events-auto">
+              <div className="w-16 h-16 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mb-4">
+                <Lock className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Premium Broadcast</h3>
+              <p className="text-sm text-zinc-400 mb-6 leading-relaxed">Log in to unlock this stream.</p>
+              <button
+                onClick={(e) => { e.stopPropagation(); goToLogin(); }}
+                className="w-full py-4 bg-amber-500 text-amber-950 rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:bg-amber-400 active:scale-95"
+              >
+                <LogIn className="w-5 h-5" /> Log in to unlock
+              </button>
             </div>
           ) : isPaywall ? (
             <div className="flex flex-col items-center max-w-sm text-center p-8 z-20 bg-zinc-950/90 backdrop-blur-md border border-amber-500/20 rounded-[2rem] shadow-2xl pointer-events-auto">
@@ -340,11 +383,13 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             </div>
           ) : (
             <NativeStreamPlayer 
+              key={playerKey}
               streamUrl={activePlaybackUrl} 
               isPlaying={isPlaying} 
               isMuted={isMuted || volume === 0} 
               videoRef={videoRef}               
               onLiveEdgeChange={setIsAtLiveEdge} 
+              onStalledChange={setIsStalled}
               // Passing settings down (NativeStreamPlayer needs to handle these eventually)
               quality={streamQuality}
               isLowLatency={isLowLatency}
@@ -352,6 +397,14 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           )}
           {!activePlaybackUrl && (
             <img src={creator.avatar_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 blur-2xl pointer-events-none" />
+          )}
+
+          {isReconnecting && activePlaybackUrl && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm text-center px-6 pointer-events-none">
+              <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+              <p className="text-base lg:text-lg font-bold text-white">{creator.name} is reconnecting…</p>
+              <p className="text-xs lg:text-sm text-zinc-400">Hang tight, the video will continue by itself. Chat is still on.</p>
+            </div>
           )}
 
           <AnimatePresence>
@@ -373,7 +426,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           </button>
           
           <div className="flex items-center gap-2 pointer-events-auto">
-            {role === 'viewer' && (
+            {role === 'viewer' && !isGuest && (
               <button onClick={openPurchaseModal} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm border border-blue-500/30 transition-colors shadow-lg">
                 <span className="text-blue-400 text-sm">🪙</span>
                 <span className="text-sm font-bold">{balanceCoins.toLocaleString()}</span>
@@ -422,9 +475,17 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               </div>
               
               {role === 'viewer' && (
-                <button onClick={handleFollow} disabled={isFollowActionLoading} className={`mt-2 mr-10 lg:mr-12 px-5 py-2 lg:px-8 lg:py-2.5 rounded-xl font-bold text-sm lg:text-base transition-all shadow-lg shrink-0 disabled:opacity-50 ${isFollowing ? 'bg-white/10 text-white hover:bg-white/20 border border-white/5' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
-                  {isFollowing ? 'Following' : 'Follow'}
-                </button>
+                <div className="mt-2 mr-10 lg:mr-12">
+                  <FollowButton
+                    username={creator.username}
+                    creatorName={creator.name}
+                    state={followState}
+                    onChange={handleFollowChange}
+                    isGuest={isGuest}
+                    onLoginClick={goToLogin}
+                    size="md"
+                  />
+                </div>
               )}
             </div>
             <p className="text-zinc-400 text-xs lg:text-sm leading-relaxed mt-2 max-w-2xl">
@@ -464,10 +525,14 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             <div className="flex items-center gap-2 shrink-0">
               {role === 'viewer' ? (
                 <>
-                  <button onClick={handleFollow} disabled={isFollowActionLoading} className={`flex items-center gap-1 px-3 py-1.5 lg:px-4 lg:py-2 rounded-md text-xs lg:text-sm font-bold transition-all backdrop-blur-md disabled:opacity-50 ${isFollowing ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-blue-600 text-white hover:bg-blue-500'}`}>
-                    <Heart className={`w-3.5 h-3.5 lg:w-4 lg:h-4 ${isFollowing ? 'fill-current text-blue-400' : ''}`} />
-                    {isFollowing ? 'Following' : 'Follow'}
-                  </button>
+                  <FollowButton
+                    username={creator.username}
+                    creatorName={creator.name}
+                    state={followState}
+                    onChange={handleFollowChange}
+                    isGuest={isGuest}
+                    onLoginClick={goToLogin}
+                  />
                   <button onClick={handleShare} className="hidden lg:block p-2 rounded-md bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-colors" title="Share stream"><Share2 className="w-4 h-4" /></button>
                 </>
               ) : (
@@ -605,7 +670,34 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           }
         `}
       >
-        <div className="absolute inset-0 w-full h-full min-w-[320px]">
+        <div className="absolute inset-0 w-full h-full min-w-[320px] flex flex-col">
+          {/* Always-visible creator bar (YouTube-style), right under the video on mobile */}
+          <div className="shrink-0 flex items-center gap-3 px-4 py-2.5 border-b border-white/5 bg-[#09090b]">
+            <img
+              src={creator.avatar_url || '/logo.webp'}
+              alt={creator.name}
+              onClick={() => setShowProfileOverlay(true)}
+              className="w-9 h-9 rounded-full object-cover border border-white/10 cursor-pointer"
+            />
+            <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setShowProfileOverlay(true)}>
+              <p className="text-sm font-bold text-white truncate flex items-center gap-1">
+                {creator.name} {creatorProfile?.verified && <BadgeCheck className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+              </p>
+              <p className="text-[11px] text-zinc-500">{(creatorProfile?.follower_count || 0).toLocaleString()} followers</p>
+            </div>
+            {role === 'viewer' && (
+              <FollowButton
+                username={creator.username}
+                creatorName={creator.name}
+                state={followState}
+                onChange={handleFollowChange}
+                isGuest={isGuest}
+                onLoginClick={goToLogin}
+              />
+            )}
+          </div>
+
+          <div className="flex-1 min-h-0">
           <StreamChatSidebar 
             role={role}
             balanceCoins={balanceCoins}
@@ -619,7 +711,10 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             isStreamEnded={isStreamEnded}
             onOpenPurchase={openPurchaseModal}
             onToggleCollapse={() => setIsChatCollapsed(true)} 
+            isGuest={isGuest}
+            onLoginClick={goToLogin}
           />
+          </div>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Loader2, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import SEO from '../components/SEO';
@@ -10,7 +10,12 @@ const GOOGLE_CLIENT_ID = "1024944888869-9356nb9mq73ki2u2tch6ebtaoic7q3bg.apps.go
 function AuthForm() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { refreshSession, loginAsGuest } = useAuth();
+
+  // Only in-app paths, so a crafted link can't send users to another site.
+  const nextParam = searchParams.get('next') || '';
+  const nextPath = nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.startsWith('/\\') ? nextParam : '';
 
   const handleSuccess = async (credentialResponse: any) => {
     setIsLoading(true);
@@ -30,7 +35,7 @@ function AuthForm() {
       }
 
       await refreshSession();
-      navigate('/home');
+      navigate(nextPath || '/home');
     } catch (error: any) {
       console.error(error);
       alert(`Failed to log in: ${error.message}`);
