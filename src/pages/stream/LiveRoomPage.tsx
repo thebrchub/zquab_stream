@@ -213,7 +213,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, isLoginRequired, retryEnter, refreshPlaybackUrl } = useStreamEntry(resolvedStreamId);
 
   const roomId = stream?.room_id;
-  const { viewerCount, messages, isGiftPending, sendError, isStreamEnded, isPaused, sendChat, sendGift, retractMessage } = useLiveStreamRoom(roomId, resolvedStreamId, stream?.creator.username, stream?.is_paused ?? false);
+  const { viewerCount, messages, isGiftPending, sendError, isStreamEnded, isPaused, streamEarnings, sendChat, sendGift, retractMessage } = useLiveStreamRoom(roomId, resolvedStreamId, stream?.creator.username, stream?.is_paused ?? false);
 
   const isReconnecting = streamMode !== 'mock' && !isStreamEnded && (isPaused || isStalled);
 
@@ -431,6 +431,13 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                 <span className="text-blue-400 text-sm">🪙</span>
                 <span className="text-sm font-bold">{balanceCoins.toLocaleString()}</span>
               </button>
+            )}
+            {role === 'creator' && (
+              <div title="Earned this stream" className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-black/60 text-white backdrop-blur-sm border border-amber-500/30 shadow-lg">
+                <span className="text-amber-400 text-sm">🪙</span>
+                <span className="text-xs text-zinc-300">Earned</span>
+                <span className="text-sm font-bold">{(streamEarnings ?? 0).toLocaleString()}</span>
+              </div>
             )}
           </div>
         </div>

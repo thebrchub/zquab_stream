@@ -73,10 +73,12 @@ export const useLiveStreamRoom = (
   const [sendError, setSendError] = useState<string | null>(null);
   const [isStreamEnded, setIsStreamEnded] = useState(false);
   const [isPaused, setIsPaused] = useState(initialPaused);
+  // Coins earned this stream so far (streamer only; null until the first update).
+  const [streamEarnings, setStreamEarnings] = useState<number | null>(null);
   const hasConnectedRef = useRef(false);
   const pendingChatRef = useRef(new Map<string, string>());
   
-  const { updateBalanceLocally, refreshBalance } = useWallet();
+  const { updateBalanceLocally } = useWallet();
   const { user } = useAuth();
   const { isConnected, sendMessage } = useWebSocket();
   const ownUserID = user?.user_id;
@@ -88,8 +90,8 @@ export const useLiveStreamRoom = (
   }, [initialPaused]);
 
   // Latest values for the socket listener, which is subscribed once per room.
-  const latestRef = useRef({ ownUserID, ownUsername, ownAvatarURL, creatorUsername, refreshBalance, updateBalanceLocally });
-  latestRef.current = { ownUserID, ownUsername, ownAvatarURL, creatorUsername, refreshBalance, updateBalanceLocally };
+  const latestRef = useRef({ ownUserID, ownUsername, ownAvatarURL, creatorUsername, updateBalanceLocally });
+  latestRef.current = { ownUserID, ownUsername, ownAvatarURL, creatorUsername, updateBalanceLocally };
 
   useEffect(() => {
     if (!isConnected) return;
@@ -169,7 +171,8 @@ export const useLiveStreamRoom = (
         return;
       }
       if (msg.type === 'stream_earnings') {
-        void latest.refreshBalance();
+        const earnings = msg.payload?.earnings_coins ?? msg.payload?.earningsCoins;
+        if (earnings !== undefined) setStreamEarnings(Number(earnings));
         return;
       }
       if (msgRoomId !== roomId) return;
@@ -280,6 +283,7 @@ export const useLiveStreamRoom = (
     sendError,
     isStreamEnded,
     isPaused,
+    streamEarnings,
     sendChat,
     sendGift,
     retractMessage,

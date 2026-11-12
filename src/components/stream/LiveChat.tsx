@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useWallet, type GiftItem } from '../../context/WalletContext'; 
-import { Send, Gift, X, Trash2, Ban, ArrowDown, LogIn } from 'lucide-react';
+import { Send, Gift, X, Trash2, Ban, ArrowDown, LogIn, BadgeCheck } from 'lucide-react';
 import { SponsoredChatDrop } from '../../components/SponsoredChatDrop';
 import type { LiveChatMessage } from '../../types/streamEvents';
 
@@ -203,7 +203,10 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                       <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-amber-500/0 via-amber-500/40 to-amber-500/0" />
                       
                       <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-1.5">
-                        <span className="text-[13px] font-extrabold text-amber-500 drop-shadow-sm">{item.senderName}</span>
+                        <span className="inline-flex items-center gap-1 text-[13px] font-extrabold text-amber-500 drop-shadow-sm">
+                          {item.senderName}
+                          {item.isCreator && <span title="Stream creator"><BadgeCheck className="w-3.5 h-3.5" /></span>}
+                        </span>
                         <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Sent</span>
                         <span className="text-[13px] font-bold text-zinc-200">{item.gift.name}</span>
                         
@@ -221,7 +224,10 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                   ) : (
                     /* Standard Text Layout */
                     <div className="leading-snug mt-1">
-                      <span className={`text-[13px] font-bold mr-2.5 align-baseline ${item.isCreator ? 'text-indigo-400' : 'text-zinc-400'}`}>{item.senderName}</span>
+                      <span className={`inline-flex items-center gap-1 text-[13px] font-bold mr-2.5 align-baseline ${item.isCreator ? 'text-indigo-400' : 'text-zinc-400'}`}>
+                        {item.senderName}
+                        {item.isCreator && <span title="Stream creator"><BadgeCheck className="w-3.5 h-3.5 text-amber-400" /></span>}
+                      </span>
                       <span className="text-[13px] text-zinc-200 break-words break-all whitespace-pre-wrap align-baseline">{item.text}</span>
                     </div>
                   )}
