@@ -43,8 +43,10 @@ export default function ChatInput({
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     let newValue = e.target.value;
 
-    if (newValue.includes(STORAGE_CDN_BASE_URL)) {
-      newValue = newValue.replace(new RegExp(STORAGE_CDN_BASE_URL + '\\S*', 'g'), '');
+    // A blank address would match everything and wipe the whole message.
+    if (STORAGE_CDN_BASE_URL && newValue.includes(STORAGE_CDN_BASE_URL)) {
+      const escapedURL = STORAGE_CDN_BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      newValue = newValue.replace(new RegExp(escapedURL + '\\S*', 'g'), '');
     }
 
     setText(newValue);
