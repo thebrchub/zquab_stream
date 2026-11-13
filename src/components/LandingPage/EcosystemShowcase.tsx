@@ -1,5 +1,6 @@
 import { useEffect, useRef, type CSSProperties, type MouseEvent } from 'react';
-import { Radio, Video, Shuffle, type LucideIcon } from 'lucide-react';
+// Video comes back with the 1:1 section in the next release.
+import { Radio, /* Video, */ Shuffle, type LucideIcon } from 'lucide-react';
 import EcosystemAnimation from '../showcase_animation/EcosystemAnimation'; // 🚀 IMPORT NEW FILE
 
 interface EcosystemSection {
@@ -19,20 +20,22 @@ const SECTIONS: EcosystemSection[] = [
       'Join your favorite creators while they game, chat, or perform. Drop gifts, join the conversation, and be part of the room.',
     Icon: Radio,
   },
-  {
-    id: 2,
-    tag: '1:1 Interaction',
-    title: 'Skip the crowd. Talk directly.',
-    description:
-      'Jump into the queue for a private, premium 1-on-1 video call. Set your duration, pay with zCoins, and connect face-to-face.',
-    Icon: Video,
-  },
+  // 1:1 calls will be enabled in the next release.
+  // {
+  //   id: 2,
+  //   tag: '1:1 Interaction',
+  //   title: 'Skip the crowd. Talk directly.',
+  //   description:
+  //     'Jump into the queue for a private, premium 1-on-1 video call. Set your duration, pay with zCoins, and connect face-to-face.',
+  //   Icon: Video,
+  // },
   {
     id: 3,
     tag: 'Stranger Chat',
     title: 'Meet someone entirely new.',
     description:
-      'The classic zQuab experience. Swipe into an anonymous text or video chat and instantly match with someone across the globe.',
+      // Back to "text or video chat" when video chat is enabled in the next release.
+      'The classic zQuab experience. Swipe into an anonymous text chat and instantly match with someone across the globe.',
     Icon: Shuffle,
   },
 ];
@@ -173,7 +176,8 @@ export default function EcosystemShowcase() {
           The Ecosystem
         </p>
         <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-[-0.03em] text-[var(--text-main)]">
-          One app, three ways to connect.
+          {/* Back to "three ways" when 1:1 calls are enabled in the next release. */}
+          One app, two ways to connect.
         </h2>
       </div>
 

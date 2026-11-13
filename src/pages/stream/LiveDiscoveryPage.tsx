@@ -5,6 +5,10 @@ import { streamService, type LiveStream, type UpcomingStream } from '../../servi
 import { creatorService, type DiscoverCreator } from '../../services/creatorService';
 // import { MOCK_CREATORS } from '../../constants/streamMockData';
 import { useAuth } from '../../context/AuthContext';
+import { wsEvents } from '../../context/WebSocketContext';
+
+// How often the live/upcoming lists refresh while the page is visible.
+const DISCOVERY_REFRESH_MS = 30_000;
 
 // 🚀 CLEAN UI (For layout, cards, inputs, and tabs)
 const CLEAN_CARD = "bg-[var(--card)] rounded-[2rem] border border-[var(--border-color)] shadow-sm hover:shadow-md transition-all duration-300";
@@ -34,6 +38,7 @@ export const LiveDiscoveryPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const categories = ['All', 'gaming', 'chatting', 'music'];
+  // 1:1 calls will be enabled in the next release.
   // const creatorsAcceptingCalls = MOCK_CREATORS.filter((c) => c.oneOnOne.enabled);
 
   const handleProtectedAction = (path: string) => {
@@ -73,6 +78,40 @@ export const LiveDiscoveryPage: React.FC = () => {
     fetchDiscoveryData();
   }, [selectedCategory]);
 
+  // Quietly refresh live/upcoming: every 30s while visible, on return to the tab, and when a followed creator goes live.
+  useEffect(() => {
+    const apiCategory = selectedCategory === 'All' ? undefined : selectedCategory;
+    let cancelled = false;
+    const refreshStreams = async () => {
+      try {
+        const data = await streamService.getDiscoverStreams();
+        if (cancelled) return;
+        setLiveStreams(apiCategory ? data.live.filter((s: LiveStream) => s.category === apiCategory) : data.live);
+        setUpcomingStreams(apiCategory ? data.upcoming.filter((s: UpcomingStream) => s.category === apiCategory) : data.upcoming);
+      } catch {
+        // Keep the current lists; the next tick tries again.
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshStreams();
+    }, DISCOVERY_REFRESH_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshStreams();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    const unsubscribe = wsEvents.subscribe((msg) => {
+      if (msg?.type === 'creator_live') void refreshStreams();
+    });
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      unsubscribe();
+    };
+  }, [selectedCategory]);
+
   const query = searchQuery.toLowerCase();
   const displayedStreams = liveStreams.filter(s => 
     s.title.toLowerCase().includes(query) || s.name.toLowerCase().includes(query) || s.category.toLowerCase().includes(query)
@@ -83,6 +122,7 @@ export const LiveDiscoveryPage: React.FC = () => {
   const displayedCreators = discoverCreators.filter(c => 
     c.name.toLowerCase().includes(query) || c.username.toLowerCase().includes(query)
   );
+  // 1:1 calls will be enabled in the next release.
   // const displayed1on1 = creatorsAcceptingCalls.filter(c => 
   //   c.name.toLowerCase().includes(query) || c.handle.toLowerCase().includes(query)
   // );
@@ -105,7 +145,8 @@ export const LiveDiscoveryPage: React.FC = () => {
                 Watch, Connect & Interact
               </h1>
               <p className="text-[var(--text-muted)] text-sm md:text-base font-medium max-w-lg mx-auto md:mx-0">
-                Join live creator rooms, enter private 1:1 queues, or jump into global chats instantly.
+                {/* 1:1 calls will be enabled in the next release; then restore "enter private 1:1 queues" here. */}
+                Join live creator rooms or jump into global chats instantly.
               </p>
             </div>
 
@@ -341,7 +382,7 @@ export const LiveDiscoveryPage: React.FC = () => {
               </section>
             )}
 
-            {/* --- Section: 1:1 Creator Interactions ---
+            {/* --- Section: 1:1 Creator Interactions (will be enabled in the next release) ---
             {displayed1on1.length > 0 && (
               <section>
                 <div className="flex items-center gap-3 mb-6 px-2">

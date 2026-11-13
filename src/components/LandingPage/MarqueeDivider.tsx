@@ -2,7 +2,8 @@ export default function MarqueeDivider() {
   const content = (
     <div className="flex items-center gap-8 px-4 text-xl md:text-2xl font-black uppercase tracking-widest text-white">
       <span>Watch Live</span> <span className="text-indigo-300">✦</span> 
-      <span>Talk 1:1</span> <span className="text-indigo-300">✦</span> 
+      {/* 1:1 calls will be enabled in the next release.
+      <span>Talk 1:1</span> <span className="text-indigo-300">✦</span> */}
       <span>Meet Strangers</span> <span className="text-indigo-300">✦</span> 
       <span>Support Creators</span> <span className="text-indigo-300">✦</span>
     </div>

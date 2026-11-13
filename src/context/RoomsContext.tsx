@@ -43,6 +43,8 @@ const RoomsContext = createContext<RoomsContextType | null>(null);
 
 export const LAST_ROOM_STORAGE_KEY = 'zquab_last_active_room';
 
+const LIVE_REQUEST_KEEP_MS = 60_000;
+
 export function RoomsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { sendMessage, isConnected } = useWebSocket(); 
@@ -56,6 +58,10 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const activeRoomIdRef = useRef<string | null>(null);
   
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  // Requests that arrived live, kept on reloads until the server list includes them.
+  const liveRequestsRef = useRef<Map<string, { req: any; at: number }>>(new Map());
+  const friendRequestsRef = useRef<any[]>([]);
+  useEffect(() => { friendRequestsRef.current = friendRequests; }, [friendRequests]);
 
   const setActiveRoomId = useCallback((roomId: string | null) => {
     setActiveRoomIdState(roomId);
@@ -78,8 +84,22 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
 
   const refreshFriendRequests = useCallback(async () => {
     try {
-      const data = await friendsApi.getRequests('received', 50, 0);
-      setFriendRequests(data || []);
+      // 100 is a page size the server clears from its cache on every change.
+      const data: any[] = (await friendsApi.getRequests('received', 100, 0)) || [];
+      const onServer = new Set(data.map((r) => r.username));
+      // Gone from the list means the user already accepted, rejected or it was withdrawn.
+      const stillShown = new Set(friendRequestsRef.current.map((r) => r.username));
+      const kept: any[] = [];
+      const now = Date.now();
+      liveRequestsRef.current.forEach((entry, username) => {
+        // The server saves new requests within seconds; after a minute trust the server list.
+        if (onServer.has(username) || !stillShown.has(username) || now - entry.at > LIVE_REQUEST_KEEP_MS) {
+          liveRequestsRef.current.delete(username);
+        } else {
+          kept.push(entry.req);
+        }
+      });
+      setFriendRequests([...kept, ...data]);
     } catch (err) {
       console.error('Failed to refresh friend requests:', err);
     }
@@ -117,16 +137,12 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         };
 
         if (newReq.username) {
+          liveRequestsRef.current.set(newReq.username, { req: newReq, at: Date.now() });
           setFriendRequests(prev => {
             if (prev.some(r => r.username === newReq.username || r.request_id === newReq.request_id)) return prev;
             return [newReq, ...prev];
           });
         }
-        
-        // 🛠️ THE FIX: 1-second delay beats the Protobuf database race condition
-        setTimeout(() => {
-          refreshFriendRequests();
-        }, 1000);
       }
 
       // 2. WebSocket-First: Handle Accepted Friend Requests
@@ -136,6 +152,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         const dmRoomId = payload.dm_room_id || payload.room_id || payload.roomId;
 
         if (otherUsername || otherUserId) {
+          if (otherUsername) liveRequestsRef.current.delete(otherUsername);
           setFriendRequests(prev => prev.filter(r => 
             (otherUsername && r.username !== otherUsername) && 
             (otherUserId && r.user_id !== otherUserId && r.from !== otherUserId)
@@ -185,6 +202,10 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         const targetUsername = payload.username;
         const reqId = payload.request_id || payload.requestId;
 
+        if (targetUsername) liveRequestsRef.current.delete(targetUsername);
+        liveRequestsRef.current.forEach((entry, username) => {
+          if (targetId && entry.req.user_id === targetId) liveRequestsRef.current.delete(username);
+        });
         setFriendRequests(prev => prev.filter(r => {
           if (reqId && r.request_id === reqId) return false;
           if (targetUsername && r.username === targetUsername) return false;

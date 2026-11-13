@@ -1,8 +1,10 @@
 import React from 'react';
-import { X, Coins, Loader2, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, Coins, Loader2, Sparkles, History } from 'lucide-react';
 import { useWallet } from '../../context/WalletContext';
 
 export const CoinPurchaseModal: React.FC = () => {
+  const navigate = useNavigate();
   const {
     isPurchaseModalOpen,
     closePurchaseModal,
@@ -105,6 +107,18 @@ export const CoinPurchaseModal: React.FC = () => {
         <p className="text-[11px] text-[var(--text-muted)] font-medium text-center leading-relaxed px-4">
           Payments are securely processed. Coins are credited automatically once confirmed.
         </p>
+
+        <button
+          onClick={() => {
+            closePurchaseModal();
+            navigate('/wallet/history');
+          }}
+          disabled={isProcessingPayment}
+          className="-mt-2 mx-auto inline-flex items-center gap-1.5 text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors disabled:opacity-50"
+        >
+          <History className="w-3.5 h-3.5" />
+          View transaction history
+        </button>
       </div>
     </div>
   );

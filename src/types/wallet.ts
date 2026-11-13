@@ -19,7 +19,13 @@ export interface WalletTransaction {
   reference_id: string;
   note: string;
   created_at: string;
+  counterparty_username?: string | null; // the other person in a gift / premium entry
+  counterparty_name?: string | null;
+  stream_title?: string | null;
+  stream_creator_username?: string | null;
 }
+
+export type TransactionFilter = '' | 'earned' | 'spent' | 'topup';
 
 export interface CoinPackage {
   id: number;

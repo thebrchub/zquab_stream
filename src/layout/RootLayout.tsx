@@ -29,7 +29,7 @@ export default function RootLayout() {
       
       {/* Toast notifications positioned globally */}
       <Toaster 
-        position="bottom-center"
+        position="top-right"
         toastOptions={{
           style: {
             background: 'var(--card)',

@@ -37,7 +37,8 @@ export default function LandingPage() {
     <div className="flex flex-col w-full bg-[#050608] text-white selection:bg-indigo-500/30">
       <SEO 
         title="zQuab | Watch, Connect & Meet Strangers"
-        description="Join live creator rooms, enter private 1:1 video queues, or meet someone new instantly. Your social ecosystem."
+        // 1:1 calls will be enabled in the next release; then restore "enter private 1:1 video queues" here.
+        description="Join live creator rooms or meet someone new instantly. Your social ecosystem."
         path="/"
       />
 

@@ -43,6 +43,7 @@ export interface CreatorStream {
   is_premium: boolean;
   entry_price_coins: number;
   peak_viewer_count: number;
+  unique_viewer_count: number | null; // null for streams ended before this was counted
   total_earnings_coins: number;
 }
 
@@ -156,12 +157,17 @@ export const streamService = {
     return res.data;
   },
 
-  async getMyStreams(): Promise<CreatorStreamsResponse> {
+  async getMyStreams(status?: CreatorStream['status'], limit?: number, offset?: number): Promise<CreatorStreamsResponse> {
     if (isMockMode()) {
       await delay(500);
       return { ingest_url: '', streams: [] };
     }
-    const res = await apiClient.get('/streams/me');
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (limit !== undefined) params.append('limit', String(limit));
+    if (offset !== undefined) params.append('offset', String(offset));
+    const query = params.toString();
+    const res = await apiClient.get(query ? `/streams/me?${query}` : '/streams/me');
     return res.data;
   },
 

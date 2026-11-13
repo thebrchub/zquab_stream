@@ -1,11 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { BarChart2, Settings, TrendingUp, Loader2, DollarSign, ArrowRight, Play, Copy, Radio, X, Clock3, RefreshCw, AlertTriangle } from 'lucide-react';
+import { BarChart2, Settings, TrendingUp, Loader2, DollarSign, ArrowRight, Play, Copy, Radio, X, Clock3, RefreshCw, AlertTriangle, History, Eye, Users } from 'lucide-react';
 import { creatorService, type CreatorEarnings } from '../../services/creatorService';
 import { streamService, type CreatorStream } from '../../services/streamService';
 import { GoLiveModal } from '../../components/studio/GoLiveModal'; 
 import { wsEvents } from '../../context/WebSocketContext';
+import PaginationLoader from '../../components/PaginationLoader';
+
+const TIMELINE_DAYS = 30;
+const PAST_STREAMS_PAGE = 20;
+
+// Local calendar day key, e.g. "2026-11-13" in the viewer's own time zone.
+const localDayKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const formatDuration = (start: string | null, end: string | null) => {
+  if (!start || !end) return '—';
+  const mins = Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000));
+  const h = Math.floor(mins / 60);
+  return h > 0 ? `${h}h ${mins % 60}m` : `${mins}m`;
+};
 
 const toDateTimeLocal = (value: string) => {
   const date = new Date(value);
@@ -29,10 +44,10 @@ export const CreatorDashboardPage: React.FC = () => {
   const [plannedEndAt, setPlannedEndAt] = useState('');
   const [streamNotice, setStreamNotice] = useState<string | null>(null);
 
-  // Monetization Settings State
-  const [isOneOnOneEnabled, setIsOneOnOneEnabled] = useState(false);
-  const [price, setPrice] = useState(100);
-  const [duration, setDuration] = useState(15);
+  // Monetization Settings State (1:1 calls will be enabled in the next release)
+  // const [isOneOnOneEnabled, setIsOneOnOneEnabled] = useState(false);
+  // const [price, setPrice] = useState(100);
+  // const [duration, setDuration] = useState(15);
 
   // Guard: Redirect non-approved users
   useEffect(() => {
@@ -44,7 +59,8 @@ export const CreatorDashboardPage: React.FC = () => {
   useEffect(() => {
     const fetchEarnings = async () => {
       try {
-        const data = await creatorService.getMyEarnings(30);
+        // One extra day so the oldest local day shown is complete.
+        const data = await creatorService.getMyEarnings(TIMELINE_DAYS + 1);
         setEarnings(data);
       } catch (err) {
         console.error("Failed to load earnings", err);
@@ -54,6 +70,45 @@ export const CreatorDashboardPage: React.FC = () => {
     };
     fetchEarnings();
   }, []);
+
+  // Past streams load page by page as the creator scrolls.
+  const [pastStreams, setPastStreams] = useState<CreatorStream[]>([]);
+  const [pastHasMore, setPastHasMore] = useState(true);
+  const [isLoadingPast, setIsLoadingPast] = useState(false);
+  const pastRequestRef = useRef(0);
+  const pastLoadingRef = useRef(false);
+  const pastOffsetRef = useRef(0);
+
+  const loadPastStreams = useCallback(async (reset: boolean) => {
+    if (pastLoadingRef.current && !reset) return;
+    const requestId = ++pastRequestRef.current;
+    pastLoadingRef.current = true;
+    setIsLoadingPast(true);
+    const offset = reset ? 0 : pastOffsetRef.current;
+    try {
+      const data = await streamService.getMyStreams('ended', PAST_STREAMS_PAGE, offset);
+      if (requestId !== pastRequestRef.current) return;
+      const page = data.streams || [];
+      pastOffsetRef.current = offset + page.length;
+      setPastStreams((prev) => (reset ? page : [...prev, ...page]));
+      setPastHasMore(page.length === PAST_STREAMS_PAGE);
+    } catch (err) {
+      if (requestId !== pastRequestRef.current) return;
+      console.error('Failed to load past streams', err);
+      setPastHasMore(false);
+    } finally {
+      if (requestId === pastRequestRef.current) {
+        pastLoadingRef.current = false;
+        setIsLoadingPast(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPastStreams(true);
+  }, [loadPastStreams]);
+
+  const loadMorePastStreams = useCallback(() => void loadPastStreams(false), [loadPastStreams]);
 
   const fetchStreams = async () => {
     setIsLoadingStreams(true);
@@ -86,6 +141,7 @@ export const CreatorDashboardPage: React.FC = () => {
     if (message.type === 'stream_auto_ended') {
       setStreamNotice('Your stream was ended because it reached its planned end time.');
       fetchStreams();
+      void loadPastStreams(true);
     }
 
     if (message.type === 'stream_earnings') {
@@ -99,6 +155,7 @@ export const CreatorDashboardPage: React.FC = () => {
     try {
       if (stream.status === 'live') {
         await streamService.endStream(stream.stream_id);
+        void loadPastStreams(true);
       } else {
         await streamService.cancelStream(stream.stream_id);
       }
@@ -155,9 +212,38 @@ export const CreatorDashboardPage: React.FC = () => {
     }
   };
 
-  const maxDailyEarning = earnings?.daily.length 
-    ? Math.max(...earnings.daily.map(d => d.earnings_coins))
-    : 100;
+  // Adds the server's 15-minute UTC slots into the viewer's own local days.
+  const timeline = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const [at, coins] of earnings?.slots ?? []) {
+      const key = localDayKey(new Date(at * 1000));
+      totals.set(key, (totals.get(key) ?? 0) + coins);
+    }
+    const today = new Date();
+    const days: { key: string; date: Date; coins: number }[] = [];
+    for (let i = TIMELINE_DAYS - 1; i >= 0; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+      const key = localDayKey(date);
+      days.push({ key, date, coins: totals.get(key) ?? 0 });
+    }
+    return days;
+  }, [earnings]);
+
+  const maxDailyEarning = Math.max(1, ...timeline.map((d) => d.coins));
+  const hasTimelineData = timeline.some((d) => d.coins > 0);
+
+  // Summary over the latest streams loaded (up to one page).
+  const pastSummary = useMemo(() => {
+    const recent = pastStreams.slice(0, PAST_STREAMS_PAGE);
+    const withUnique = recent.filter((s) => s.unique_viewer_count !== null && s.unique_viewer_count !== undefined);
+    const avg = (nums: number[]) => (nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null);
+    return {
+      count: recent.length,
+      avgPeak: avg(recent.map((s) => s.peak_viewer_count)),
+      avgUnique: avg(withUnique.map((s) => s.unique_viewer_count as number)),
+      totalEarned: recent.reduce((sum, s) => sum + (s.total_earnings_coins || 0), 0),
+    };
+  }, [pastStreams]);
 
   // Prevent rendering the dashboard momentarily before redirect
   if (user?.approval_status !== 'approved') return null;
@@ -177,11 +263,17 @@ export const CreatorDashboardPage: React.FC = () => {
           <div className="flex items-center gap-5">
             <div className="relative">
               <div className="w-16 h-16 rounded-full overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                <img 
-                  src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop" 
-                  alt="Profile" 
-                  className="w-full h-full object-cover" 
-                />
+                {user?.avatar_url ? (
+                  <img 
+                    src={user.avatar_url} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover" 
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-blue-600/10 text-blue-600 dark:text-blue-400 text-2xl font-semibold">
+                    {(user?.name || user?.username || '?').charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-black rounded-full" />
             </div>
@@ -211,6 +303,7 @@ export const CreatorDashboardPage: React.FC = () => {
             Overview
             {activeTab === 'overview' && <div className="absolute bottom-[-1px] left-0 w-full h-[2px] bg-blue-600 dark:bg-blue-500" />}
           </button>
+          {/* 1:1 calls will be enabled in the next release.
           <button 
             onClick={() => setActiveTab('settings')}
             className={`pb-4 text-sm font-medium transition-colors relative ${
@@ -219,7 +312,7 @@ export const CreatorDashboardPage: React.FC = () => {
           >
             Monetization Settings
             {activeTab === 'settings' && <div className="absolute bottom-[-1px] left-0 w-full h-[2px] bg-blue-600 dark:bg-blue-500" />}
-          </button>
+          </button> */}
         </div>
 
         {/* --- OVERVIEW TAB --- */}
@@ -349,7 +442,7 @@ export const CreatorDashboardPage: React.FC = () => {
                   <div className="pt-6">
                     <div className="flex items-baseline gap-2">
                       <span className="text-5xl font-light tracking-tighter text-zinc-900 dark:text-white">
-                        {earnings?.totalEarningsCoins.toLocaleString() || 0}
+                        {timeline.reduce((sum, d) => sum + d.coins, 0).toLocaleString()}
                       </span>
                       <span className="text-lg text-zinc-500 font-medium">zCoins</span>
                     </div>
@@ -370,29 +463,99 @@ export const CreatorDashboardPage: React.FC = () => {
                   <div className="flex justify-center py-12">
                     <Loader2 className="w-5 h-5 text-zinc-400 dark:text-zinc-600 animate-spin" />
                   </div>
-                ) : !earnings?.daily.length ? (
+                ) : !hasTimelineData ? (
                   <div className="flex items-center justify-center h-32 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg">
-                    <span className="text-sm text-zinc-500 dark:text-zinc-600">Insufficient data for this period.</span>
+                    <span className="text-sm text-zinc-500 dark:text-zinc-600">No earnings in the last {TIMELINE_DAYS} days.</span>
                   </div>
                 ) : (
-                  <div className="h-40 flex items-end justify-between gap-2 border-b border-zinc-100 dark:border-zinc-800/50 pb-2">
-                    {earnings.daily.map((dayData, idx) => {
-                      const heightPercent = Math.max((dayData.earnings_coins / maxDailyEarning) * 100, 4);
-                      return (
-                        <div key={idx} className="group relative flex flex-col items-center flex-1 h-full justify-end">
-                          <div 
-                            className="w-full max-w-[16px] bg-zinc-200 dark:bg-zinc-800 group-hover:bg-blue-600 dark:group-hover:bg-blue-500 rounded-t-sm transition-colors duration-200"
-                            style={{ height: `${heightPercent}%` }}
-                          />
-                          {/* Tooltip */}
-                          <div className="absolute -top-10 scale-0 group-hover:scale-100 transition-transform bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white px-2.5 py-1.5 rounded shadow-lg whitespace-nowrap z-10 pointer-events-none">
-                            <span className="font-semibold">{dayData.earnings_coins}</span> zCoins
+                  <div>
+                    <div className="h-40 flex items-end justify-between gap-1 border-b border-zinc-100 dark:border-zinc-800/50 pb-2">
+                      {timeline.map((dayData) => {
+                        const heightPercent = dayData.coins > 0 ? Math.max((dayData.coins / maxDailyEarning) * 100, 4) : 2;
+                        return (
+                          <div key={dayData.key} className="group relative flex flex-col items-center flex-1 h-full justify-end">
+                            <div 
+                              className={`w-full max-w-[16px] rounded-t-sm transition-colors duration-200 ${dayData.coins > 0 ? 'bg-zinc-300 dark:bg-zinc-700 group-hover:bg-blue-600 dark:group-hover:bg-blue-500' : 'bg-zinc-100 dark:bg-zinc-900'}`}
+                              style={{ height: `${heightPercent}%` }}
+                            />
+                            {/* Tooltip */}
+                            <div className="absolute -top-12 scale-0 group-hover:scale-100 transition-transform bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white px-2.5 py-1.5 rounded shadow-lg whitespace-nowrap z-10 pointer-events-none text-center">
+                              <div className="text-[10px] text-zinc-500">{dayData.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</div>
+                              <span className="font-semibold">{dayData.coins.toLocaleString()}</span> zCoins
+                            </div>
                           </div>
+                        );
+                      })}
+                    </div>
+                    {/* Date labels every 5 days, plus today */}
+                    <div className="flex justify-between gap-1 pt-2">
+                      {timeline.map((dayData, idx) => (
+                        <div key={dayData.key} className="flex-1 text-center text-[9px] text-zinc-400 dark:text-zinc-600 whitespace-nowrap overflow-visible">
+                          {(idx % 5 === 0 || idx === timeline.length - 1)
+                            ? dayData.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                            : ''}
                         </div>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
                 )}
+              </div>
+
+              {/* Past Streams */}
+              <div className="bg-white dark:bg-[#0a0a0a] border border-zinc-200 dark:border-zinc-800/80 p-6 rounded-2xl shadow-sm">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Past Streams</h3>
+                  <History className="w-4 h-4 text-zinc-400 dark:text-zinc-600" />
+                </div>
+
+                {pastStreams.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Avg peak viewers</div>
+                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.avgPeak ?? '—'}</div>
+                      <div className="text-[11px] text-zinc-500 mt-1">Most people watching at the same time.</div>
+                    </div>
+                    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Avg unique viewers</div>
+                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.avgUnique ?? '—'}</div>
+                      <div className="text-[11px] text-zinc-500 mt-1">How many different people joined.</div>
+                    </div>
+                    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Total earned</div>
+                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.totalEarned.toLocaleString()}</div>
+                      <div className="text-[11px] text-zinc-500 mt-1">zCoins from your last {pastSummary.count} stream{pastSummary.count === 1 ? '' : 's'}.</div>
+                    </div>
+                  </div>
+                )}
+
+                {!isLoadingPast && pastStreams.length === 0 ? (
+                  <div className="py-8 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-500">No past streams yet.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {pastStreams.map((stream) => (
+                      <div key={stream.stream_id} className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">{stream.title}</div>
+                            <div className="text-xs text-zinc-500 mt-1">
+                              {stream.ended_at ? new Date(stream.ended_at).toLocaleString() : '—'} · {formatDuration(stream.started_at, stream.ended_at)}
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-sm font-medium text-zinc-900 dark:text-white">{(stream.total_earnings_coins || 0).toLocaleString()} <span className="text-xs text-zinc-500">zCoins</span></div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-zinc-500">
+                          <span className="inline-flex items-center gap-1.5" title="Most people watching at the same time">
+                            <Eye className="w-3.5 h-3.5" /> {stream.peak_viewer_count.toLocaleString()} peak
+                          </span>
+                          <span className="inline-flex items-center gap-1.5" title="Different people who joined">
+                            <Users className="w-3.5 h-3.5" /> {stream.unique_viewer_count === null || stream.unique_viewer_count === undefined ? '—' : stream.unique_viewer_count.toLocaleString()} unique
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <PaginationLoader onLoadMore={loadMorePastStreams} hasMore={pastHasMore} isLoading={isLoadingPast} />
               </div>
             </div>
 
@@ -439,7 +602,10 @@ export const CreatorDashboardPage: React.FC = () => {
                   </div>
                 </div>
 
-                <button className="w-full mt-10 flex items-center justify-between p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors">
+                <button
+                  onClick={() => navigate('/wallet/history')}
+                  className="w-full mt-10 flex items-center justify-between p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors"
+                >
                   View Full Ledger
                   <ArrowRight className="w-4 h-4" />
                 </button>
@@ -448,7 +614,7 @@ export const CreatorDashboardPage: React.FC = () => {
           </div>
         )}
 
-        {/* --- SETTINGS TAB --- */}
+        {/* --- SETTINGS TAB (1:1 calls will be enabled in the next release) ---
         {activeTab === 'settings' && (
           <div className="max-w-3xl animate-fadeIn">
             <div className="bg-white dark:bg-[#0a0a0a] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-8 shadow-sm">
@@ -464,7 +630,6 @@ export const CreatorDashboardPage: React.FC = () => {
                     Allow viewers to book private video sessions directly from your profile. Configure your pricing and duration below.
                   </p>
                 </div>
-                {/* Custom Minimal Toggle */}
                 <button 
                   onClick={() => setIsOneOnOneEnabled(!isOneOnOneEnabled)}
                   className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
@@ -517,7 +682,7 @@ export const CreatorDashboardPage: React.FC = () => {
               </div>
             </div>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );

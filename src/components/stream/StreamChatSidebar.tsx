@@ -64,7 +64,8 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
         <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-indigo-500/50" />
         <Pin className="w-3.5 h-3.5 text-indigo-400/80 mt-0.5 shrink-0" />
         <p className="text-xs text-zinc-400 font-medium leading-relaxed pr-2">
-          <span className="text-zinc-200 font-semibold">Welcome!</span> Keep it positive, no spamming. 1:1 consultations open after the match!
+          {/* 1:1 calls will be enabled in the next release; then restore "1:1 consultations open after the match!" here. */}
+          <span className="text-zinc-200 font-semibold">Welcome!</span> Keep it positive, no spamming.
         </p>
       </div>
 

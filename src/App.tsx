@@ -20,7 +20,8 @@ import WaitlistPage from './pages/WaitlistPage';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const ChatSelectionPage = lazy(() => import('./pages/ChatSelectionPage'));
-const VideoChatPage = lazy(() => import('./pages/VideoChatPage')); 
+// Audio/video calls will be enabled in the next release.
+// const VideoChatPage = lazy(() => import('./pages/VideoChatPage')); 
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const BlogPage = lazy(() => import('./pages/BlogPage'));
 const Terms = lazy(() => import('./pages/Terms'));
@@ -42,8 +43,10 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 // --- NEW STREAM PIVOT PAGES (Named Exports via lazy) ---
 const LiveDiscoveryPage = lazy(() => import('./pages/stream/LiveDiscoveryPage').then(m => ({ default: m.LiveDiscoveryPage })));
 const LiveRoomPage = lazy(() => import('./pages/stream/LiveRoomPage').then(m => ({ default: m.LiveRoomPage })));
-const OneOnOneRoomPage = lazy(() => import('./pages/stream/OneOnOneRoomPage').then(m => ({ default: m.OneOnOneRoomPage })));
+// 1:1 calls will be enabled in the next release.
+// const OneOnOneRoomPage = lazy(() => import('./pages/stream/OneOnOneRoomPage').then(m => ({ default: m.OneOnOneRoomPage })));
 const CreatorDashboardPage = lazy(() => import('./pages/stream/CreatorDashboardPage').then(m => ({ default: m.CreatorDashboardPage })));
+const TransactionHistoryPage = lazy(() => import('./pages/wallet/TransactionHistoryPage'));
 
 function RouteFallback() {
   return (
@@ -253,7 +256,8 @@ function App() {
                 {/* 🚀 NEW CHAT ROUTING HUB */}
                 <Route path="/chat" element={<ChatSelectionPage />} />
                 <Route path="/chat/text" element={<ChatPage />} />
-                <Route path="/chat/video" element={<VideoChatPage />} />
+                {/* Audio/video calls will be enabled in the next release.
+                <Route path="/chat/video" element={<VideoChatPage />} /> */}
                 
                 <Route path="/about" element={<About />} />
                 <Route path="/blog" element={<BlogPage />} />
@@ -278,13 +282,15 @@ function App() {
                 {/* GRADUATED STREAM ROUTES (Inside RootLayout = Gets Navbar) */}
                 <Route path="/discover" element={<LiveDiscoveryPage />} />
                 <Route path="/creator/dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
+                <Route path="/wallet/history" element={<ProtectedRoute><TransactionHistoryPage /></ProtectedRoute>} />
                 
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
 
               {/* EDGE-TO-EDGE STREAM ROUTES (Outside RootLayout = No Navbar) */}
               <Route path="/live/:streamId" element={<LiveRoute><LiveRoomPage /></LiveRoute>} />
-              <Route path="/stream/1on1/:creatorId" element={<ProtectedRoute><OneOnOneRoomPage /></ProtectedRoute>} />
+              {/* 1:1 calls will be enabled in the next release.
+              <Route path="/stream/1on1/:creatorId" element={<ProtectedRoute><OneOnOneRoomPage /></ProtectedRoute>} /> */}
 
               {/* 🚀 RESTORED DEV UI TESTING ROUTES */}
               <Route path="/dev/onboarding" element={<OnboardingPage />} />
@@ -295,7 +301,8 @@ function App() {
               <Route path="/dev/waitlist" element={<WaitlistPage />} />
               <Route path="/dev/stream/discovery" element={<LiveDiscoveryPage />} />
               <Route path="/dev/stream/live" element={<LiveRoomPage />} />
-              <Route path="/dev/stream/1on1" element={<OneOnOneRoomPage />} />
+              {/* 1:1 calls will be enabled in the next release.
+              <Route path="/dev/stream/1on1" element={<OneOnOneRoomPage />} /> */}
               <Route path="/dev/stream/dashboard" element={<CreatorDashboardPage />} />
 
             </Routes>

@@ -242,6 +242,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   }, [isStreamEnded]);
 
   const [isHoveringPlayer, setIsHoveringPlayer] = useState(false);
+  const [isOverControls, setIsOverControls] = useState(false);
 
   if (isLoadingStream) return <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>;
   if (!stream) return <div className="text-white p-10 bg-[#0e0e10] min-h-screen">{streamError || 'Stream not found.'}</div>;
@@ -265,8 +266,10 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
 
   // 🛠️ Keep UI visible if the settings menu is open
   const showMobileUI = isChatCollapsed || isUserActive || !isPlaying || showProfileOverlay || isSettingsOpen;
-  const showDesktopUI = isHoveringPlayer || !isPlaying || showProfileOverlay || isSettingsOpen;
+  // Desktop bar hides after 3s without mouse movement, unless the mouse rests on the bar itself.
+  const showDesktopUI = (isHoveringPlayer && (isUserActive || isOverControls)) || !isPlaying || showProfileOverlay || isSettingsOpen;
   const uiVisibilityClasses = `transition-opacity duration-300 pointer-events-none ${showMobileUI ? 'opacity-100' : 'opacity-0'} ${showDesktopUI ? 'lg:opacity-100' : 'lg:opacity-0'}`;
+  const hideCursor = isFullscreen && !showDesktopUI;
 
   const handleLeaveRoom = () => {
     if (onLeaveRoom) {
@@ -287,7 +290,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
 
   return (
     <div ref={rootRef} className="flex flex-col lg:flex-row h-[100dvh] w-full bg-[#0e0e10] text-gray-100 overflow-hidden font-sans">
-      <Toaster position="top-center" />
+      <Toaster position="top-right" />
       
       {/* --- LEFT COLUMN: Video & Meta --- */}
       <div 
@@ -296,6 +299,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
           relative bg-black flex flex-col justify-between overflow-hidden group/player shrink-0
           transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]
           ${isChatCollapsed ? 'h-full lg:flex-1 w-full' : 'h-[40vh] lg:h-auto lg:flex-1 w-full'}
+          ${hideCursor ? 'cursor-none' : ''}
         `}
         onMouseEnter={() => { setIsHoveringPlayer(true); handleInteraction(); }}
         onMouseLeave={() => setIsHoveringPlayer(false)}
@@ -503,6 +507,8 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
 
         <div 
           onClick={(e) => e.stopPropagation()} 
+          onMouseEnter={() => setIsOverControls(true)}
+          onMouseLeave={() => setIsOverControls(false)}
           className={`relative z-30 w-full pt-20 pb-3 px-4 lg:pt-32 lg:pb-4 lg:px-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent ${uiVisibilityClasses}`}
         >
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-3 lg:mb-4 pointer-events-auto">

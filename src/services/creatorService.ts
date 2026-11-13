@@ -22,9 +22,19 @@ export interface CreatorProfile {
   stream_count: number;
   is_following: boolean;
   live_alerts?: boolean;
-  one_on_one_enabled: boolean;
-  one_on_one_price_coins: number;
-  one_on_one_duration_mins: number;
+  // 1:1 calls will be enabled in the next release.
+  // one_on_one_enabled: boolean;
+  // one_on_one_price_coins: number;
+  // one_on_one_duration_mins: number;
+  live_stream?: CreatorLiveStream | null;
+}
+
+export interface CreatorLiveStream {
+  stream_id: string;
+  room_id: string;
+  title: string;
+  is_premium: boolean;
+  entry_price_coins: number;
 }
 
 export interface DiscoverCreator {
@@ -37,10 +47,8 @@ export interface DiscoverCreator {
   verified: boolean;
 }
 
-export interface DailyEarning {
-  day: string;
-  earnings_coins: number;
-}
+// Earnings in one 15-minute slot: [UTC start time in unix seconds, coins].
+export type EarningSlot = [number, number];
 
 export interface CreatorEarnings {
   totalEarningsCoins: number;
@@ -48,16 +56,17 @@ export interface CreatorEarnings {
     giftReceived: number;
     premiumEntryEarning: number;
   };
-  daily: DailyEarning[];
+  slots: EarningSlot[];
 }
 
 export interface ApplyCreatorPayload {
 	 social_links: SocialLink[];
   category: string;
   headline: string;
-  one_on_one_enabled: boolean;
-  one_on_one_price_coins: number;
-  one_on_one_duration_mins: number;
+  // 1:1 calls will be enabled in the next release.
+  // one_on_one_enabled: boolean;
+  // one_on_one_price_coins: number;
+  // one_on_one_duration_mins: number;
 }
 
 export interface ApplyCreatorResponse {
@@ -132,9 +141,10 @@ export const creatorService = {
         follower_count: 12500,
     		stream_count: 42,
         is_following: false,
-    		one_on_one_enabled: false,
-    		one_on_one_price_coins: 0,
-    		one_on_one_duration_mins: 0,
+        // 1:1 calls will be enabled in the next release.
+    		// one_on_one_enabled: false,
+    		// one_on_one_price_coins: 0,
+    		// one_on_one_duration_mins: 0,
       };
     }
     const res = await apiClient.get(`/creators/${username}`);
@@ -200,14 +210,10 @@ export const creatorService = {
           giftReceived: 10500,
           premiumEntryEarning: 4000
         },
-        daily: [
-          { day: "2026-08-25", earnings_coins: 1200 },
-          { day: "2026-08-26", earnings_coins: 3400 },
-          { day: "2026-08-27", earnings_coins: 800 },
-          { day: "2026-08-28", earnings_coins: 4500 },
-          { day: "2026-08-29", earnings_coins: 2100 },
-          { day: "2026-08-30", earnings_coins: 2500 }
-        ]
+        slots: [5, 4, 3, 2, 1, 0].map((daysAgo, i): EarningSlot => [
+          Math.floor((Date.now() - daysAgo * 86400000) / 1000),
+          [1200, 3400, 800, 4500, 2100, 2500][i],
+        ])
       };
     }
     const res = await apiClient.get(`/creators/me/earnings?days=${days}`);
@@ -299,7 +305,7 @@ export const creatorService = {
 
   // --- Stream Scheduling ---
 
-  async getUpcomingStreams(username: string): Promise<UpcomingStream[]> {
+  async getUpcomingStreams(username: string, limit: number = 10, offset: number = 0): Promise<UpcomingStream[]> {
     if (isMockMode()) {
       await delay(400);
       const now = new Date();
@@ -315,7 +321,7 @@ export const creatorService = {
         }
       ];
     }
-    const res = await apiClient.get(`/creators/${username}/upcoming`);
+    const res = await apiClient.get(`/creators/${username}/upcoming?limit=${limit}&offset=${offset}`);
     return res.data;
   }
 };

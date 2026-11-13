@@ -109,9 +109,10 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
 		  .map(([platform, url]) => ({ platform: platform === 'twitter' ? 'x' : platform, url })) as CreatorApplication['social_links'],
         category: 'other',
         headline: 'zQuab Creator', 
-        one_on_one_enabled: false,
-        one_on_one_price_coins: 0,
-        one_on_one_duration_mins: 0
+        // 1:1 calls will be enabled in the next release.
+        // one_on_one_enabled: false,
+        // one_on_one_price_coins: 0,
+        // one_on_one_duration_mins: 0
       });
       
       await refreshSession();

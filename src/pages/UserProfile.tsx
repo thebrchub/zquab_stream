@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { usersApi } from '../api/users';
 import { friendsApi } from '../api/friends';
 import { roomsApi } from '../api/rooms';
 import { useAuth } from '../context/AuthContext';
+import { creatorService, type CreatorProfile, type UpcomingStream } from '../services/creatorService';
+import { FollowButton, type FollowState } from '../components/stream/FollowButton';
+import PaginationLoader from '../components/PaginationLoader';
 import {
   Loader2,
   UserPlus,
@@ -26,7 +29,12 @@ import {
   UserRound,
   Check,
   Zap,
+  Radio,
+  CalendarClock,
+  BadgeCheck,
 } from 'lucide-react';
+
+const UPCOMING_PAGE = 10;
 
 export default function UserProfile() {
   const { username } = useParams<{ username: string }>();
@@ -41,6 +49,73 @@ export default function UserProfile() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [showUnfriendConfirm, setShowUnfriendConfirm] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+
+  // Creator-only: channel info, follow state, and live/upcoming streams.
+  const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
+  const [followState, setFollowState] = useState<FollowState>({ isFollowing: false, liveAlerts: true });
+  const [activeTab, setActiveTab] = useState<'streams' | 'friends'>('streams');
+  const [upcoming, setUpcoming] = useState<UpcomingStream[]>([]);
+  const [upcomingHasMore, setUpcomingHasMore] = useState(true);
+  const [isLoadingUpcoming, setIsLoadingUpcoming] = useState(false);
+  const upcomingRequestRef = useRef(0);
+  const upcomingLoadingRef = useRef(false);
+  const upcomingOffsetRef = useRef(0);
+  const isCreator = Boolean(profile?.is_creator);
+
+  useEffect(() => {
+    setCreatorProfile(null);
+    if (!isCreator || !username) return;
+    let active = true;
+    creatorService.getProfile(username)
+      .then((cp) => {
+        if (!active) return;
+        setCreatorProfile(cp);
+        setFollowState({ isFollowing: cp.is_following, liveAlerts: cp.live_alerts ?? true });
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isCreator, username]);
+
+  const loadUpcoming = useCallback(async (reset: boolean) => {
+    if (!username || (upcomingLoadingRef.current && !reset)) return;
+    const requestId = ++upcomingRequestRef.current;
+    upcomingLoadingRef.current = true;
+    setIsLoadingUpcoming(true);
+    const offset = reset ? 0 : upcomingOffsetRef.current;
+    try {
+      const page = (await creatorService.getUpcomingStreams(username, UPCOMING_PAGE, offset)) || [];
+      if (requestId !== upcomingRequestRef.current) return;
+      upcomingOffsetRef.current = offset + page.length;
+      setUpcoming((prev) => (reset ? page : [...prev, ...page]));
+      setUpcomingHasMore(page.length === UPCOMING_PAGE);
+    } catch {
+      if (requestId !== upcomingRequestRef.current) return;
+      setUpcomingHasMore(false);
+    } finally {
+      if (requestId === upcomingRequestRef.current) {
+        upcomingLoadingRef.current = false;
+        setIsLoadingUpcoming(false);
+      }
+    }
+  }, [username]);
+
+  useEffect(() => {
+    setUpcoming([]);
+    setUpcomingHasMore(true);
+    upcomingOffsetRef.current = 0;
+    if (isCreator) void loadUpcoming(true);
+  }, [isCreator, loadUpcoming]);
+
+  const loadMoreUpcoming = useCallback(() => void loadUpcoming(false), [loadUpcoming]);
+
+  const handleFollowChange = (next: FollowState) => {
+    if (next.isFollowing !== followState.isFollowing) {
+      setCreatorProfile((p) => p ? { ...p, follower_count: Math.max(0, p.follower_count + (next.isFollowing ? 1 : -1)) } : p);
+    }
+    setFollowState(next);
+  };
 
   useEffect(() => {
     if (user && user.username === username) {
@@ -575,7 +650,100 @@ export default function UserProfile() {
         </div>
       </section>
 
+      {/* Creator channel */}
+      {isCreator && (
+        <section className="mb-8">
+          <div className="mb-5 flex flex-col gap-4 rounded-[1.5rem] border border-white/[0.08] bg-[#101115] p-5 sm:flex-row sm:items-center sm:justify-between shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.05)]">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="truncate text-lg font-black text-white">{creatorProfile?.name || displayName}</h2>
+                {creatorProfile?.verified && <BadgeCheck className="h-4 w-4 shrink-0 text-blue-400" />}
+                <span className="rounded-full border border-blue-400/20 bg-blue-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-blue-300">Creator</span>
+              </div>
+              {creatorProfile?.headline && <p className="mt-1 truncate text-xs text-white/50">{creatorProfile.headline}</p>}
+              <div className="mt-2 flex items-center gap-4 text-xs font-semibold text-white/60">
+                <span><span className="font-black text-white">{(creatorProfile?.follower_count ?? 0).toLocaleString()}</span> followers</span>
+                <span><span className="font-black text-white">{(creatorProfile?.stream_count ?? 0).toLocaleString()}</span> streams</span>
+                {creatorProfile?.category && <span className="capitalize">{creatorProfile.category}</span>}
+              </div>
+            </div>
+            {username && (
+              <FollowButton
+                username={username}
+                creatorName={creatorProfile?.name || displayName}
+                state={followState}
+                onChange={handleFollowChange}
+                isGuest={!user || user.is_guest}
+                onLoginClick={() => navigate(`/auth?next=${encodeURIComponent(`/user/${username}`)}`)}
+                size="md"
+              />
+            )}
+          </div>
+
+          <div className="mb-5 flex gap-2">
+            {(['streams', 'friends'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`rounded-full px-4 py-2 text-xs font-black transition-colors ${
+                  activeTab === tab ? 'bg-blue-500 text-white' : 'border border-white/10 bg-white/[0.04] text-white/60 hover:text-white'
+                }`}
+              >
+                {tab === 'streams' ? 'Live & Upcoming' : 'Friends'}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === 'streams' && (
+            <div className="space-y-3">
+              {creatorProfile?.live_stream && (
+                <button
+                  onClick={() => navigate(`/live/${creatorProfile.live_stream!.stream_id}`)}
+                  className="group flex w-full items-center gap-4 rounded-[1.25rem] border border-red-500/30 bg-red-500/[0.06] p-4 text-left transition hover:bg-red-500/[0.1]"
+                >
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-500/15 text-red-400">
+                    <Radio className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-red-400">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" /> Live now
+                      {creatorProfile.live_stream.is_premium && <span className="text-amber-400">· {creatorProfile.live_stream.entry_price_coins} 🪙</span>}
+                    </div>
+                    <div className="truncate text-sm font-black text-white">{creatorProfile.live_stream.title}</div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-white/40 transition-transform group-hover:translate-x-0.5" />
+                </button>
+              )}
+
+              {upcoming.map((s) => (
+                <div key={s.stream_id} className="flex items-center gap-4 rounded-[1.25rem] border border-white/[0.08] bg-[#101115] p-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
+                    <CalendarClock className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-black text-white">{s.title}</div>
+                    <div className="truncate text-xs text-white/50">
+                      {new Date(s.scheduled_at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      {s.category && <span className="capitalize"> · {s.category}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {!creatorProfile?.live_stream && upcoming.length === 0 && !isLoadingUpcoming && (
+                <div className="rounded-[1.25rem] border border-white/[0.04] bg-[#0b0c0f] px-5 py-10 text-center text-sm text-white/40">
+                  Not live right now, and nothing scheduled yet.
+                </div>
+              )}
+
+              <PaginationLoader onLoadMore={loadMoreUpcoming} hasMore={upcomingHasMore} isLoading={isLoadingUpcoming} />
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Friends section */}
+      {(!isCreator || activeTab === 'friends') && (
       <section>
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -690,6 +858,7 @@ export default function UserProfile() {
           </div>
         )}
       </section>
+      )}
 
       {/* Action error toast */}
       {actionError && (
