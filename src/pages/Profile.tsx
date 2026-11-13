@@ -23,7 +23,7 @@ import { LiveAlertsSetting } from '../components/stream/LiveAlertsSetting';
 import { createZAvatarURL, MAX_AVATAR_URL_LENGTH, MAX_USERNAME_LENGTH } from '../utils/avatar';
 
 const GENDER_OPTIONS = ['Prefer not to say', 'Male', 'Female', 'Other'];
-type Tab = 'friends' | 'requests' | 'search' | 'blocked';
+type Tab = 'friends' | 'requests' | 'search' | 'blocked' | 'followers';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -34,6 +34,7 @@ export default function Profile() {
 
   const [profile, setProfile] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const creatorApprovalStatus = profile?.approval_status ?? authUser?.approval_status;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -73,9 +74,13 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState<Tab>('friends');
   const [networkData, setNetworkData] = useState<any[]>([]);
   const [networkLoading, setNetworkLoading] = useState(false);
+  const [networkError, setNetworkError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [followerCount, setFollowerCount] = useState<number | null>(null);
+  const [followerCountLoading, setFollowerCountLoading] = useState(false);
+  const [followerCountError, setFollowerCountError] = useState<string | null>(null);
   const LIMIT = 15;
 
   useEffect(() => {
@@ -135,6 +140,37 @@ export default function Profile() {
     fetchProfile();
   }, [authUser]);
 
+  useEffect(() => {
+    let active = true;
+    if (creatorApprovalStatus !== 'approved' || !username) {
+      setFollowerCount(null);
+      setFollowerCountError(null);
+      setFollowerCountLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setFollowerCountLoading(true);
+    setFollowerCountError(null);
+    creatorService.getProfile(username)
+      .then((creatorProfile) => {
+        if (active) setFollowerCount(creatorProfile.follower_count);
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.error('Failed to fetch follower count:', err);
+        setFollowerCountError('Unable to load follower count.');
+      })
+      .finally(() => {
+        if (active) setFollowerCountLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [creatorApprovalStatus, username]);
+
   const fetchNetworkData = async (reset = false) => {
     if (activeTab === 'requests') return;
 
@@ -144,6 +180,7 @@ export default function Profile() {
         setOffset(0);
         setHasMore(true);
         setNetworkData([]); 
+        setNetworkError(null);
       }
       
       const currentOffset = reset ? 0 : offset;
@@ -151,6 +188,8 @@ export default function Profile() {
 
       if (activeTab === 'friends') {
         results = await friendsApi.getFriends(LIMIT, currentOffset);
+      } else if (activeTab === 'followers' && username) {
+        results = await creatorService.getFollowers(username, LIMIT, currentOffset);
       } else if (activeTab === 'blocked') {
         results = await friendsApi.getBlockedUsers(LIMIT, currentOffset);
       } else if (activeTab === 'search' && searchQuery.trim()) {
@@ -161,8 +200,9 @@ export default function Profile() {
       setNetworkData(prev => reset ? results : [...prev, ...results]);
       if (results.length < LIMIT && activeTab !== 'search') setHasMore(false);
       setOffset(currentOffset + LIMIT);
-    } catch (error) {
-      console.error('Failed to fetch network data:', error);
+    } catch (err) {
+      console.error('Failed to fetch network data:', err);
+      setNetworkError(activeTab === 'followers' ? 'Unable to load followers. Please try again.' : 'Unable to load connections. Please try again.');
     } finally {
       setNetworkLoading(false);
     }
@@ -326,8 +366,6 @@ export default function Profile() {
   const genderLower = profile?.gender?.toLowerCase() || '';
   const isMale = genderLower === 'male';
   const isFemale = genderLower === 'female';
-  const creatorApprovalStatus = profile?.approval_status ?? authUser?.approval_status;
-
   if (profileLoading) {
     return (
       <div className="flex-1 flex items-center justify-center min-h-[50vh]">
@@ -579,11 +617,12 @@ export default function Profile() {
               <div className="flex gap-2 overflow-x-auto pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {[
                   { id: 'friends', icon: Users, label: 'Friends' },
+                  ...(creatorApprovalStatus === 'approved' ? [{ id: 'followers', icon: Users, label: 'Followers', count: followerCount }] : []),
                   { id: 'requests', icon: UserPlus, label: 'Friend requests', count: friendRequests.length },
                   { id: 'search', icon: Search, label: 'Find people' },
                 ].map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id as Tab)} className={`relative flex shrink-0 items-center gap-2 rounded-t-xl px-4 py-3 text-sm font-extrabold transition-colors ${activeTab === tab.id ? 'bg-[#0b0c0f] text-blue-400 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.4),inset_-1px_0_3px_rgba(255,255,255,0.02)]' : 'text-zinc-500 hover:bg-white/[0.035] hover:text-white/80'}`}>
-                    <tab.icon className="h-4 w-4 drop-shadow-sm" />{tab.label}{tab.id === 'requests' && !!tab.count && <span className="rounded-md bg-blue-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow-[inset_1px_1px_2px_rgba(255,255,255,0.3)]">{tab.count}</span>}{activeTab === tab.id && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />}
+                    <tab.icon className="h-4 w-4 drop-shadow-sm" />{tab.label}{((tab.id === 'requests' && !!tab.count) || (tab.id === 'followers' && typeof tab.count === 'number')) && <span className="rounded-md bg-blue-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow-[inset_1px_1px_2px_rgba(255,255,255,0.3)]">{tab.count}</span>}{activeTab === tab.id && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />}
                   </button>
                 ))}
               </div>
@@ -593,17 +632,20 @@ export default function Profile() {
             {activeTab === 'search' && <div className="px-5 pt-5 sm:px-7"><div className="relative"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 drop-shadow-sm" /><input autoFocus type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by username..." className="w-full rounded-[1.25rem] border border-white/[0.04] bg-[#0b0c0f] py-3.5 pl-11 pr-4 text-sm text-white outline-none transition-all placeholder:text-zinc-600 focus:border-[#3B82F6] shadow-[inset_2px_2px_5px_rgba(0,0,0,0.4),inset_-1px_-1px_3px_rgba(255,255,255,0.02)]" /></div></div>}
 
             <div className="flex-1 p-5 sm:p-7">
+              {activeTab === 'followers' && followerCountError && <p className="mb-4 text-sm text-red-400">{followerCountError}</p>}
+              {activeTab === 'followers' && followerCountLoading && followerCount === null && <div className="mb-4 flex items-center gap-2 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" /> Loading follower count...</div>}
+              {networkError && <p role="alert" className="mb-4 text-sm text-red-400">{networkError}</p>}
               {isDisplayLoading && displayData.length === 0 ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-400" /></div> : displayData.length === 0 ? (
                 // 🛠️ Claymorphic Recessed Empty State
                 <div className="relative flex min-h-[270px] flex-col items-center justify-center overflow-hidden rounded-[1.5rem] border border-white/[0.04] bg-[#0b0c0f] px-5 py-12 text-center shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4),inset_-2px_-2px_6px_rgba(255,255,255,0.02)]">
                   <div className="pointer-events-none absolute -left-10 -top-16 h-40 w-40 rounded-full bg-blue-500/[0.07] blur-3xl" /><div className="pointer-events-none absolute -bottom-16 -right-10 h-40 w-40 rounded-full bg-violet-500/[0.07] blur-3xl" />
                   <div className="relative mb-5 flex h-16 w-16 items-center justify-center rounded-[1.25rem] border border-white/[0.08] bg-[#17181d] text-zinc-500 shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02)]"><Users className="h-7 w-7 drop-shadow-sm" />{activeTab === 'requests' && <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-[#17181d] bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]" />}</div>
-                  <h3 className="relative text-lg font-black text-white drop-shadow-sm">{activeTab === 'friends' ? 'Your circle starts here.' : activeTab === 'requests' ? 'You’re all caught up.' : activeTab === 'blocked' ? 'No blocked accounts.' : searchQuery.trim() ? 'No people found.' : 'Find your people.'}</h3>
-                  <p className="relative mt-2 max-w-md text-sm leading-6 text-zinc-400 drop-shadow-sm">{activeTab === 'friends' ? 'Find people and send a friend request. When they accept, you become mutual friends.' : activeTab === 'requests' ? 'Incoming friend requests will appear here. Accepting creates a friendship; following remains separate.' : activeTab === 'blocked' ? 'Accounts you block will appear here.' : searchQuery.trim() ? 'Try another username or check the spelling.' : 'Search the zQuab community by username and open profiles to connect.'}</p>
+                  <h3 className="relative text-lg font-black text-white drop-shadow-sm">{activeTab === 'friends' ? 'Your circle starts here.' : activeTab === 'followers' ? 'No followers yet.' : activeTab === 'requests' ? 'You’re all caught up.' : activeTab === 'blocked' ? 'No blocked accounts.' : searchQuery.trim() ? 'No people found.' : 'Find your people.'}</h3>
+                  <p className="relative mt-2 max-w-md text-sm leading-6 text-zinc-400 drop-shadow-sm">{activeTab === 'friends' ? 'Find people and send a friend request. When they accept, you become mutual friends.' : activeTab === 'followers' ? 'People who follow your creator profile will appear here.' : activeTab === 'requests' ? 'Incoming friend requests will appear here. Accepting creates a friendship; following remains separate.' : activeTab === 'blocked' ? 'Accounts you block will appear here.' : searchQuery.trim() ? 'Try another username or check the spelling.' : 'Search the zQuab community by username and open profiles to connect.'}</p>
                   {activeTab === 'friends' && <button onClick={() => setActiveTab('search')} className="relative mt-5 inline-flex items-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-2.5 text-xs font-black text-white transition-all hover:brightness-110 active:scale-95 shadow-[4px_4px_10px_rgba(0,0,0,0.4),-2px_-2px_6px_rgba(255,255,255,0.05),inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)] active:shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4)] border-none"><Search className="h-4 w-4 drop-shadow-sm" /> Find people</button>}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">{displayData.map((networkUser) => <UserCard key={networkUser.id || networkUser.request_id} user={{...networkUser, subtitle: activeTab === 'friends' ? (networkUser.friends_since ? `Friends since ${new Date(networkUser.friends_since).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : 'Mutual friend') : activeTab === 'blocked' ? 'Blocked account' : undefined}} onClick={() => navigate(`/user/${networkUser.username}`)} actionButton={activeTab === 'requests' ? <div className="flex gap-2"><button aria-label="Accept friend request" onClick={(e) => { e.stopPropagation(); handleNetworkAction(() => friendsApi.acceptRequest(networkUser.username), networkUser.username, true); }} className="rounded-xl bg-blue-500 p-2 text-white transition-all hover:brightness-110 active:scale-95 shadow-[2px_2px_5px_rgba(0,0,0,0.3),inset_1px_1px_2px_rgba(255,255,255,0.2),inset_-1px_-1px_2px_rgba(0,0,0,0.3)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.4)] border-none"><Check className="h-5 w-5 drop-shadow-sm" /></button><button aria-label="Reject friend request" onClick={(e) => { e.stopPropagation(); handleNetworkAction(() => friendsApi.rejectRequest(networkUser.username), networkUser.username, true); }} className="rounded-xl border border-white/10 bg-white/[0.04] p-2 text-white/65 transition-all hover:border-red-400/30 hover:text-red-400 hover:bg-red-500/10 active:scale-95 shadow-[2px_2px_5px_rgba(0,0,0,0.2),-1px_-1px_2px_rgba(255,255,255,0.02)] active:shadow-[inset_1px_1px_3px_rgba(0,0,0,0.3)]"><X className="h-5 w-5" /></button></div> : activeTab === 'blocked' ? <button aria-label="Unblock user" onClick={(e) => { e.stopPropagation(); handleNetworkAction(() => friendsApi.unblockUser(networkUser.username), networkUser.username, false); }} className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-white/70 transition-all hover:border-blue-400/30 hover:text-white shadow-[2px_2px_5px_rgba(0,0,0,0.2),-1px_-1px_2px_rgba(255,255,255,0.02)] active:scale-95 active:shadow-[inset_1px_1px_3px_rgba(0,0,0,0.3)]">Unblock</button> : null} />)}</div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">{displayData.map((networkUser) => <UserCard key={networkUser.id || networkUser.request_id || networkUser.username} user={{...networkUser, subtitle: activeTab === 'friends' ? (networkUser.friends_since ? `Friends since ${new Date(networkUser.friends_since).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : 'Mutual friend') : activeTab === 'followers' ? (networkUser.followed_at ? `Following since ${new Date(networkUser.followed_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : 'Follower') : activeTab === 'blocked' ? 'Blocked account' : undefined}} onClick={() => navigate(`/user/${networkUser.username}`)} actionButton={activeTab === 'requests' ? <div className="flex gap-2"><button aria-label="Accept friend request" onClick={(e) => { e.stopPropagation(); handleNetworkAction(() => friendsApi.acceptRequest(networkUser.username), networkUser.username, true); }} className="rounded-xl bg-blue-500 p-2 text-white transition-all hover:brightness-110 active:scale-95 shadow-[2px_2px_5px_rgba(0,0,0,0.3),inset_1px_1px_2px_rgba(255,255,255,0.2),inset_-1px_-1px_2px_rgba(0,0,0,0.3)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.4)] border-none"><Check className="h-5 w-5 drop-shadow-sm" /></button><button aria-label="Reject friend request" onClick={(e) => { e.stopPropagation(); handleNetworkAction(() => friendsApi.rejectRequest(networkUser.username), networkUser.username, true); }} className="rounded-xl border border-white/10 bg-white/[0.04] p-2 text-white/65 transition-all hover:border-red-400/30 hover:text-red-400 hover:bg-red-500/10 active:scale-95 shadow-[2px_2px_5px_rgba(0,0,0,0.2),-1px_-1px_2px_rgba(255,255,255,0.02)] active:shadow-[inset_1px_1px_3px_rgba(0,0,0,0.3)]"><X className="h-5 w-5" /></button></div> : activeTab === 'blocked' ? <button aria-label="Unblock user" onClick={(e) => { e.stopPropagation(); handleNetworkAction(() => friendsApi.unblockUser(networkUser.username), networkUser.username, false); }} className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-white/70 transition-all hover:border-blue-400/30 hover:text-white shadow-[2px_2px_5px_rgba(0,0,0,0.2),-1px_-1px_2px_rgba(255,255,255,0.02)] active:scale-95 active:shadow-[inset_1px_1px_3px_rgba(0,0,0,0.3)]">Unblock</button> : null} />)}</div>
               )}
               {activeTab !== 'requests' && <div className="mt-4"><PaginationLoader onLoadMore={() => fetchNetworkData()} hasMore={currentHasMore} isLoading={networkLoading} /></div>}
             </div>

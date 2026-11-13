@@ -647,39 +647,78 @@ export default function UserProfile() {
               </p>
             </div>
           </div>
+
+          {/* Creator identity — integrated into the main profile card */}
+          {isCreator && (
+            <div className="mt-7 border-t border-white/[0.08] pt-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Radio className="h-4 w-4 text-blue-400" />
+                    <h2 className="text-base font-black text-white">
+                      {creatorProfile?.name || displayName}
+                    </h2>
+
+                    {creatorProfile?.verified && (
+                      <BadgeCheck className="h-4 w-4 text-blue-400" />
+                    )}
+
+                    <span className="rounded-full border border-blue-400/20 bg-blue-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-blue-300">
+                      Creator
+                    </span>
+                  </div>
+
+                  {creatorProfile?.headline && (
+                    <p className="mt-1 text-xs text-white/50">
+                      {creatorProfile.headline}
+                    </p>
+                  )}
+
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-white/60">
+                    <span>
+                      <strong className="text-white">
+                        {(creatorProfile?.follower_count ?? 0).toLocaleString()}
+                      </strong>{" "}
+                      followers
+                    </span>
+
+                    <span>
+                      <strong className="text-white">
+                        {(creatorProfile?.stream_count ?? 0).toLocaleString()}
+                      </strong>{" "}
+                      streams
+                    </span>
+
+                    {creatorProfile?.category && (
+                      <span className="capitalize">{creatorProfile.category}</span>
+                    )}
+                  </div>
+                </div>
+
+                {username && (
+                  <div className="shrink-0">
+                    <FollowButton
+                      username={username}
+                      creatorName={creatorProfile?.name || displayName}
+                      state={followState}
+                      onChange={handleFollowChange}
+                      isGuest={!user || user.is_guest}
+                      onLoginClick={() =>
+                        navigate(`/auth?next=${encodeURIComponent(`/user/${username}`)}`)
+                      }
+                      size="md"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Creator channel */}
+      {/* Creator content */}
       {isCreator && (
         <section className="mb-8">
-          <div className="mb-5 flex flex-col gap-4 rounded-[1.5rem] border border-white/[0.08] bg-[#101115] p-5 sm:flex-row sm:items-center sm:justify-between shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.05)]">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="truncate text-lg font-black text-white">{creatorProfile?.name || displayName}</h2>
-                {creatorProfile?.verified && <BadgeCheck className="h-4 w-4 shrink-0 text-blue-400" />}
-                <span className="rounded-full border border-blue-400/20 bg-blue-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-blue-300">Creator</span>
-              </div>
-              {creatorProfile?.headline && <p className="mt-1 truncate text-xs text-white/50">{creatorProfile.headline}</p>}
-              <div className="mt-2 flex items-center gap-4 text-xs font-semibold text-white/60">
-                <span><span className="font-black text-white">{(creatorProfile?.follower_count ?? 0).toLocaleString()}</span> followers</span>
-                <span><span className="font-black text-white">{(creatorProfile?.stream_count ?? 0).toLocaleString()}</span> streams</span>
-                {creatorProfile?.category && <span className="capitalize">{creatorProfile.category}</span>}
-              </div>
-            </div>
-            {username && (
-              <FollowButton
-                username={username}
-                creatorName={creatorProfile?.name || displayName}
-                state={followState}
-                onChange={handleFollowChange}
-                isGuest={!user || user.is_guest}
-                onLoginClick={() => navigate(`/auth?next=${encodeURIComponent(`/user/${username}`)}`)}
-                size="md"
-              />
-            )}
-          </div>
-
           <div className="mb-5 flex gap-2">
             {(['streams', 'friends'] as const).map((tab) => (
               <button
