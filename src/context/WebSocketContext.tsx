@@ -40,6 +40,7 @@ const MuteUserRequestProto = safeLookup('eventspb.MuteUserRequest', 'MuteUserReq
 const RecentMessagesProto = safeLookup('chatpb.RecentMessages', 'RecentMessages');
 const StreamPausedProto = safeLookup('eventspb.StreamPaused', 'StreamPaused');
 const StreamResumedProto = safeLookup('eventspb.StreamResumed', 'StreamResumed');
+const StreamEnterRequestProto = safeLookup('eventspb.StreamEnterRequest', 'StreamEnterRequest');
 
 // These events are read with snake_case keys (e.g. avatar_url), so they get both spellings.
 const plainEventProtos: Record<string, protobuf.Type | null> = {
@@ -50,6 +51,11 @@ const plainEventProtos: Record<string, protobuf.Type | null> = {
   friend_request_rejected: safeLookup('eventspb.FriendRequestRejected', 'FriendRequestRejected'),
   room_closed: safeLookup('eventspb.RoomClosed', 'RoomClosed'),
   unfriend: safeLookup('eventspb.Unfriended', 'Unfriended'),
+  stream_enter_ok: safeLookup('eventspb.StreamEnterOk', 'StreamEnterOk'),
+  stream_confirm_required: safeLookup('eventspb.StreamConfirmRequired', 'StreamConfirmRequired'),
+  stream_enter_error: safeLookup('eventspb.StreamEnterError', 'StreamEnterError'),
+  stream_expired: safeLookup('eventspb.StreamExpired', 'StreamExpired'),
+  purchase_completed: safeLookup('eventspb.PurchaseCompleted', 'PurchaseCompleted'),
 };
 
 const toSnake = (key: string) => key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
@@ -274,6 +280,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         payloadBytes = MuteUserRequestProto.encode(MuteUserRequestProto.create({
           userId: payload.user_id || payload.userId,
           minutes: payload.minutes || 0,
+        })).finish();
+      } else if (type === 'stream_enter' && payload && StreamEnterRequestProto) {
+        payloadBytes = StreamEnterRequestProto.encode(StreamEnterRequestProto.create({
+          streamId: payload.stream_id || payload.streamId,
+          confirm: !!payload.confirm,
         })).finish();
       }
       // Handle raw JSON payloads sent from the client just in case

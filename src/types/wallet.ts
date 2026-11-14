@@ -43,8 +43,10 @@ export interface PurchaseInitResponse {
   coins: number;
 }
 
-export interface PurchaseStatusResponse {
-  status: 'pending' | 'completed' | 'failed';
+export interface PurchaseCompletedEvent {
+  order_id: string;
+  coins: number;
+  balance_coins: number;
 }
 
 export interface GiftItem {

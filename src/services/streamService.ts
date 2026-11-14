@@ -24,9 +24,11 @@ export interface CreateStreamPayload {
 export interface StreamCreationResponse {
   stream_id: string;
   room_id: string;
-  stream_key: string;
+  stream_key: string; // "<playback_id>?key=<secret>", goes in OBS's Stream Key box
   ingest_url: string;
 }
+
+export type StreamStatus = 'scheduled' | 'live' | 'ended' | 'cancelled' | 'expired';
 
 export interface CreatorStream {
   stream_id: string;
@@ -34,7 +36,7 @@ export interface CreatorStream {
   title: string;
   category: string;
   tags: string[];
-  status: 'scheduled' | 'live' | 'ended' | 'cancelled';
+  status: StreamStatus;
   stream_key: string;
   scheduled_at: string | null;
   planned_end_at: string;
@@ -80,7 +82,7 @@ export interface StreamMetadata {
   title: string;
   category: string;
   tags: string[];
-  status: 'scheduled' | 'live' | 'ended';
+  status: StreamStatus;
   is_premium: boolean;
   entry_price_coins: number;
   viewer_count: number;
@@ -102,26 +104,8 @@ export const streamService = {
 
   async getDiscoverStreams(): Promise<DiscoverStreams> {
     if (isMockMode()) {
-      const live = await this.getLiveStreams();
-      return { live, upcoming: [] };
-    }
-    const res = await apiClient.get('/streams');
-    return res.data;
-  },
-
-  async enterStream(streamId: string): Promise<{ playback_url: string }> {
-    if (isMockMode()) {
-      await delay(800);
-      return { playback_url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" };
-    }
-    const res = await apiClient.post(`/streams/${streamId}/enter`);
-    return res.data;
-  },
-
-  async getLiveStreams(): Promise<LiveStream[]> {
-    if (isMockMode()) {
       await delay(600);
-      return MOCK_STREAMS.map(stream => {
+      const live = MOCK_STREAMS.map(stream => {
         const creator = MOCK_CREATORS.find(c => c.id === stream.creatorId)!;
         return {
           stream_id: stream.id,
@@ -136,8 +120,9 @@ export const streamService = {
           avatar_url: creator.avatar,
         };
       });
+      return { live, upcoming: [] };
     }
-    const res = await apiClient.get('/streams/live');
+    const res = await apiClient.get('/streams');
     return res.data;
   },
 
@@ -149,7 +134,7 @@ export const streamService = {
       return {
         stream_id: `mock-stream-${Date.now()}`,
         room_id: `mock-room-${Date.now()}`,
-        stream_key: `sk_live_mock_${Math.random().toString(36).substring(7)}`,
+        stream_key: `pb_mock_${Math.random().toString(36).substring(7)}?key=sk_live_mock_${Math.random().toString(36).substring(7)}`,
         ingest_url: '',
       };
     }
@@ -157,7 +142,7 @@ export const streamService = {
     return res.data;
   },
 
-  async getMyStreams(status?: CreatorStream['status'], limit?: number, offset?: number): Promise<CreatorStreamsResponse> {
+  async getMyStreams(status?: StreamStatus, limit?: number, offset?: number): Promise<CreatorStreamsResponse> {
     if (isMockMode()) {
       await delay(500);
       return { ingest_url: '', streams: [] };
@@ -183,7 +168,7 @@ export const streamService = {
   async regenerateKey(streamId: string): Promise<{ stream_key: string }> {
     if (isMockMode()) {
       await delay(1000);
-      return { stream_key: `sk_live_mock_REGEN_${Math.random().toString(36).substring(7)}` };
+      return { stream_key: `pb_mock?key=sk_live_mock_REGEN_${Math.random().toString(36).substring(7)}` };
     }
     const res = await apiClient.post(`/streams/${streamId}/regenerate-key`);
     return res.data;

@@ -3,13 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { BarChart2, Settings, TrendingUp, Loader2, DollarSign, ArrowRight, Play, Copy, Radio, X, Clock3, RefreshCw, AlertTriangle, History, Eye, Users } from 'lucide-react';
 import { creatorService, type CreatorEarnings } from '../../services/creatorService';
-import { streamService, type CreatorStream } from '../../services/streamService';
+import { streamService, type CreatorStream, type StreamStatus } from '../../services/streamService';
 import { GoLiveModal } from '../../components/studio/GoLiveModal'; 
 import { wsEvents } from '../../context/WebSocketContext';
 import PaginationLoader from '../../components/PaginationLoader';
 
 const TIMELINE_DAYS = 30;
 const PAST_STREAMS_PAGE = 20;
+
+const STATUS_LABELS: Record<StreamStatus, string> = {
+  scheduled: 'Scheduled',
+  live: 'Live',
+  ended: 'Ended',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
+};
+
+type PastStatus = 'ended' | 'cancelled' | 'expired';
+const PAST_STATUSES: PastStatus[] = ['ended', 'cancelled', 'expired'];
 
 // Local calendar day key, e.g. "2026-11-13" in the viewer's own time zone.
 const localDayKey = (d: Date) =>
@@ -75,6 +86,8 @@ export const CreatorDashboardPage: React.FC = () => {
   const [pastStreams, setPastStreams] = useState<CreatorStream[]>([]);
   const [pastHasMore, setPastHasMore] = useState(true);
   const [isLoadingPast, setIsLoadingPast] = useState(false);
+  const [pastStatus, setPastStatus] = useState<PastStatus>('ended');
+  const pastStatusRef = useRef<PastStatus>('ended');
   const pastRequestRef = useRef(0);
   const pastLoadingRef = useRef(false);
   const pastOffsetRef = useRef(0);
@@ -86,7 +99,7 @@ export const CreatorDashboardPage: React.FC = () => {
     setIsLoadingPast(true);
     const offset = reset ? 0 : pastOffsetRef.current;
     try {
-      const data = await streamService.getMyStreams('ended', PAST_STREAMS_PAGE, offset);
+      const data = await streamService.getMyStreams(pastStatusRef.current, PAST_STREAMS_PAGE, offset);
       if (requestId !== pastRequestRef.current) return;
       const page = data.streams || [];
       pastOffsetRef.current = offset + page.length;
@@ -109,6 +122,15 @@ export const CreatorDashboardPage: React.FC = () => {
   }, [loadPastStreams]);
 
   const loadMorePastStreams = useCallback(() => void loadPastStreams(false), [loadPastStreams]);
+
+  const selectPastStatus = (status: PastStatus) => {
+    if (status === pastStatusRef.current) return;
+    pastStatusRef.current = status;
+    setPastStatus(status);
+    setPastStreams([]);
+    setPastHasMore(true);
+    void loadPastStreams(true);
+  };
 
   const fetchStreams = async () => {
     setIsLoadingStreams(true);
@@ -140,6 +162,12 @@ export const CreatorDashboardPage: React.FC = () => {
 
     if (message.type === 'stream_auto_ended') {
       setStreamNotice('Your stream was ended because it reached its planned end time.');
+      fetchStreams();
+      void loadPastStreams(true);
+    }
+
+    if (message.type === 'stream_expired') {
+      setStreamNotice(`Your scheduled stream "${payload.title || 'Untitled'}" expired because it wasn't started.`);
       fetchStreams();
       void loadPastStreams(true);
     }
@@ -203,7 +231,7 @@ export const CreatorDashboardPage: React.FC = () => {
     setStreamActionID(stream.stream_id);
     try {
       await streamService.regenerateKey(stream.stream_id);
-      setStreamNotice('Stream key reset. Copy the new key into OBS before broadcasting.');
+      setStreamNotice('Stream key reset. Copy the new key into OBS (Settings → Stream → Stream Key) before broadcasting.');
       await fetchStreams();
     } catch (err) {
       console.error('Failed to regenerate stream key', err);
@@ -366,11 +394,11 @@ export const CreatorDashboardPage: React.FC = () => {
                             <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">{stream.title}</div>
                             <div className="text-xs text-zinc-500 mt-1">{stream.status === 'live' ? 'Live now' : stream.scheduled_at ? `Scheduled ${new Date(stream.scheduled_at).toLocaleString()}` : 'Ready to broadcast'}</div>
                           </div>
-                          <span className={`shrink-0 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${stream.status === 'live' ? 'bg-red-500/10 text-red-500' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'}`}>{stream.status}</span>
+                          <span className={`shrink-0 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${stream.status === 'live' ? 'bg-red-500/10 text-red-500' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'}`}>{STATUS_LABELS[stream.status] ?? stream.status}</span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           {stream.status === 'scheduled' && (
-                            <button onClick={() => copyStreamKey(stream.stream_key)} className="inline-flex items-center gap-1.5 px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+                            <button onClick={() => copyStreamKey(stream.stream_key)} title="Paste into OBS: Settings → Stream → Stream Key" className="inline-flex items-center gap-1.5 px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
                               <Copy className="w-3.5 h-3.5" /> Copy Stream Key
                             </button>
                           )}
@@ -503,12 +531,23 @@ export const CreatorDashboardPage: React.FC = () => {
 
               {/* Past Streams */}
               <div className="bg-white dark:bg-[#0a0a0a] border border-zinc-200 dark:border-zinc-800/80 p-6 rounded-2xl shadow-sm">
-                <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center justify-between gap-3 mb-5">
                   <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Past Streams</h3>
-                  <History className="w-4 h-4 text-zinc-400 dark:text-zinc-600" />
+                  <div className="flex items-center gap-1">
+                    {PAST_STATUSES.map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => selectPastStatus(status)}
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors ${pastStatus === status ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                      >
+                        {STATUS_LABELS[status]}
+                      </button>
+                    ))}
+                    <History className="w-4 h-4 ml-2 text-zinc-400 dark:text-zinc-600" />
+                  </div>
                 </div>
 
-                {pastStreams.length > 0 && (
+                {pastStatus === 'ended' && pastStreams.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
                     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Avg peak viewers</div>
@@ -529,7 +568,9 @@ export const CreatorDashboardPage: React.FC = () => {
                 )}
 
                 {!isLoadingPast && pastStreams.length === 0 ? (
-                  <div className="py-8 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-500">No past streams yet.</div>
+                  <div className="py-8 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-500">
+                    {pastStatus === 'ended' ? 'No past streams yet.' : `No ${STATUS_LABELS[pastStatus].toLowerCase()} streams.`}
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {pastStreams.map((stream) => (
@@ -538,19 +579,27 @@ export const CreatorDashboardPage: React.FC = () => {
                           <div className="min-w-0">
                             <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">{stream.title}</div>
                             <div className="text-xs text-zinc-500 mt-1">
-                              {stream.ended_at ? new Date(stream.ended_at).toLocaleString() : '—'} · {formatDuration(stream.started_at, stream.ended_at)}
+                              {stream.status === 'ended'
+                                ? <>{stream.ended_at ? new Date(stream.ended_at).toLocaleString() : '—'} · {formatDuration(stream.started_at, stream.ended_at)}</>
+                                : stream.scheduled_at ? `Scheduled ${new Date(stream.scheduled_at).toLocaleString()}` : '—'}
                             </div>
                           </div>
-                          <div className="shrink-0 text-sm font-medium text-zinc-900 dark:text-white">{(stream.total_earnings_coins || 0).toLocaleString()} <span className="text-xs text-zinc-500">zCoins</span></div>
+                          {stream.status === 'ended' ? (
+                            <div className="shrink-0 text-sm font-medium text-zinc-900 dark:text-white">{(stream.total_earnings_coins || 0).toLocaleString()} <span className="text-xs text-zinc-500">zCoins</span></div>
+                          ) : (
+                            <span className="shrink-0 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">{STATUS_LABELS[stream.status] ?? stream.status}</span>
+                          )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-zinc-500">
-                          <span className="inline-flex items-center gap-1.5" title="Most people watching at the same time">
-                            <Eye className="w-3.5 h-3.5" /> {stream.peak_viewer_count.toLocaleString()} peak
-                          </span>
-                          <span className="inline-flex items-center gap-1.5" title="Different people who joined">
-                            <Users className="w-3.5 h-3.5" /> {stream.unique_viewer_count === null || stream.unique_viewer_count === undefined ? '—' : stream.unique_viewer_count.toLocaleString()} unique
-                          </span>
-                        </div>
+                        {stream.status === 'ended' && (
+                          <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-zinc-500">
+                            <span className="inline-flex items-center gap-1.5" title="Most people watching at the same time">
+                              <Eye className="w-3.5 h-3.5" /> {stream.peak_viewer_count.toLocaleString()} peak
+                            </span>
+                            <span className="inline-flex items-center gap-1.5" title="Different people who joined">
+                              <Users className="w-3.5 h-3.5" /> {stream.unique_viewer_count === null || stream.unique_viewer_count === undefined ? '—' : stream.unique_viewer_count.toLocaleString()} unique
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

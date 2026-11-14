@@ -1,6 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from './AuthContext';
+import { wsEvents } from './WebSocketContext';
+import type { PurchaseCompletedEvent } from '../types/wallet';
+
+// How long to wait for the webhook's "purchase_completed" push before refetching the wallet once.
+const PURCHASE_PUSH_TIMEOUT_MS = 30000;
 
 type RazorpayConstructor = new (options: Record<string, unknown>) => {
   on: (event: 'payment.failed', handler: (response: { error: unknown }) => void) => void;
@@ -128,19 +133,34 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
   const closePurchaseModal = () => setIsPurchaseModalOpen(false);
 
-  const pollOrderStatus = async (internalOrderId: string): Promise<boolean> => {
-    for (let i = 0; i < 10; i++) {
-      try {
-        const res = await apiClient.get(`/wallet/purchase/${internalOrderId}`);
-        if (res.data.status === 'completed') return true;
-        if (res.data.status === 'failed') return false;
-      } catch (e) {
-        console.error("Polling error:", e);
-      }
-      await new Promise(resolve => setTimeout(resolve, 2000));
+  const purchaseWaitersRef = useRef(new Map<string, () => void>());
+  // Orders whose push arrived before Razorpay's success callback started waiting.
+  const completedOrdersRef = useRef(new Set<string>());
+
+  useEffect(() => wsEvents.subscribe((msg) => {
+    if (msg.type !== 'purchase_completed') return;
+    const event = (msg.payload || {}) as PurchaseCompletedEvent;
+    setBalanceCoins(Number(event.balance_coins || 0));
+    const onCompleted = purchaseWaitersRef.current.get(event.order_id);
+    if (onCompleted) onCompleted();
+    else if (event.order_id) completedOrdersRef.current.add(event.order_id);
+  }), []);
+
+  const waitForPurchase = (orderId: string) => new Promise<boolean>((resolve) => {
+    if (completedOrdersRef.current.delete(orderId)) {
+      resolve(true);
+      return;
     }
-    return false;
-  };
+    const timer = window.setTimeout(() => {
+      purchaseWaitersRef.current.delete(orderId);
+      resolve(false);
+    }, PURCHASE_PUSH_TIMEOUT_MS);
+    purchaseWaitersRef.current.set(orderId, () => {
+      window.clearTimeout(timer);
+      purchaseWaitersRef.current.delete(orderId);
+      resolve(true);
+    });
+  });
 
   const buyCoinPackage = async (pkg: CoinPackage) => {
     if (isProcessingPayment) return;
@@ -163,11 +183,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           color: "#3B82F6"
         },
         handler: async function () {
-          const success = await pollOrderStatus(orderData.order_id);
+          const success = await waitForPurchase(orderData.order_id);
           if (success) {
-            await refreshBalance();
             closePurchaseModal();
           } else {
+            await refreshBalance();
             alert("Payment verification is taking longer than expected. Your coins will reflect shortly if the payment went through.");
           }
           setIsProcessingPayment(false);

@@ -66,6 +66,8 @@ export const useLiveStreamRoom = (
   streamId: string,
   creatorUsername?: string,
   initialPaused = false,
+  // Premium rooms refuse the join (ROOM_FORBIDDEN) until stream_enter_ok, so the caller holds it until then.
+  canJoin = true,
 ) => {
   const [viewerCount, setViewerCount] = useState<number>(0);
   const [messages, setMessages] = useState<LiveChatMessage[]>([]);
@@ -118,7 +120,7 @@ export const useLiveStreamRoom = (
 
   // 1. Join the room on mount or reconnect
   useEffect(() => {
-    if (!roomId || !isConnected) return;
+    if (!roomId || !isConnected || !canJoin) return;
     
     // Sends the standard join_room envelope so the backend registers the viewer
     sendMessage('join_room', undefined, roomId);
@@ -127,7 +129,7 @@ export const useLiveStreamRoom = (
       // Optional: Explicitly leave room on unmount if your backend requires it
       if (isConnected) sendMessage('leave_room', undefined, roomId);
     };
-  }, [roomId, isConnected, sendMessage]);
+  }, [roomId, isConnected, canJoin, sendMessage]);
 
   // 2. Listen to every socket message (not just the latest one, which can skip messages in busy chats)
   useEffect(() => {
@@ -239,6 +241,10 @@ export const useLiveStreamRoom = (
   // 3. Send a gift
   const sendGift = useCallback((giftId: number, message: string = "") => {
     if (!roomId || isGiftPending || isStreamEnded) return;
+    if (!canJoin) {
+      setSendError('Unlock this stream to join the chat.');
+      return;
+    }
 
     // Truncate message defensively as per backend spec (max 200 chars)
     const safeMessage = message.substring(0, 200);
@@ -254,11 +260,15 @@ export const useLiveStreamRoom = (
       setIsGiftPending(false);
       setSendError('Unable to send gift.');
     }
-  }, [roomId, sendMessage, isGiftPending, isStreamEnded]);
+  }, [roomId, sendMessage, isGiftPending, isStreamEnded, canJoin]);
 
   const sendChat = useCallback((text: string) => {
     const safeText = text.trim();
     if (!roomId || !safeText || isStreamEnded) return;
+    if (!canJoin) {
+      setSendError('Unlock this stream to join the chat.');
+      return;
+    }
 
     setSendError(null);
     const messageId = sendMessage('chat_message', { text: safeText }, roomId);
@@ -267,7 +277,7 @@ export const useLiveStreamRoom = (
       return;
     }
     pendingChatRef.current.set(messageId, safeText);
-  }, [roomId, sendMessage, isStreamEnded]);
+  }, [roomId, sendMessage, isStreamEnded, canJoin]);
 
   const retractMessage = useCallback((messageId: string) => {
     if (!roomId || !messageId || isStreamEnded) return;

@@ -5,6 +5,10 @@ import Hls from 'hls.js';
 const STALL_MS = 10000;
 // Shortest gap between two fresh-session restarts, so a down stream isn't hammered.
 const FRESH_SESSION_GAP_MS = 5000;
+// Bunny path token, e.g. /bcdn_token=HS256-abc&token_path=%2F<pid>%2F&expires=1700000000/; segments inherit it from the playlist URL.
+const TOKEN_SEGMENT = /\/bcdn_token=[^/]*\//;
+
+const withoutToken = (url: string) => url.replace(TOKEN_SEGMENT, '/');
 
 interface NativeStreamPlayerProps {
   streamUrl: string;
@@ -27,6 +31,13 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
 }) => {
   const [isBuffering, setIsBuffering] = useState(true);
   const stallTimerRef = useRef<number | null>(null);
+  // A renewed ticket only changes the token, so the player keeps going and requests pick it up from here.
+  const latestUrlRef = useRef(streamUrl);
+  const streamPath = withoutToken(streamUrl);
+
+  useEffect(() => {
+    latestUrlRef.current = streamUrl;
+  }, [streamUrl]);
 
   const clearStallTimer = () => {
     if (stallTimerRef.current) window.clearTimeout(stallTimerRef.current);
@@ -43,7 +54,7 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
     startStallTimer();
     return clearStallTimer;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streamUrl]);
+  }, [streamPath]);
 
   // --- HLS Setup ---
   useEffect(() => {
@@ -60,9 +71,13 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
         maxBufferLength: 30, 
         maxMaxBufferLength: 60, 
         liveSyncDurationCount: 3, 
+        xhrSetup: (xhr, url) => {
+          const token = latestUrlRef.current.match(TOKEN_SEGMENT)?.[0];
+          if (token && TOKEN_SEGMENT.test(url)) xhr.open('GET', url.replace(TOKEN_SEGMENT, token), true);
+        },
       });
 
-      hls.loadSource(streamUrl);
+      hls.loadSource(latestUrlRef.current);
       hls.attachMedia(video);
 
       let chunksDownloaded = 0;
@@ -81,13 +96,14 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
           const status = data.response?.code;
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && (status === 401 || status === 404)) {
-            // Session or pieces gone from MediaMTX; reload index.m3u8 for a fresh session.
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && (status === 401 || status === 403 || status === 404)) {
+            // Session or pieces gone from MediaMTX, or the CDN refused an expired ticket;
+            // reload index.m3u8 (with the latest ticket) for a fresh session.
             const wait = Math.max(0, lastFreshSessionAt + FRESH_SESSION_GAP_MS - Date.now());
             window.clearTimeout(freshSessionTimer);
             freshSessionTimer = window.setTimeout(() => {
               lastFreshSessionAt = Date.now();
-              hls.loadSource(streamUrl);
+              hls.loadSource(latestUrlRef.current);
             }, wait);
           }
           else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
@@ -96,7 +112,8 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
         }
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamUrl;
+      // Native HLS can't swap tickets per request; a new ticket is used on the next reload.
+      video.src = latestUrlRef.current;
       video.addEventListener('loadedmetadata', () => {
         if (isPlaying) video.play().catch((e) => console.log("Autoplay prevented:", e));
       });
@@ -106,7 +123,7 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
       window.clearTimeout(freshSessionTimer);
       if (hls) hls.destroy();
     };
-  }, [streamUrl]);
+  }, [streamPath]);
 
   // --- Sync Play/Pause State ---
   useEffect(() => {

@@ -178,3 +178,52 @@ message MuteUserRequest {
     string user_id = 1;
     int32  minutes = 2;
 }
+
+// ---------- Stream entry over the WebSocket. Every answer goes only to the
+// socket that asked (like gift_confirm) and carries the stream_id it answers. ----------
+
+// MsgType "stream_enter" (client -> server). Gets a playback ticket, and renews
+// it when sent again before expires_at. Never charges unless confirm is true.
+message StreamEnterRequest {
+    string stream_id = 1;
+    bool   confirm   = 2; // true only from the viewer's Unlock click on a premium stream
+}
+
+// MsgType "stream_enter_ok" (server -> asking socket only)
+message StreamEnterOk {
+    string stream_id     = 1;
+    string playback_url  = 2; // CDN link carrying a short-lived ticket
+    int64  expires_at    = 3; // unix seconds; send stream_enter again before this
+    int32  charged_coins = 4; // the entry fee, only on the request that paid it
+    int64  balance_coins = 5; // the viewer's balance; valid only when has_balance
+    bool   has_balance   = 6; // true when this request touched the wallet (paid, or found already paid)
+}
+
+// MsgType "stream_confirm_required" (server -> asking socket only). Premium
+// stream not paid yet and confirm was false: nothing was charged.
+message StreamConfirmRequired {
+    string stream_id         = 1;
+    int32  entry_price_coins = 2;
+}
+
+// MsgType "stream_enter_error" (server -> asking socket only)
+message StreamEnterError {
+    string stream_id = 1;
+    string code      = 2; // LOGIN_REQUIRED, INSUFFICIENT_BALANCE, STREAM_NOT_FOUND, STREAM_NOT_LIVE, ENTER_FAILED
+    string message   = 3;
+}
+
+// MsgType "stream_expired" (server -> creator only). A scheduled stream that
+// was never started passed its planned end and can no longer go live.
+message StreamExpired {
+    string stream_id = 1;
+    string title     = 2;
+}
+
+// MsgType "purchase_completed" (server -> buyer). Sent once the Razorpay
+// webhook has credited the coins; replaces polling the order status.
+message PurchaseCompleted {
+    string order_id      = 1;
+    int32  coins         = 2;
+    int64  balance_coins = 3;
+}

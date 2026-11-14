@@ -210,10 +210,14 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   }, []);
 
   const { balanceCoins, openPurchaseModal } = useWallet();
-  const { playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, isLoginRequired, retryEnter, refreshPlaybackUrl } = useStreamEntry(resolvedStreamId);
+  const {
+    playbackUrl: apiPlaybackUrl, isLoading: apiIsLoading, error: apiError, isPaywall, isLoginRequired,
+    confirmPrice, needsConfirm, isUnlocking, hasAccess, unlock, retryEnter, refreshPlaybackUrl,
+  } = useStreamEntry(resolvedStreamId);
 
   const roomId = stream?.room_id;
-  const { viewerCount, messages, isGiftPending, sendError, isStreamEnded, isPaused, streamEarnings, sendChat, sendGift, retractMessage, muteUser } = useLiveStreamRoom(roomId, resolvedStreamId, stream?.creator.username, stream?.is_paused ?? false);
+  const canJoinRoom = !stream?.is_premium || hasAccess;
+  const { viewerCount, messages, isGiftPending, sendError, isStreamEnded, isPaused, streamEarnings, sendChat, sendGift, retractMessage, muteUser } = useLiveStreamRoom(roomId, resolvedStreamId, stream?.creator.username, stream?.is_paused ?? false, canJoinRoom);
 
   const isReconnecting = streamMode !== 'mock' && !isStreamEnded && (isPaused || isStalled);
 
@@ -263,6 +267,8 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const activePlaybackUrl = streamMode === 'mock' ? "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" : apiPlaybackUrl;
   const activeIsLoading = streamMode === 'mock' ? false : apiIsLoading;
   const activeError = streamMode === 'mock' ? null : apiError;
+  const unlockPrice = confirmPrice ?? stream.entry_price_coins;
+  const needsCoins = isPaywall || balanceCoins < unlockPrice;
 
   // 🛠️ Keep UI visible if the settings menu is open
   const showMobileUI = isChatCollapsed || isUserActive || !isPlaying || showProfileOverlay || isSettingsOpen;
@@ -346,30 +352,34 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                 <LogIn className="w-5 h-5" /> Log in to unlock
               </button>
             </div>
-          ) : isPaywall ? (
+          ) : needsConfirm || isPaywall ? (
             <div className="flex flex-col items-center max-w-sm text-center p-8 z-20 bg-zinc-950/90 backdrop-blur-md border border-amber-500/20 rounded-[2rem] shadow-2xl pointer-events-auto">
               <div className="w-16 h-16 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mb-4">
                 <Lock className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Premium Broadcast</h3>
+              <h3 className="text-xl font-bold text-white mb-2">Premium stream</h3>
               <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
-                {activeError || "You need zCoins to enter this stream. Top up your balance to join the action."}
+                Unlock for <strong className="text-white">{unlockPrice.toLocaleString()} zCoins</strong>. Your balance: <strong className="text-white">{balanceCoins.toLocaleString()}</strong>
               </p>
               
-              <div className="flex flex-col w-full gap-3">
+              {needsCoins ? (
                 <button 
-                  onClick={openPurchaseModal} 
+                  onClick={(e) => { e.stopPropagation(); openPurchaseModal(); }} 
                   className="w-full py-4 bg-amber-500 text-amber-950 rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:bg-amber-400 active:scale-95 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
                 >
                   <Coins className="w-5 h-5" /> Get zCoins
                 </button>
+              ) : (
                 <button 
-                  onClick={retryEnter} 
-                  className="w-full py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-medium transition-colors border border-white/5"
+                  onClick={(e) => { e.stopPropagation(); unlock(); }} 
+                  disabled={isUnlocking}
+                  className="w-full py-4 bg-amber-500 text-amber-950 rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:bg-amber-400 active:scale-95 shadow-[0_0_15px_rgba(245,158,11,0.2)] disabled:opacity-60 disabled:active:scale-100"
                 >
-                  I have coins, Try Again
+                  {isUnlocking
+                    ? <><Loader2 className="w-5 h-5 animate-spin" /> Unlocking…</>
+                    : <>Unlock for {unlockPrice.toLocaleString()} 🪙</>}
                 </button>
-              </div>
+              )}
             </div>
           ) : activeError || !activePlaybackUrl ? (
             <div className="flex flex-col items-center max-w-sm text-center p-8 z-20 bg-zinc-950/90 backdrop-blur-md border border-red-500/20 rounded-[2rem] shadow-2xl pointer-events-auto">

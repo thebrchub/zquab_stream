@@ -3,7 +3,6 @@ import type {
   WalletTransaction,
   CoinPackage,
   PurchaseInitResponse,
-  PurchaseStatusResponse,
   GiftItem,
 } from '../types/wallet';
 
@@ -46,13 +45,6 @@ export const walletService = {
       body: JSON.stringify({ package_id: packageId }),
     });
     return handleResponse<PurchaseInitResponse>(res);
-  },
-
-  async pollPurchaseStatus(orderId: string): Promise<PurchaseStatusResponse> {
-    const res = await fetch(`${BASE_URL}/wallet/purchase/${orderId}`, {
-      credentials: 'include',
-    });
-    return handleResponse<PurchaseStatusResponse>(res);
   },
 
   // Gift Catalog

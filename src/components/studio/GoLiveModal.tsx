@@ -284,12 +284,12 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
               
               <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-[1.25rem] text-amber-600 dark:text-amber-400 text-sm font-medium flex items-start gap-3 leading-relaxed shadow-inner">
                 <ShieldAlert className="w-5 h-5 shrink-0 text-amber-500 mt-0.5" />
-                <p>Your stream is provisioned. Paste these settings into OBS Studio. <strong className="font-bold text-amber-700 dark:text-amber-300">Never share your stream key with anyone.</strong></p>
+                <p>Your stream is provisioned. In OBS Studio, open Settings → Stream, choose Service "Custom", paste the Ingest URL into "Server" and the Stream Key into "Stream Key". <strong className="font-bold text-amber-700 dark:text-amber-300">Never share your stream key with anyone.</strong></p>
               </div>
 
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider ml-1">Ingest URL</label>
+                  <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider ml-1">Ingest URL (OBS "Server")</label>
                   <input 
                     readOnly 
                     value={streamData.ingest_url}
@@ -299,7 +299,7 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between ml-1 mb-2">
-                    <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Stream Key</label>
+                    <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Stream Key (OBS "Stream Key")</label>
                     <button onClick={handleRegenerateKey} disabled={isLoading} className="text-xs font-bold text-[#3B82F6] hover:text-blue-600 transition-colors flex items-center gap-1.5 disabled:opacity-50">
                       <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Reset Key
                     </button>
