@@ -10,6 +10,27 @@ const TOKEN_SEGMENT = /\/bcdn_token=[^/]*\//;
 
 const withoutToken = (url: string) => url.replace(TOKEN_SEGMENT, '/');
 
+// hls.js never retries a 4xx, so one missing piece would end the session. A
+// 404 is usually brief (MediaMTX restarting the stream's muxer after the
+// streamer reconnects, or a playlist naming a segment a moment early) and a
+// 403 can be a ticket that expired just before renewal (xhrSetup puts the
+// latest ticket on every retry). Retry those ~1s, 2s, 4s before the
+// fresh-session fallback in the error handler.
+type LoadPolicy = typeof Hls.DefaultConfig.fragLoadPolicy;
+const RETRY_STATUSES = new Set([403, 404]);
+const retryBrief4xx = (policy: LoadPolicy): LoadPolicy => ({
+  default: {
+    ...policy.default,
+    errorRetry: {
+      maxNumRetry: 3,
+      retryDelayMs: 1000,
+      maxRetryDelayMs: 4000,
+      shouldRetry: (config, retryCount, _isTimeout, response, retry) =>
+        retry || (!!config && retryCount < config.maxNumRetry && RETRY_STATUSES.has(response?.code ?? 0)),
+    },
+  },
+});
+
 interface NativeStreamPlayerProps {
   streamUrl: string;
   isPlaying: boolean;
@@ -71,6 +92,9 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
         maxBufferLength: 30, 
         maxMaxBufferLength: 60, 
         liveSyncDurationCount: 3, 
+        fragLoadPolicy: retryBrief4xx(Hls.DefaultConfig.fragLoadPolicy),
+        playlistLoadPolicy: retryBrief4xx(Hls.DefaultConfig.playlistLoadPolicy),
+        manifestLoadPolicy: retryBrief4xx(Hls.DefaultConfig.manifestLoadPolicy),
         xhrSetup: (xhr, url) => {
           const token = latestUrlRef.current.match(TOKEN_SEGMENT)?.[0];
           if (token && TOKEN_SEGMENT.test(url)) xhr.open('GET', url.replace(TOKEN_SEGMENT, token), true);
