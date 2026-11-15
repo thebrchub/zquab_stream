@@ -7,7 +7,8 @@ import type {
   StreamEnterOkEvent,
 } from '../types/streamEvents';
 
-// Renew a random 1–2 minutes before the ticket (5 min) expires, so viewers who joined together don't renew together.
+// Renew a random 1–2 minutes before the ticket expires. Viewers who joined in the same window share
+// one ticket and expiry (5–10 min), so the random lead keeps them from all renewing at once.
 const RENEW_LEAD_MIN_MS = 60_000;
 const RENEW_LEAD_MAX_MS = 120_000;
 const MIN_RENEW_DELAY_MS = 15_000;
