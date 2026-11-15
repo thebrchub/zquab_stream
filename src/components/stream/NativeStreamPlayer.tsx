@@ -10,15 +10,15 @@ const TOKEN_SEGMENT = /\/bcdn_token=[^/]*\//;
 
 const withoutToken = (url: string) => url.replace(TOKEN_SEGMENT, '/');
 
-// hls.js never retries a 4xx, so one missing piece would end the session. A
-// 404 is usually brief (MediaMTX restarting the stream's muxer after the
-// streamer reconnects, or a playlist naming a segment a moment early) and a
-// 403 can be a ticket that expired just before renewal (xhrSetup puts the
-// latest ticket on every retry). Retry those ~1s, 2s, 4s before the
-// fresh-session fallback in the error handler.
+// hls.js never retries a 4xx, so one failed request would end the session.
+// A 403 can be a ticket that expired just before renewal (xhrSetup puts the
+// latest ticket on every retry), so retry it everywhere. A playlist 404 is
+// brief (MediaMTX starting or restarting the stream), so retry it too. A
+// segment 404 is permanent (it left MediaMTX's 5-segment window, or the
+// stream restarted with new names), so it goes straight to the fresh-session
+// fallback in the error handler. Retries wait ~1s, 2s, 4s.
 type LoadPolicy = typeof Hls.DefaultConfig.fragLoadPolicy;
-const RETRY_STATUSES = new Set([403, 404]);
-const retryBrief4xx = (policy: LoadPolicy): LoadPolicy => ({
+const retryBrief4xx = (policy: LoadPolicy, statuses: number[]): LoadPolicy => ({
   default: {
     ...policy.default,
     errorRetry: {
@@ -26,7 +26,7 @@ const retryBrief4xx = (policy: LoadPolicy): LoadPolicy => ({
       retryDelayMs: 1000,
       maxRetryDelayMs: 4000,
       shouldRetry: (config, retryCount, _isTimeout, response, retry) =>
-        retry || (!!config && retryCount < config.maxNumRetry && RETRY_STATUSES.has(response?.code ?? 0)),
+        retry || (!!config && retryCount < config.maxNumRetry && statuses.includes(response?.code ?? 0)),
     },
   },
 });
@@ -54,11 +54,16 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
   const stallTimerRef = useRef<number | null>(null);
   // A renewed ticket only changes the token, so the player keeps going and requests pick it up from here.
   const latestUrlRef = useRef(streamUrl);
+  const isPlayingRef = useRef(isPlaying);
   const streamPath = withoutToken(streamUrl);
 
   useEffect(() => {
     latestUrlRef.current = streamUrl;
   }, [streamUrl]);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   const clearStallTimer = () => {
     if (stallTimerRef.current) window.clearTimeout(stallTimerRef.current);
@@ -92,9 +97,9 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
         maxBufferLength: 30, 
         maxMaxBufferLength: 60, 
         liveSyncDurationCount: 3, 
-        fragLoadPolicy: retryBrief4xx(Hls.DefaultConfig.fragLoadPolicy),
-        playlistLoadPolicy: retryBrief4xx(Hls.DefaultConfig.playlistLoadPolicy),
-        manifestLoadPolicy: retryBrief4xx(Hls.DefaultConfig.manifestLoadPolicy),
+        fragLoadPolicy: retryBrief4xx(Hls.DefaultConfig.fragLoadPolicy, [403]),
+        playlistLoadPolicy: retryBrief4xx(Hls.DefaultConfig.playlistLoadPolicy, [403, 404]),
+        manifestLoadPolicy: retryBrief4xx(Hls.DefaultConfig.manifestLoadPolicy, [403, 404]),
         xhrSetup: (xhr, url) => {
           const token = latestUrlRef.current.match(TOKEN_SEGMENT)?.[0];
           if (token && TOKEN_SEGMENT.test(url)) xhr.open('GET', url.replace(TOKEN_SEGMENT, token), true);
@@ -111,7 +116,7 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
         chunksDownloaded++;
         if (chunksDownloaded >= 2 && !hasStartedPlaying) {
           hasStartedPlaying = true;
-          if (isPlaying) {
+          if (isPlayingRef.current) {
             video.play().catch((e) => console.log("Autoplay prevented:", e));
           }
         }
@@ -122,11 +127,14 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
           const status = data.response?.code;
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR && (status === 401 || status === 403 || status === 404)) {
             // Session or pieces gone from MediaMTX, or the CDN refused an expired ticket;
-            // reload index.m3u8 (with the latest ticket) for a fresh session.
+            // reload index.m3u8 (with the latest ticket) for a fresh session at the live edge.
+            // loadSource resets the <video> (it pauses), so play again once 2 chunks are buffered.
             const wait = Math.max(0, lastFreshSessionAt + FRESH_SESSION_GAP_MS - Date.now());
             window.clearTimeout(freshSessionTimer);
             freshSessionTimer = window.setTimeout(() => {
               lastFreshSessionAt = Date.now();
+              chunksDownloaded = 0;
+              hasStartedPlaying = false;
               hls.loadSource(latestUrlRef.current);
             }, wait);
           }
