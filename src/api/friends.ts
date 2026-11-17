@@ -6,10 +6,10 @@ export const friendsApi = {
     return res.data;
   },
   
-  // Note: Uses 'q=' instead of 'query=' as per API docs
-  searchFriends: async (q: string) => {
-    const res = await apiClient.get(`/friends/search?q=${encodeURIComponent(q)}`);
-    return res.data;
+  // Your friends whose name or username starts with q (2+ characters).
+  searchFriends: async (q: string, signal?: AbortSignal) => {
+    const res = await apiClient.get(`/friends/search?q=${encodeURIComponent(q)}`, signal);
+    return res.data || [];
   },
   
   getRequests: async (type: 'received' | 'sent' = 'received', limit: number = 10, offset: number = 0) => {

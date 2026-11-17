@@ -11,7 +11,7 @@ export const useCreatorProfile = (username: string | undefined) => {
     if (!username) return;
     setIsLoading(true);
     try {
-      const data = await creatorService.getProfile(username);
+      const data = await creatorService.getProfile(username, true);
       setProfile(data);
       setError(null);
     } catch (err: any) {

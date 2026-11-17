@@ -1,14 +1,49 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Loader2, Users, BadgeCheck, Search, Play, CalendarClock } from 'lucide-react';
-import { streamService, type LiveStream, type UpcomingStream } from '../../services/streamService';
+import { streamService, type StreamCard, type DiscoverStreamsChanged } from '../../services/streamService';
 import { creatorService, type DiscoverCreator } from '../../services/creatorService';
 // import { MOCK_CREATORS } from '../../constants/streamMockData';
 import { useAuth } from '../../context/AuthContext';
-import { wsEvents } from '../../context/WebSocketContext';
+import { useWebSocket, wsEvents } from '../../context/WebSocketContext';
+import { useDebouncedSearch, useDirectoryList } from '../../hooks/usePublicLists';
+import PaginationLoader from '../../components/PaginationLoader';
 
-// How often the live/upcoming lists refresh while the page is visible.
+// Without a socket (logged out), how often the live/upcoming lists refresh while the page is visible.
 const DISCOVERY_REFRESH_MS = 30_000;
+// Public chat room that announces every change to the live/upcoming lists.
+const DISCOVER_ROOM = 'discover:streams';
+// Creators shown here; the rest are on /creators.
+const TOP_CREATORS = 10;
+
+const streamKey = (s: StreamCard) => s.stream_id;
+const creatorKey = (c: DiscoverCreator) => c.username;
+
+// Applies a discover_streams_changed message to one list ("live" newest
+// first, "upcoming" soonest first) in place: no fetch.
+const applyStreamChange = (list: StreamCard[], change: DiscoverStreamsChanged, status: StreamCard['status'], category?: string) => {
+  const removed = new Set(change.removed || []);
+  const incoming = new Map<string, StreamCard>();
+  for (const s of [...(change.added || []), ...(change.updated || [])]) incoming.set(s.stream_id, s);
+  const fits = (s: StreamCard) => s.status === status && (!category || s.category === category);
+
+  const next: StreamCard[] = [];
+  for (const s of list) {
+    if (removed.has(s.stream_id)) continue;
+    const fresh = incoming.get(s.stream_id);
+    if (fresh) {
+      incoming.delete(s.stream_id);
+      if (fits(fresh)) next.push(fresh);
+      continue;
+    }
+    next.push(s);
+  }
+  const added = [...incoming.values()].filter(fits);
+  if (added.length === 0) return next;
+  if (status === 'live') return [...added, ...next];
+  const at = (s: StreamCard) => (s.scheduled_at ? Date.parse(s.scheduled_at) : 0);
+  return [...next, ...added].sort((a, b) => at(a) - at(b));
+};
 
 // 🚀 CLEAN UI (For layout, cards, inputs, and tabs)
 const CLEAN_CARD = "bg-[var(--card)] rounded-[2rem] border border-[var(--border-color)] shadow-sm hover:shadow-md transition-all duration-300";
@@ -28,16 +63,13 @@ const TAB_BUTTON_ACTIVE = "bg-[#3B82F6] text-white font-bold rounded-full border
 export const LiveDiscoveryPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isConnected, sendMessage } = useWebSocket();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const [liveStreams, setLiveStreams] = useState<LiveStream[]>([]);
-  const [upcomingStreams, setUpcomingStreams] = useState<UpcomingStream[]>([]);
-  const [discoverCreators, setDiscoverCreators] = useState<DiscoverCreator[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
   const categories = ['All', 'gaming', 'chatting', 'music'];
+  const apiCategory = selectedCategory === 'All' ? undefined : selectedCategory;
   // 1:1 calls will be enabled in the next release.
   // const creatorsAcceptingCalls = MOCK_CREATORS.filter((c) => c.oneOnOne.enabled);
 
@@ -49,79 +81,82 @@ export const LiveDiscoveryPage: React.FC = () => {
     navigate(path);
   };
 
+  // Lists from /public (edge-cached), page by page.
+  const live = useDirectoryList<StreamCard>(
+    (ver, page, signal) => streamService.getStreamsPage('live', apiCategory, ver, page, signal)
+      .then((r) => ({ ver: r.ver, has_more: r.has_more, items: r.streams })),
+    streamKey, `live:${selectedCategory}`,
+  );
+  const upcoming = useDirectoryList<StreamCard>(
+    (ver, page, signal) => streamService.getStreamsPage('upcoming', apiCategory, ver, page, signal)
+      .then((r) => ({ ver: r.ver, has_more: r.has_more, items: r.streams })),
+    streamKey, `upcoming:${selectedCategory}`,
+  );
+  const creators = useDirectoryList<DiscoverCreator>(
+    (ver, page, signal) => creatorService.getCreatorsPage(apiCategory, ver, page, signal)
+      .then((r) => ({ ver: r.ver, has_more: r.has_more, items: r.creators })),
+    creatorKey, `creators:${selectedCategory}`,
+  );
+
+  // Search runs on the server (2+ characters, after a short pause).
+  const streamSearch = useDebouncedSearch(searchQuery, (q, signal) => streamService.searchStreams(q, signal));
+  const creatorSearch = useDebouncedSearch(searchQuery, (q, signal) => creatorService.searchCreators(q, signal));
+
+  // With a socket, join the discover room: every change to the lists arrives
+  // as one message and is applied in place. After a reconnect the lists are
+  // reloaded once, since changes may have been missed while offline.
+  const { reload: reloadLive, setItems: setLiveItems } = live;
+  const { reload: reloadUpcoming, setItems: setUpcomingItems } = upcoming;
+  const joinedOnceRef = useRef(false);
   useEffect(() => {
-    const fetchDiscoveryData = async () => {
-      setIsLoading(true);
-      try {
-        const apiCategory = selectedCategory === 'All' ? undefined : selectedCategory;
-        const [streamsData, creatorsData] = await Promise.all([
-          streamService.getDiscoverStreams().catch(() => ({ live: [], upcoming: [] })),
-          creatorService.getDiscoverFeed(apiCategory).catch(() => [])
-        ]);
-
-        const filteredStreams = apiCategory 
-          ? streamsData.live.filter((s: LiveStream) => s.category === apiCategory)
-          : streamsData.live;
-        const filteredUpcomingStreams = apiCategory
-          ? streamsData.upcoming.filter((s: UpcomingStream) => s.category === apiCategory)
-          : streamsData.upcoming;
-
-        setLiveStreams(filteredStreams);
-        setUpcomingStreams(filteredUpcomingStreams);
-        setDiscoverCreators(creatorsData);
-      } catch (error) {
-        console.error("Failed to load discovery feeds:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchDiscoveryData();
-  }, [selectedCategory]);
-
-  // Quietly refresh live/upcoming: every 30s while visible, on return to the tab, and when a followed creator goes live.
-  useEffect(() => {
-    const apiCategory = selectedCategory === 'All' ? undefined : selectedCategory;
-    let cancelled = false;
-    const refreshStreams = async () => {
-      try {
-        const data = await streamService.getDiscoverStreams();
-        if (cancelled) return;
-        setLiveStreams(apiCategory ? data.live.filter((s: LiveStream) => s.category === apiCategory) : data.live);
-        setUpcomingStreams(apiCategory ? data.upcoming.filter((s: UpcomingStream) => s.category === apiCategory) : data.upcoming);
-      } catch {
-        // Keep the current lists; the next tick tries again.
-      }
-    };
-
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void refreshStreams();
-    }, DISCOVERY_REFRESH_MS);
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void refreshStreams();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    const unsubscribe = wsEvents.subscribe((msg) => {
-      if (msg?.type === 'creator_live') void refreshStreams();
-    });
-
+    if (!isConnected) return;
+    sendMessage('join_room', undefined, DISCOVER_ROOM);
+    if (joinedOnceRef.current) {
+      reloadLive();
+      reloadUpcoming();
+    }
+    joinedOnceRef.current = true;
     return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', onVisible);
-      unsubscribe();
+      sendMessage('leave_room', undefined, DISCOVER_ROOM);
     };
-  }, [selectedCategory]);
+  }, [isConnected, sendMessage, reloadLive, reloadUpcoming]);
 
-  const query = searchQuery.toLowerCase();
-  const displayedStreams = liveStreams.filter(s => 
-    s.title.toLowerCase().includes(query) || s.name.toLowerCase().includes(query) || s.category.toLowerCase().includes(query)
-  );
-  const displayedUpcomingStreams = upcomingStreams.filter(s =>
-    s.title.toLowerCase().includes(query) || s.name.toLowerCase().includes(query) || s.category.toLowerCase().includes(query)
-  );
-  const displayedCreators = discoverCreators.filter(c => 
-    c.name.toLowerCase().includes(query) || c.username.toLowerCase().includes(query)
-  );
+  useEffect(() => wsEvents.subscribe((msg) => {
+    if (msg?.type !== 'discover_streams_changed' || !msg.payload || msg.payload instanceof Uint8Array) return;
+    const change = msg.payload as DiscoverStreamsChanged;
+    setLiveItems((prev) => applyStreamChange(prev, change, 'live', apiCategory));
+    setUpcomingItems((prev) => applyStreamChange(prev, change, 'upcoming', apiCategory));
+  }), [apiCategory, setLiveItems, setUpcomingItems]);
+
+  // Without a socket (logged out), refresh every 30s while visible and on return to the tab.
+  useEffect(() => {
+    if (isConnected) return;
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      reloadLive();
+      reloadUpcoming();
+    };
+    const timer = window.setInterval(refresh, DISCOVERY_REFRESH_MS);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [isConnected, reloadLive, reloadUpcoming]);
+
+  const inCategory = <T extends { category: string }>(items: T[]) =>
+    apiCategory ? items.filter((i) => i.category === apiCategory) : items;
+  const displayedStreams = streamSearch.active
+    ? inCategory(streamSearch.results.filter((s) => s.status === 'live'))
+    : live.items;
+  const displayedUpcomingStreams = streamSearch.active
+    ? inCategory(streamSearch.results.filter((s) => s.status === 'upcoming'))
+    : upcoming.items;
+  const displayedCreators = (creatorSearch.active ? inCategory(creatorSearch.results) : creators.items).slice(0, TOP_CREATORS);
+  const isLoading = streamSearch.active
+    ? streamSearch.isSearching
+    : live.isLoading && live.items.length === 0;
+  const seeAllCreators = `/creators${apiCategory ? `?category=${encodeURIComponent(apiCategory)}` : ''}`;
   // 1:1 calls will be enabled in the next release.
   // const displayed1on1 = creatorsAcceptingCalls.filter(c => 
   //   c.name.toLowerCase().includes(query) || c.handle.toLowerCase().includes(query)
@@ -279,6 +314,9 @@ export const LiveDiscoveryPage: React.FC = () => {
                   ))}
                 </div>
               )}
+              {!streamSearch.active && (
+                <PaginationLoader onLoadMore={live.loadMore} hasMore={live.hasMore} isLoading={live.isLoading} />
+              )}
             </section>
 
             {/* --- Section: Upcoming Streams --- */}
@@ -319,12 +357,15 @@ export const LiveDiscoveryPage: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-bold text-[var(--text-main)] truncate group-hover:text-[#3B82F6] transition-colors">{stream.title}</h3>
                           <p className="text-xs text-[var(--text-muted)] font-medium mt-1 truncate">{stream.name}</p>
-                          <p className="text-xs text-[#3B82F6] font-bold mt-2">{new Date(stream.scheduled_at).toLocaleString()}</p>
+                          <p className="text-xs text-[#3B82F6] font-bold mt-2">{new Date(stream.scheduled_at ?? '').toLocaleString()}</p>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
+                {!streamSearch.active && (
+                  <PaginationLoader onLoadMore={upcoming.loadMore} hasMore={upcoming.hasMore} isLoading={upcoming.isLoading} />
+                )}
               </section>
             )}
 
@@ -336,6 +377,9 @@ export const LiveDiscoveryPage: React.FC = () => {
                     🌟
                   </div>
                   <h2 className="text-xl font-bold text-[var(--text-main)]">Rising Creators</h2>
+                  <Link to={seeAllCreators} className="ml-auto text-xs font-bold text-[#3B82F6]">
+                    See all creators →
+                  </Link>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

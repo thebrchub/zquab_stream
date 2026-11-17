@@ -1,4 +1,5 @@
-import { apiClient } from '../api/client';
+import { apiClient, publicGet } from '../api/client';
+import { directoryParams, type DirectoryPage } from './creatorService';
 import { MOCK_STREAMS, MOCK_CREATORS } from '../constants/streamMockData';
 
 // Helper to check if we are in mock UI mode
@@ -71,9 +72,21 @@ export interface UpcomingStream extends LiveStream {
   scheduled_at: string;
 }
 
-export interface DiscoverStreams {
-  live: LiveStream[];
-  upcoming: UpcomingStream[];
+// A stream as the public directory serves it (lists, search, live updates).
+export interface StreamCard extends LiveStream {
+  status: 'live' | 'upcoming';
+  scheduled_at?: string;
+}
+
+export interface StreamsPage extends DirectoryPage {
+  streams: StreamCard[];
+}
+
+// What the discover:streams room sends when the directory changes.
+export interface DiscoverStreamsChanged {
+  added?: StreamCard[];
+  updated?: StreamCard[];
+  removed?: string[];
 }
 
 export interface StreamMetadata {
@@ -102,14 +115,16 @@ export const streamService = {
   
   // --- Viewer Endpoints ---
 
-  async getDiscoverStreams(): Promise<DiscoverStreams> {
+  // One page of live streams (newest first) or upcoming ones (soonest first).
+  async getStreamsPage(status: 'live' | 'upcoming', category?: string, ver?: number, page = 0, signal?: AbortSignal): Promise<StreamsPage> {
     if (isMockMode()) {
       await delay(600);
-      const live = MOCK_STREAMS.map(stream => {
+      const streams: StreamCard[] = status !== 'live' ? [] : MOCK_STREAMS.map(stream => {
         const creator = MOCK_CREATORS.find(c => c.id === stream.creatorId)!;
         return {
           stream_id: stream.id,
           room_id: `room-${stream.id}`,
+          status: 'live' as const,
           title: stream.title,
           category: stream.category,
           tags: ["live"],
@@ -120,10 +135,17 @@ export const streamService = {
           avatar_url: creator.avatar,
         };
       });
-      return { live, upcoming: [] };
+      return { ver: 1, page, has_more: false, streams };
     }
-    const res = await apiClient.get('/streams');
-    return res.data;
+    const params = directoryParams(category, ver, page);
+    params.append('status', status);
+    return publicGet<StreamsPage>(`/streams?${params.toString()}`, signal);
+  },
+
+  // Live and upcoming streams whose title, creator, category or tag starts with q (2+ characters).
+  async searchStreams(q: string, signal?: AbortSignal): Promise<StreamCard[]> {
+    const res = await publicGet<{ streams: StreamCard[] }>(`/streams/search?q=${encodeURIComponent(q)}`, signal);
+    return res.streams || [];
   },
 
   // --- Creator Endpoints ---

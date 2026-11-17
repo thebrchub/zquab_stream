@@ -15,6 +15,11 @@ export default defineConfig({
         target: 'https://aarpaar-api.brchub.tech',
         changeOrigin: true,
       },
+      // Public, edge-cacheable reads (/public/v1/...)
+      '/public': {
+        target: 'https://aarpaar-api.brchub.tech',
+        changeOrigin: true,
+      },
       // Proxy WebSocket connections to your deployed backend
       '/ws': {
         target: 'wss://api.zquab.com',

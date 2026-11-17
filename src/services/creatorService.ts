@@ -1,4 +1,5 @@
-import { apiClient } from '../api/client';
+import { apiClient, publicGet } from '../api/client';
+import { usersApi } from '../api/users';
 import { MOCK_CREATORS } from '../constants/streamMockData';
 
 // Helper to check if we are in mock UI mode
@@ -46,6 +47,28 @@ export interface DiscoverCreator {
   follower_count: number;
   verified: boolean;
 }
+
+// One page of a public directory list (creators or streams). Pass ver from
+// the first page when asking for the next ones; a 410 means the list changed,
+// so start again from page 0.
+export interface DirectoryPage {
+  ver: number;
+  page: number;
+  has_more: boolean;
+}
+
+export interface CreatorsPage extends DirectoryPage {
+  creators: DiscoverCreator[];
+}
+
+// Query string for a directory page: category, then ver/page for later pages.
+export const directoryParams = (category: string | undefined, ver: number | undefined, page: number) => {
+  const params = new URLSearchParams();
+  if (category) params.append('category', category);
+  if (ver) params.append('ver', String(ver));
+  if (page > 0) params.append('page', String(page));
+  return params;
+};
 
 // Earnings in one 15-minute slot: [UTC start time in unix seconds, coins].
 export type EarningSlot = [number, number];
@@ -127,7 +150,9 @@ export const creatorService = {
   
   // --- Profile & Follow System ---
 
-  async getProfile(username: string): Promise<CreatorProfile> {
+  // A creator's channel: the public card (edge-cached) plus, with
+  // withRelation, whether this viewer follows them (needs login).
+  async getProfile(username: string, withRelation = false): Promise<CreatorProfile> {
     if (isMockMode()) {
       await delay(400);
       const mockC = MOCK_CREATORS[0]; 
@@ -147,8 +172,23 @@ export const creatorService = {
     		// one_on_one_duration_mins: 0,
       };
     }
-    const res = await apiClient.get(`/creators/${username}`);
-    return res.data;
+    const [card, relation] = await Promise.all([
+      usersApi.getProfileCard(username),
+      withRelation ? usersApi.getRelation(username).catch(() => null) : Promise.resolve(null),
+    ]);
+    return {
+      username: card.username,
+      name: card.name,
+      avatar_url: card.avatar_url,
+      category: card.category,
+      headline: card.headline,
+      verified: card.verified,
+      follower_count: card.follower_count,
+      stream_count: card.stream_count,
+      is_following: relation?.is_following ?? false,
+      live_alerts: relation?.live_alerts ?? false,
+      live_stream: card.live_stream,
+    };
   },
 
   async followCreator(username: string): Promise<void> {
@@ -177,10 +217,11 @@ export const creatorService = {
 
   // --- Discovery ---
 
-  async getDiscoverFeed(category?: string, limit = 20, offset = 0): Promise<DiscoverCreator[]> {
+  // One page of all creators (most followers first), optionally one category.
+  async getCreatorsPage(category?: string, ver?: number, page = 0, signal?: AbortSignal): Promise<CreatorsPage> {
     if (isMockMode()) {
       await delay(600);
-      return MOCK_CREATORS.map(c => ({
+      const creators = MOCK_CREATORS.map(c => ({
         username: c.name.toLowerCase().replace(/\s/g, ''),
         name: c.name,
         avatar_url: c.avatar,
@@ -189,14 +230,17 @@ export const creatorService = {
         follower_count: Math.floor(Math.random() * 50000),
         verified: c.verified || false
       }));
+      return { ver: 1, page, has_more: false, creators };
     }
-    const params = new URLSearchParams();
-    if (category) params.append('category', category);
-    params.append('limit', limit.toString());
-    params.append('offset', offset.toString());
+    const params = directoryParams(category, ver, page);
+    const query = params.toString();
+    return publicGet<CreatorsPage>(query ? `/creators?${query}` : '/creators', signal);
+  },
 
-    const res = await apiClient.get(`/discover?${params.toString()}`);
-    return res.data;
+  // Creators whose name or username starts with q (2+ characters), most followers first.
+  async searchCreators(q: string, signal?: AbortSignal): Promise<DiscoverCreator[]> {
+    const res = await publicGet<{ creators: DiscoverCreator[] }>(`/creators/search?q=${encodeURIComponent(q)}`, signal);
+    return res.creators || [];
   },
 
   // --- Creator Earnings Dashboard ---

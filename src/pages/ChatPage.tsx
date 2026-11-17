@@ -65,7 +65,12 @@ const compressImageToWebP = (file: File): Promise<File> => {
 };
 
 export default function ChatPage() {
-  const { user } = useAuth();
+  const { user, loginAsGuest } = useAuth();
+  // The latest login, for ChatClient (created once) to read when it starts.
+  const authRef = useRef({ user, loginAsGuest });
+  useEffect(() => {
+    authRef.current = { user, loginAsGuest };
+  }, [user, loginAsGuest]);
   const [status, setStatus] = useState<Status>('idle');
   const [messages, setMessages] = useState<UIMessage[]>([]);
   
@@ -195,6 +200,13 @@ export default function ChatPage() {
     if (isDev) return null; 
     
     return new ChatClient({
+      // A logged-in user chats as themselves; otherwise log in as a guest
+      // (the app's socket then reconnects as that guest).
+      ensureLogin: async () => {
+        const { user: current, loginAsGuest: login } = authRef.current;
+        if (current?.user_id) return current.user_id;
+        return (await login()).user_id;
+      },
       onStatusChange: (newStatus) => {
         if (isSkippingRef.current && newStatus === 'disconnected') return;
         setStatus(newStatus);

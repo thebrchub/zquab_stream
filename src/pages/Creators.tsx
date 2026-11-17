@@ -1,75 +1,80 @@
 import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BadgeCheck, Sparkles, Video, Gamepad2, Headphones, Hash, ArrowRight, Search } from 'lucide-react';
+import { BadgeCheck, Sparkles, Video, Gamepad2, Headphones, Hash, ArrowRight, Search, Loader2 } from 'lucide-react';
+import { creatorService, type DiscoverCreator } from '../services/creatorService';
+import { streamService, type StreamCard } from '../services/streamService';
+import { useAuth } from '../context/AuthContext';
+import { useDebouncedSearch, useDirectoryList } from '../hooks/usePublicLists';
+import PaginationLoader from '../components/PaginationLoader';
+import { CreatorApplicationModal } from '../components/studio/CreatorApplicationModal';
 
-// --- MOCK DATA ---
-const CATEGORIES = ['All', 'Gaming', 'Just Chatting', 'Music', 'Tech & Code'];
-
-const MOCK_CREATORS = [
-  {
-    id: 1,
-    name: 'Sarah Drasner',
-    handle: '@sarah_codes',
-    avatar: 'https://i.pravatar.cc/150?u=sarah',
-    bio: 'Building the future of web dev. Let\'s talk about React, animations, and clean architecture.',
-    category: 'Tech & Code',
-    isLive: true,
-    acceptingCalls: true,
-    price: '250',
-  },
-  {
-    id: 2,
-    name: 'Alex Chen',
-    handle: '@alexc_plays',
-    avatar: 'https://i.pravatar.cc/150?u=alex',
-    bio: 'Top 500 Valorant | Coffee addict | Streaming every night at 8 PM EST.',
-    category: 'Gaming',
-    isLive: false,
-    acceptingCalls: true,
-    price: '150',
-  },
-  {
-    id: 3,
-    name: 'Marcus Vibez',
-    handle: '@marcus_v',
-    avatar: 'https://i.pravatar.cc/150?u=marcus',
-    bio: 'Music production, beat breakdowns, and live mixing sessions.',
-    category: 'Music',
-    isLive: true,
-    acceptingCalls: false,
-    price: null,
-  },
-  {
-    id: 4,
-    name: 'Elena Rose',
-    handle: '@elenatalks',
-    avatar: 'https://i.pravatar.cc/150?u=elena',
-    bio: 'Late night chats, advice, and hanging out. Welcome to the cozy corner.',
-    category: 'Just Chatting',
-    isLive: false,
-    acceptingCalls: true,
-    price: '100',
-  },
+// Category slugs as creators and streams store them ('' = all).
+const CATEGORIES = [
+  { id: '', label: 'All' },
+  { id: 'gaming', label: 'Gaming' },
+  { id: 'chatting', label: 'Just Chatting' },
+  { id: 'music', label: 'Music' },
+  { id: 'art', label: 'Art' },
 ];
 
+const creatorKey = (c: DiscoverCreator) => c.username;
+const streamKey = (s: StreamCard) => s.stream_id;
+
 export default function Creators() {
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const filteredCreators = MOCK_CREATORS.filter(c => {
-    const matchesCategory = activeCategory === 'All' || c.category === activeCategory;
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          c.handle.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  // Category and search live in the URL, so "See all creators" on /discover
+  // lands on the same category and a search can be shared.
+  const [params, setParams] = useSearchParams();
+  const activeCategory = params.get('category') || '';
+  const searchQuery = params.get('q') || '';
+  const setParam = (key: string, value: string) => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value) next.set(key, value);
+      else next.delete(key);
+      return next;
+    }, { replace: true });
+  };
+
+  // All creators, most followers first, page by page as you scroll.
+  const directory = useDirectoryList<DiscoverCreator>(
+    (ver, page, signal) => creatorService.getCreatorsPage(activeCategory || undefined, ver, page, signal)
+      .then((r) => ({ ver: r.ver, has_more: r.has_more, items: r.creators })),
+    creatorKey, `creators:${activeCategory}`,
+  );
+  const search = useDebouncedSearch(searchQuery, (q, signal) => creatorService.searchCreators(q, signal));
+
+  // LIVE badges come from the first page of live streams (one cached request, none per creator).
+  const liveNow = useDirectoryList<StreamCard>(
+    (ver, page, signal) => streamService.getStreamsPage('live', undefined, ver, page, signal)
+      .then((r) => ({ ver: r.ver, has_more: r.has_more, items: r.streams })),
+    streamKey, 'live',
+  );
+  const liveUsernames = new Set(liveNow.items.map((s) => s.username));
+
+  const creators = search.active
+    ? search.results.filter((c) => !activeCategory || c.category === activeCategory)
+    : directory.items;
+  const isLoading = search.active ? search.isSearching : directory.isLoading && directory.items.length === 0;
+
+  const openApplication = () => {
+    if (!user || user.is_guest) {
+      navigate(`/auth?next=${encodeURIComponent('/creators')}`);
+      return;
+    }
+    setIsModalOpen(true);
+  };
 
   const getCategoryIcon = (cat: string) => {
     switch (cat) {
-      case 'Gaming': return <Gamepad2 className="w-4 h-4" />;
-      case 'Music': return <Headphones className="w-4 h-4" />;
-      case 'Tech & Code': return <Hash className="w-4 h-4" />;
-      case 'Just Chatting': return <Video className="w-4 h-4" />;
+      case 'gaming': return <Gamepad2 className="w-4 h-4" />;
+      case 'music': return <Headphones className="w-4 h-4" />;
+      case 'art': return <Hash className="w-4 h-4" />;
+      case 'chatting': return <Video className="w-4 h-4" />;
       default: return <Sparkles className="w-4 h-4" />;
     }
   };
@@ -90,7 +95,7 @@ export default function Creators() {
               Meet the <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F46E5] to-[#818CF8]">Creators</span>
             </h1>
             <p className="text-sm sm:text-lg text-[var(--text-muted)] max-w-2xl mx-auto leading-relaxed">
-              Connect with verified hosts, gamers, and experts. Join their live rooms or book exclusive 1-on-1 sessions.
+              Connect with verified hosts, gamers, and experts. Follow them and join their live rooms.
             </p>
           </motion.div>
         </div>
@@ -103,13 +108,14 @@ export default function Creators() {
               type="text"
               placeholder="Search creators..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              maxLength={40}
+              onChange={(e) => setParam('q', e.target.value)}
               className="w-full bg-[var(--background)] text-[var(--text-main)] pl-12 pr-4 py-3.5 rounded-full border border-[var(--border-color)] shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2),inset_-1px_-1px_3px_rgba(255,255,255,0.02)] focus:outline-none focus:border-[#4F46E5] transition-colors text-sm font-medium placeholder:text-[var(--text-muted)]"
             />
           </div>
 
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={openApplication}
             className="group w-full md:w-auto flex items-center justify-center gap-2 bg-[var(--card)] text-[var(--text-main)] px-6 py-3.5 rounded-full font-bold transition-all duration-200 active:scale-95 text-sm border border-[var(--border-color)] shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] hover:text-[#4F46E5]"
           >
             Apply to be a Creator
@@ -122,124 +128,120 @@ export default function Creators() {
           <div className="flex items-center gap-2 sm:gap-4 w-max pr-4">
             {CATEGORIES.map((category) => (
               <button
-                key={category}
-                onClick={() => setActiveCategory(category)}
+                key={category.id}
+                onClick={() => setParam('category', category.id)}
                 className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-full font-bold text-xs sm:text-sm transition-all whitespace-nowrap border ${
-                  activeCategory === category
+                  activeCategory === category.id
                     ? 'bg-[#4F46E5] text-white border-[#4F46E5] shadow-[inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)]'
                     : 'bg-[var(--card)] text-[var(--text-muted)] border-[var(--border-color)] shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.05),inset_-1px_-1px_2px_rgba(0,0,0,0.2)] hover:text-[var(--text-main)]'
                 }`}
               >
-                {getCategoryIcon(category)}
-                {category}
+                {getCategoryIcon(category.id)}
+                {category.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* CREATOR GRID */}
-        {/* 🛠️ FIX: Layout prop correctly drives the animation, but expansion is safely contained by the parent wrapper */}
-        <motion.div 
-          layout
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8 w-full"
-        >
-          <AnimatePresence>
-            {filteredCreators.map((creator, index) => (
-              <motion.div
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-                key={creator.id}
-                className="flex flex-col bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 shadow-[8px_8px_20px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] relative group"
-              >
-                {creator.isLive && (
-                  <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-red-500/10 text-red-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-red-500/20 shadow-sm z-10">
-                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
-                    Live Now
-                  </div>
-                )}
+        {isLoading ? (
+          <div className="flex justify-center py-20 w-full">
+            <Loader2 className="w-10 h-10 text-[#4F46E5] animate-spin" />
+          </div>
+        ) : (
+          <>
+            {/* CREATOR GRID */}
+            {/* 🛠️ FIX: Layout prop correctly drives the animation, but expansion is safely contained by the parent wrapper */}
+            <motion.div 
+              layout
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8 w-full"
+            >
+              <AnimatePresence>
+                {creators.map((creator, index) => (
+                  <motion.div
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.3, delay: Math.min(index % 20, 10) * 0.05 }}
+                    key={creator.username}
+                    className="flex flex-col bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 shadow-[8px_8px_20px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] relative group"
+                  >
+                    {liveUsernames.has(creator.username) && (
+                      <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-red-500/10 text-red-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-red-500/20 shadow-sm z-10">
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
+                        Live Now
+                      </div>
+                    )}
 
-                <div className="flex flex-col items-center mt-4 mb-4">
-                  <div className="relative mb-4">
-                    <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-[#4F46E5] to-[#818CF8] shadow-lg">
-                      <img 
-                        src={creator.avatar} 
-                        alt={creator.name} 
-                        className="w-full h-full rounded-full object-cover border-4 border-[var(--card)]"
-                      />
+                    <div className="flex flex-col items-center mt-4 mb-4">
+                      <div className="relative mb-4">
+                        <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-[#4F46E5] to-[#818CF8] shadow-lg">
+                          <img 
+                            src={creator.avatar_url || 'https://via.placeholder.com/150'} 
+                            alt={creator.name} 
+                            className="w-full h-full rounded-full object-cover border-4 border-[var(--card)]"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 text-xl font-black text-[var(--text-main)]">
+                        {creator.name || creator.username}
+                        {creator.verified && <BadgeCheck className="w-5 h-5 text-[#4F46E5]" />}
+                      </div>
+                      <span className="text-sm font-bold text-[var(--text-muted)] mt-1">@{creator.username}</span>
+                      <span className="text-sm font-bold text-[var(--text-muted)] mt-1">
+                        {creator.follower_count.toLocaleString()} followers{creator.category ? ` · ${creator.category}` : ''}
+                      </span>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5 text-xl font-black text-[var(--text-main)]">
-                    {creator.name}
-                    <BadgeCheck className="w-5 h-5 text-[#4F46E5]" />
-                  </div>
-                  <span className="text-sm font-bold text-[var(--text-muted)] mt-1">{creator.handle}</span>
-                </div>
 
-                <p className="text-sm text-[var(--text-muted)] text-center line-clamp-3 mb-6 flex-grow leading-relaxed">
-                  {creator.bio}
+                    <p className="text-sm text-[var(--text-muted)] text-center line-clamp-3 mb-6 flex-grow leading-relaxed">
+                      {creator.headline}
+                    </p>
+
+                    <div className="flex flex-col gap-3 mt-auto">
+                      <button
+                        onClick={() => navigate(`/user/${creator.username}`)}
+                        className="w-full py-3 px-4 rounded-xl font-bold text-[var(--text-main)] hover:bg-[var(--text-main)]/5 transition-colors text-sm border border-transparent hover:border-[var(--border-color)]"
+                      >
+                        View Profile
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
+
+            {!search.active && (
+              <PaginationLoader onLoadMore={directory.loadMore} hasMore={directory.hasMore} isLoading={directory.isLoading} />
+            )}
+
+            {!search.active && !directory.hasMore && creators.length > 0 && (
+              <p className="text-[var(--text-muted)] text-center py-6 w-full">That's everyone.</p>
+            )}
+
+            {creators.length === 0 && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col items-center justify-center py-20 opacity-50 w-full"
+              >
+                <Search className="w-12 h-12 mb-4 text-[var(--text-muted)]" />
+                <h3 className="text-xl font-bold text-[var(--text-main)] mb-2">No creators found</h3>
+                <p className="text-[var(--text-muted)] text-center">
+                  {search.active
+                    ? <>We couldn't find anyone matching "{searchQuery}".<br/>Try a different name or category.</>
+                    : 'No creators in this category yet.'}
                 </p>
-
-                <div className="flex flex-col gap-3 mt-auto">
-                  {creator.acceptingCalls ? (
-                    <button className="w-full flex items-center justify-center gap-2 bg-[#4F46E5] text-white py-3 px-4 rounded-xl font-bold transition-transform active:scale-95 text-sm shadow-[4px_4px_10px_rgba(0,0,0,0.4),-2px_-2px_6px_rgba(255,255,255,0.05),inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)] hover:shadow-[2px_2px_6px_rgba(0,0,0,0.4),-1px_-1px_4px_rgba(255,255,255,0.05),inset_1px_1px_3px_rgba(255,255,255,0.3),inset_-1px_-1px_3px_rgba(0,0,0,0.4)]">
-                      <Video className="w-4 h-4" />
-                      Request 1-on-1 • {creator.price} zCoins
-                    </button>
-                  ) : (
-                    <button className="w-full py-3 px-4 rounded-xl font-bold text-[var(--text-muted)] bg-[var(--background)] border border-[var(--border-color)] shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2),inset_-2px_-2px_4px_rgba(255,255,255,0.02)] cursor-not-allowed text-sm">
-                      Not taking calls
-                    </button>
-                  )}
-                  
-                  <button className="w-full py-3 px-4 rounded-xl font-bold text-[var(--text-main)] hover:bg-[var(--text-main)]/5 transition-colors text-sm border border-transparent hover:border-[var(--border-color)]">
-                    View Profile
-                  </button>
-                </div>
               </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
-
-        {filteredCreators.length === 0 && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-20 opacity-50 w-full"
-          >
-            <Search className="w-12 h-12 mb-4 text-[var(--text-muted)]" />
-            <h3 className="text-xl font-bold text-[var(--text-main)] mb-2">No creators found</h3>
-            <p className="text-[var(--text-muted)] text-center">We couldn't find anyone matching "{searchQuery}".<br/>Try a different name or category.</p>
-          </motion.div>
+            )}
+          </>
         )}
 
-        <AnimatePresence>
-          {isModalOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            >
-              <div className="bg-[var(--card)] p-8 rounded-[2rem] border border-[var(--border-color)] shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02)] max-w-md w-full text-center relative">
-                <Sparkles className="w-12 h-12 text-[#3B82F6] mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-[var(--text-main)] mb-2">Creator Application</h3>
-                <p className="text-[var(--text-muted)] mb-8">
-                  Your custom application form component will load here!
-                </p>
-                <button 
-                  onClick={() => setIsModalOpen(false)}
-                  className="w-full py-4 bg-[#3B82F6] hover:bg-blue-600 text-white rounded-xl font-bold active:scale-95 transition-all shadow-md shadow-blue-500/20"
-                >
-                  Close Placeholder
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <CreatorApplicationModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          username={user?.username || ''}
+        />
 
       </div>
     </div>
