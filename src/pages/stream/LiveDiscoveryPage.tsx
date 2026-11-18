@@ -45,13 +45,36 @@ const applyStreamChange = (list: StreamCard[], change: DiscoverStreamsChanged, s
   return [...next, ...added].sort((a, b) => at(a) - at(b));
 };
 
-// 🚀 CLEAN UI (For layout, cards, inputs, and tabs)
-const CLEAN_CARD = "bg-[var(--card)] rounded-[2rem] border border-[var(--border-color)] shadow-sm hover:shadow-md transition-all duration-300";
-const CLEAN_INPUT = "bg-[var(--card)] border border-[var(--border-color)] rounded-[1.25rem] text-[var(--text-main)] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all shadow-sm";
-const TAB_BUTTON = "bg-[var(--card)] border border-[var(--border-color)] rounded-full text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--background)] transition-colors shadow-sm px-5 py-2.5 whitespace-nowrap capitalize text-sm font-medium";
-const TAB_BUTTON_ACTIVE = "bg-[#3B82F6] text-white font-bold rounded-full border-none shadow-md transition-colors px-5 py-2.5 whitespace-nowrap capitalize text-sm";
+// Claymorphism primitives: soft raised surfaces, subtle edge highlights and inset controls.
+// Kept theme-aware so the same component works in light and dark mode.
+const CLEAN_CARD =
+  "bg-[var(--card)] rounded-[2rem] border border-[var(--border-color)] " +
+  "shadow-[8px_8px_18px_rgba(0,0,0,0.08),-7px_-7px_18px_rgba(255,255,255,0.72),inset_1px_1px_2px_rgba(255,255,255,0.72)] " +
+  "dark:shadow-[8px_8px_18px_rgba(0,0,0,0.34),-4px_-4px_12px_rgba(255,255,255,0.035),inset_1px_1px_2px_rgba(255,255,255,0.045)] " +
+  "transition-[box-shadow,border-color] duration-300 ease-out " +
+  "hover:shadow-[10px_12px_24px_rgba(0,0,0,0.11),-7px_-7px_18px_rgba(255,255,255,0.78),inset_1px_1px_2px_rgba(255,255,255,0.75)] " +
+  "dark:hover:shadow-[10px_12px_24px_rgba(0,0,0,0.4),-4px_-4px_12px_rgba(255,255,255,0.045),inset_1px_1px_2px_rgba(255,255,255,0.055)]";
 
-// 🚀 TRUE CLAYMORPHISM (Reserved STRICTLY for primary action buttons)
+const CLEAN_INPUT =
+  "bg-[var(--background)] border border-[var(--border-color)] rounded-[1.25rem] text-[var(--text-main)] " +
+  "shadow-[inset_3px_3px_7px_rgba(0,0,0,0.08),inset_-3px_-3px_7px_rgba(255,255,255,0.72)] " +
+  "dark:shadow-[inset_3px_3px_7px_rgba(0,0,0,0.3),inset_-2px_-2px_6px_rgba(255,255,255,0.035)] " +
+  "focus:outline-none focus:border-[#3B82F6]/70 focus:ring-2 focus:ring-[#3B82F6]/15 transition-all duration-200";
+
+const TAB_BUTTON =
+  "bg-[var(--card)] border border-[var(--border-color)] rounded-full text-[var(--text-muted)] " +
+  "shadow-[4px_4px_9px_rgba(0,0,0,0.07),-4px_-4px_9px_rgba(255,255,255,0.72),inset_1px_1px_2px_rgba(255,255,255,0.7)] " +
+  "dark:shadow-[4px_4px_9px_rgba(0,0,0,0.3),-2px_-2px_7px_rgba(255,255,255,0.03),inset_1px_1px_2px_rgba(255,255,255,0.04)] " +
+  "hover:text-[var(--text-main)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 " +
+  "px-5 py-2.5 whitespace-nowrap capitalize text-sm font-semibold";
+
+const TAB_BUTTON_ACTIVE =
+  "bg-[#3B82F6] text-white font-bold rounded-full border border-[#3B82F6]/70 " +
+  "shadow-[5px_5px_12px_rgba(59,130,246,0.28),-4px_-4px_10px_rgba(255,255,255,0.72),inset_2px_2px_4px_rgba(255,255,255,0.35),inset_-2px_-2px_4px_rgba(0,0,0,0.12)] " +
+  "dark:shadow-[5px_5px_12px_rgba(0,0,0,0.32),-3px_-3px_8px_rgba(255,255,255,0.045),inset_2px_2px_4px_rgba(255,255,255,0.22),inset_-2px_-2px_4px_rgba(0,0,0,0.2)] " +
+  "transition-all duration-200 px-5 py-2.5 whitespace-nowrap capitalize text-sm";
+
+// Legacy clay button tokens retained as comments for the disabled 1:1 section
 // const CLAY_BUTTON = "bg-[var(--card)] rounded-[1.25rem] border-none text-[var(--text-muted)] hover:text-[var(--text-main)] active:scale-95 transition-all " +
 //   "shadow-[4px_4px_10px_rgba(0,0,0,0.06),-4px_-4px_10px_rgba(255,255,255,0.9),inset_1px_1px_2px_rgba(255,255,255,0.8)] " +
 //   "dark:shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_8px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.05)]";
@@ -166,7 +189,7 @@ export const LiveDiscoveryPage: React.FC = () => {
     <div className="min-h-screen bg-[var(--background)] text-[var(--text-main)] pb-20 transition-colors duration-300 font-sans selection:bg-[#3B82F6]/30">
       
       <section className="px-4 sm:px-6 pt-8 pb-10">
-        <div className={`max-w-7xl mx-auto p-8 sm:p-12 relative overflow-hidden ${CLEAN_CARD} bg-gradient-to-br from-[var(--background)] to-[#3B82F6]/5 dark:from-[var(--card)] dark:to-[#3B82F6]/10`}>
+        <div className={`max-w-7xl mx-auto p-7 sm:p-10 md:p-12 relative overflow-hidden ${CLEAN_CARD} bg-gradient-to-br from-[var(--card)] via-[var(--card)] to-[#3B82F6]/[0.07] dark:to-[#3B82F6]/[0.12]`}>
           
           <div className="absolute -top-32 -right-32 w-80 h-80 bg-[#3B82F6]/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -189,8 +212,8 @@ export const LiveDiscoveryPage: React.FC = () => {
             <button
               onClick={() => navigate('/chat')} 
               className="group flex items-center gap-4 px-6 py-4 rounded-[1.5rem] bg-[#3B82F6] hover:brightness-110 text-white transition-all active:scale-95 border-none
-              shadow-[6px_6px_16px_rgba(59,130,246,0.3),-6px_-6px_16px_rgba(255,255,255,0.9),inset_2px_2px_6px_rgba(255,255,255,0.4),inset_-3px_-3px_6px_rgba(0,0,0,0.1)] 
-              dark:shadow-[8px_8px_20px_rgba(0,0,0,0.4),-4px_-4px_12px_rgba(255,255,255,0.03),inset_2px_2px_6px_rgba(255,255,255,0.25),inset_-3px_-3px_6px_rgba(0,0,0,0.2)]"
+              shadow-[7px_8px_16px_rgba(59,130,246,0.25),-5px_-5px_14px_rgba(255,255,255,0.78),inset_2px_2px_5px_rgba(255,255,255,0.38),inset_-2px_-2px_5px_rgba(0,0,0,0.12)]
+              dark:shadow-[7px_8px_16px_rgba(0,0,0,0.38),-3px_-3px_10px_rgba(255,255,255,0.04),inset_2px_2px_5px_rgba(255,255,255,0.22),inset_-2px_-2px_5px_rgba(0,0,0,0.2)]"
             >
               <div className="w-12 h-12 bg-white/20 rounded-[1rem] flex items-center justify-center text-2xl shadow-[inset_2px_2px_4px_rgba(255,255,255,0.3)] group-hover:rotate-12 transition-transform">
                 🎲
@@ -244,15 +267,15 @@ export const LiveDiscoveryPage: React.FC = () => {
             {/* --- Section: Live Streams --- */}
             <section>
               <div className="flex items-center gap-3 mb-6 px-2">
-                <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center shadow-inner">
+                <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center shadow-[inset_2px_2px_5px_rgba(0,0,0,0.08),inset_-2px_-2px_5px_rgba(255,255,255,0.55)] dark:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.22),inset_-1px_-1px_4px_rgba(255,255,255,0.035)]">
                   <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
                 </div>
                 <h2 className="text-xl font-bold text-[var(--text-main)]">Live Broadcasts</h2>
-                <span className="px-3 py-1 rounded-full bg-[var(--card)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-muted)] shadow-sm">{displayedStreams.length}</span>
+                <span className="px-3 py-1 rounded-full bg-[var(--card)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-muted)] rounded-full shadow-[3px_3px_7px_rgba(0,0,0,0.07),-3px_-3px_7px_rgba(255,255,255,0.65)] dark:shadow-[3px_3px_7px_rgba(0,0,0,0.28),-2px_-2px_6px_rgba(255,255,255,0.03)]">{displayedStreams.length}</span>
               </div>
 
               {displayedStreams.length === 0 ? (
-                <div className="py-20 text-center bg-[var(--background)] border border-[var(--border-color)] border-dashed rounded-[2rem] flex flex-col items-center justify-center">
+                <div className="py-20 text-center bg-[var(--background)] border border-[var(--border-color)] border-dashed rounded-[2rem] flex flex-col items-center justify-center shadow-[inset_4px_4px_10px_rgba(0,0,0,0.055),inset_-4px_-4px_10px_rgba(255,255,255,0.68)] dark:shadow-[inset_4px_4px_10px_rgba(0,0,0,0.24),inset_-3px_-3px_8px_rgba(255,255,255,0.025)]">
                   <Play className="w-10 h-10 text-[var(--text-muted)] mb-3 opacity-50" />
                   <p className="text-[var(--text-muted)] font-medium">No active broadcasts match your search.</p>
                 </div>
@@ -264,7 +287,7 @@ export const LiveDiscoveryPage: React.FC = () => {
                       onClick={() => stream.is_premium
                         ? handleProtectedAction(`/live/${stream.stream_id}`)
                         : navigate(`/live/${stream.stream_id}`)} 
-                      className={`group cursor-pointer flex flex-col overflow-hidden ${CLEAN_CARD} hover:-translate-y-1`}
+                      className={`group cursor-pointer flex flex-col overflow-hidden ${CLEAN_CARD}`}
                     >
                       <div className="relative aspect-video w-full bg-black overflow-hidden rounded-t-[1.9rem]">
                         <div className="absolute inset-0 bg-gradient-to-br from-[#3B82F6]/20 to-black overflow-hidden">
@@ -292,7 +315,7 @@ export const LiveDiscoveryPage: React.FC = () => {
                           <img
                             src={stream.avatar_url || 'https://via.placeholder.com/150'}
                             alt={stream.name}
-                            className="w-12 h-12 rounded-xl object-cover shadow-sm border border-[var(--border-color)]"
+                            className="w-12 h-12 rounded-xl object-cover border border-[var(--border-color)] shadow-[3px_3px_7px_rgba(0,0,0,0.12),-2px_-2px_6px_rgba(255,255,255,0.5)] dark:shadow-[3px_3px_7px_rgba(0,0,0,0.3),-1px_-1px_5px_rgba(255,255,255,0.035)]"
                           />
                           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-[var(--card)]" />
                         </div>
@@ -323,11 +346,11 @@ export const LiveDiscoveryPage: React.FC = () => {
             {displayedUpcomingStreams.length > 0 && (
               <section>
                 <div className="flex items-center gap-3 mb-6 px-2">
-                  <div className="w-10 h-10 rounded-xl bg-[#3B82F6]/10 flex items-center justify-center shadow-inner text-[#3B82F6]">
+                  <div className="w-10 h-10 rounded-xl bg-[#3B82F6]/10 flex items-center justify-center shadow-[inset_2px_2px_5px_rgba(0,0,0,0.07),inset_-2px_-2px_5px_rgba(255,255,255,0.6)] dark:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2),inset_-1px_-1px_4px_rgba(255,255,255,0.035)] text-[#3B82F6]">
                     <CalendarClock className="w-5 h-5" />
                   </div>
                   <h2 className="text-xl font-bold text-[var(--text-main)]">Upcoming Broadcasts</h2>
-                  <span className="px-3 py-1 rounded-full bg-[var(--card)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-muted)] shadow-sm">{displayedUpcomingStreams.length}</span>
+                  <span className="px-3 py-1 rounded-full bg-[var(--card)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-muted)] rounded-full shadow-[3px_3px_7px_rgba(0,0,0,0.07),-3px_-3px_7px_rgba(255,255,255,0.65)] dark:shadow-[3px_3px_7px_rgba(0,0,0,0.28),-2px_-2px_6px_rgba(255,255,255,0.03)]">{displayedUpcomingStreams.length}</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -335,7 +358,7 @@ export const LiveDiscoveryPage: React.FC = () => {
                     <div
                       key={stream.stream_id}
                       onClick={() => navigate(`/user/${stream.username}`)}
-                      className={`group cursor-pointer flex flex-col overflow-hidden ${CLEAN_CARD} hover:-translate-y-1`}
+                      className={`group cursor-pointer flex flex-col overflow-hidden ${CLEAN_CARD}`}
                     >
                       <div className="relative aspect-video w-full bg-black overflow-hidden rounded-t-[1.9rem]">
                         <img
@@ -352,7 +375,7 @@ export const LiveDiscoveryPage: React.FC = () => {
                         <img
                           src={stream.avatar_url || 'https://via.placeholder.com/150'}
                           alt={stream.name}
-                          className="w-12 h-12 rounded-xl object-cover shadow-sm border border-[var(--border-color)]"
+                          className="w-12 h-12 rounded-xl object-cover border border-[var(--border-color)] shadow-[3px_3px_7px_rgba(0,0,0,0.12),-2px_-2px_6px_rgba(255,255,255,0.5)] dark:shadow-[3px_3px_7px_rgba(0,0,0,0.3),-1px_-1px_5px_rgba(255,255,255,0.035)]"
                         />
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-bold text-[var(--text-main)] truncate group-hover:text-[#3B82F6] transition-colors">{stream.title}</h3>
@@ -373,7 +396,7 @@ export const LiveDiscoveryPage: React.FC = () => {
             {displayedCreators.length > 0 && (
               <section>
                 <div className="flex items-center gap-3 mb-6 px-2">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shadow-inner text-amber-500">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shadow-[inset_2px_2px_5px_rgba(0,0,0,0.07),inset_-2px_-2px_5px_rgba(255,255,255,0.6)] dark:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2),inset_-1px_-1px_4px_rgba(255,255,255,0.035)] text-amber-500">
                     🌟
                   </div>
                   <h2 className="text-xl font-bold text-[var(--text-main)]">Rising Creators</h2>
@@ -387,7 +410,7 @@ export const LiveDiscoveryPage: React.FC = () => {
                     <div
                       key={creator.username}
                       onClick={() => navigate(`/user/${creator.username}`)} 
-                      className={`group cursor-pointer p-6 flex flex-col justify-between ${CLEAN_CARD} hover:-translate-y-1`}
+                      className={`group cursor-pointer p-6 flex flex-col justify-between ${CLEAN_CARD}`}
                     >
                       <div>
                         <div className="flex items-center gap-4">
@@ -411,7 +434,7 @@ export const LiveDiscoveryPage: React.FC = () => {
 
                       <div className="mt-6 flex items-center justify-between pt-5 border-t border-[var(--border-color)]">
                         <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-muted)]">
-                          <div className="w-6 h-6 rounded-lg bg-[var(--background)] border border-[var(--border-color)] flex items-center justify-center shadow-sm">
+                          <div className="w-6 h-6 rounded-lg bg-[var(--background)] border border-[var(--border-color)] flex items-center justify-center shadow-[inset_1px_1px_2px_rgba(255,255,255,0.65),2px_2px_5px_rgba(0,0,0,0.06)] dark:shadow-[inset_1px_1px_2px_rgba(255,255,255,0.04),2px_2px_5px_rgba(0,0,0,0.25)]">
                             <Users className="w-3.5 h-3.5" />
                           </div>
                           {creator.follower_count.toLocaleString()}
@@ -448,7 +471,7 @@ export const LiveDiscoveryPage: React.FC = () => {
                             <img
                               src={creator.avatar}
                               alt={creator.name}
-                              className="w-14 h-14 rounded-2xl object-cover shadow-sm border border-[var(--border-color)]"
+                              className="w-14 h-14 rounded-2xl object-cover border border-[var(--border-color)] shadow-[3px_3px_7px_rgba(0,0,0,0.12),-2px_-2px_6px_rgba(255,255,255,0.5)] dark:shadow-[3px_3px_7px_rgba(0,0,0,0.3),-1px_-1px_5px_rgba(255,255,255,0.035)]"
                             />
                             {creator.isLive && (
                               <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-[var(--card)] rounded-full"></span>

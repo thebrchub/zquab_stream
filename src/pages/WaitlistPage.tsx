@@ -8,12 +8,12 @@ import {
   Check,
   CheckCircle2,
   Globe,
-  Loader2,
   LogIn,
   Radio,
   ShieldCheck,
   Users,
   Video,
+  Loader2
 } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
@@ -78,8 +78,9 @@ export default function WaitlistPage() {
 
   const [links, setLinks] = useState<SocialLinks>(initialLinks);
   const [error, setError] = useState('');
-  const [isApplying, setIsApplying] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  // The waitlist API is not connected yet, so submission cannot enter a loading/success state.
+  const isApplying = false;
+  const submitted = false;
 
   const filledLinks = Object.values(links).filter(
     (value) => value.trim().length > 0

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import { StreamChatSidebar } from '../../components/stream/StreamChatSidebar'; 
 import { useStreamEntry } from '../../hooks/useStreamEntry';
 import { useLiveStreamRoom } from '../../hooks/useLiveStreamRoom';
@@ -10,11 +10,10 @@ import { NativeStreamPlayer } from '../../components/stream/NativeStreamPlayer';
 import { FollowButton, type FollowState } from '../../components/stream/FollowButton';
 import { streamService, type StreamMetadata } from '../../services/streamService';
 import { creatorService, type CreatorProfile } from '../../services/creatorService';
-import { StreamSettingsMenu } from '../../components/stream/StreamSettingsMenu';
 import { 
   Loader2, AlertCircle, ArrowLeft, 
-  Eye, Share2, Activity, StopCircle, BadgeCheck,
-  Play, Pause, Volume1, Volume2, VolumeX, Settings, Maximize, Minimize, MessageSquare,
+  Eye, Share2, Copy, Activity, StopCircle, BadgeCheck,
+  Play, Pause, Volume1, Volume2, VolumeX, Flag, PictureInPicture2, Maximize, Minimize, MessageSquare,
   X, Users, Lock, Coins, LogIn
 } from 'lucide-react';
 import { StreamOverlayAd } from '../../components/stream/StreamOverlayAd';
@@ -52,10 +51,9 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const [isAtLiveEdge, setIsAtLiveEdge] = useState(true);
   const [isUserActive, setIsUserActive] = useState(true);
   
-  // 🛠️ Settings Menu State
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [streamQuality, setStreamQuality] = useState('Auto');
-  const [isLowLatency, setIsLowLatency] = useState(true);
+  // Playback defaults retained while the settings modal is removed from the viewer UI.
+  const streamQuality = 'Auto';
+  const isLowLatency = true;
 
   const [stream, setStream] = useState<StreamMetadata | null>(null);
   const [isLoadingStream, setIsLoadingStream] = useState(true);
@@ -201,6 +199,13 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
     linkUrl: string;
   } | null>(null);
 
+  // Report dialog UI state. Submission is intentionally not wired to an API here.
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
+
   // Listen for Overlay Ad trigger
   useEffect(() => {
     const handleOverlayAdTrigger = (e: any) => {
@@ -209,6 +214,35 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
     window.addEventListener('dev_overlay_ad_triggered', handleOverlayAdTrigger);
     return () => window.removeEventListener('dev_overlay_ad_triggered', handleOverlayAdTrigger);
   }, []);
+
+  useEffect(() => {
+    if (!isReportOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsReportOpen(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isReportOpen]);
+
+  useEffect(() => {
+    if (!isShareMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(event.target as Node)) {
+        setIsShareMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsShareMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [isShareMenuOpen]);
 
   const { balanceCoins, openPurchaseModal } = useWallet();
   const {
@@ -272,9 +306,9 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
   const needsCoins = isPaywall || balanceCoins < unlockPrice;
 
   // 🛠️ Keep UI visible if the settings menu is open
-  const showMobileUI = isChatCollapsed || isUserActive || !isPlaying || showProfileOverlay || isSettingsOpen;
+  const showMobileUI = isChatCollapsed || isUserActive || !isPlaying || showProfileOverlay;
   // Desktop bar hides after 3s without mouse movement, unless the mouse rests on the bar itself.
-  const showDesktopUI = (isHoveringPlayer && (isUserActive || isOverControls)) || !isPlaying || showProfileOverlay || isSettingsOpen;
+  const showDesktopUI = (isHoveringPlayer && (isUserActive || isOverControls)) || !isPlaying || showProfileOverlay;
   const uiVisibilityClasses = `transition-opacity duration-300 pointer-events-none ${showMobileUI ? 'opacity-100' : 'opacity-0'} ${showDesktopUI ? 'lg:opacity-100' : 'lg:opacity-0'}`;
   const hideCursor = isFullscreen && !showDesktopUI;
 
@@ -286,13 +320,33 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
     }
   };
 
-  const handleShare = async () => {
-    const shareData = { title: stream.title, url: window.location.href };
-    if (navigator.share) {
-      await navigator.share(shareData);
+  const handleCopyStreamLink = async () => {
+    const url = window.location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Stream link copied!');
+      setIsShareMenuOpen(false);
+    } catch {
+      toast.error('Could not copy the link. Please copy the URL from your browser.');
+    }
+  };
+
+  const handleNativeShare = async () => {
+    const shareData = { title: stream.title, text: `Watch ${stream.title} on zQuab`, url: window.location.href };
+    if (!navigator.share) {
+      await handleCopyStreamLink();
       return;
     }
-    await navigator.clipboard.writeText(shareData.url);
+
+    try {
+      await navigator.share(shareData);
+      setIsShareMenuOpen(false);
+    } catch (error) {
+      // Closing the native share sheet is not an application error.
+      if (error instanceof Error && error.name !== 'AbortError') {
+        toast.error('Unable to open sharing options.');
+      }
+    }
   };
 
   return (
@@ -314,7 +368,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
         onTouchStart={handleInteraction}
         onClick={() => {
           const isMobile = window.innerWidth < 1024;
-          const areControlsHidden = !isChatCollapsed && !isUserActive && isPlaying && !showProfileOverlay && !isSettingsOpen;
+          const areControlsHidden = !isChatCollapsed && !isUserActive && isPlaying && !showProfileOverlay;
           
           handleInteraction();
           
@@ -547,22 +601,96 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {role === 'viewer' ? (
-                <>
-                  <FollowButton
-                    username={creator.username}
-                    creatorName={creator.name}
-                    state={followState}
-                    onChange={handleFollowChange}
-                    isGuest={isGuest}
-                    onLoginClick={goToLogin}
-                  />
-                  <button onClick={handleShare} className="hidden lg:block p-2 rounded-md bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-colors" title="Share stream"><Share2 className="w-4 h-4" /></button>
-                </>
-              ) : (
-                <div className="flex items-center gap-2 backdrop-blur-md bg-black/40 p-1 lg:p-1.5 rounded-lg border border-white/10">
-                  <button className="flex items-center gap-1.5 px-2 py-1 lg:px-3 lg:py-1.5 rounded-md hover:bg-white/10 text-xs lg:text-sm font-semibold text-gray-200 transition-colors"><Activity className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-emerald-400" /> Dashboard</button>
-                  <button className="flex items-center gap-1.5 px-2 py-1 lg:px-3 lg:py-1.5 rounded-md bg-red-600 hover:bg-red-500 text-xs lg:text-sm font-semibold text-white transition-colors"><StopCircle className="w-3.5 h-3.5 lg:w-4 lg:h-4" /> End</button>
+              {role === 'viewer' && (
+                <FollowButton
+                  username={creator.username}
+                  creatorName={creator.name}
+                  state={followState}
+                  onChange={handleFollowChange}
+                  isGuest={isGuest}
+                  onLoginClick={goToLogin}
+                />
+              )}
+
+              {(role === 'viewer' || role === 'creator') && (
+                <div ref={shareMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsShareMenuOpen((open) => !open);
+                    }}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.08] text-white shadow-[inset_1px_1px_2px_rgba(255,255,255,0.06),0_4px_12px_rgba(0,0,0,0.22)] backdrop-blur-md transition-colors duration-200 hover:border-indigo-400/30 hover:bg-indigo-400/15 hover:text-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70"
+                    title="Share stream"
+                    aria-label="Share stream"
+                    aria-expanded={isShareMenuOpen}
+                    aria-haspopup="menu"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </button>
+
+                  {isShareMenuOpen && (
+                    <div
+                      role="menu"
+                      aria-label="Share stream options"
+                      className="absolute bottom-full right-0 z-[100] mb-2 w-56 origin-bottom-right rounded-2xl border border-white/10 bg-[#19191d]/95 p-2 shadow-[0_18px_50px_rgba(0,0,0,0.55),inset_1px_1px_2px_rgba(255,255,255,0.05)] backdrop-blur-2xl"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="px-3 pb-2 pt-1">
+                        <p className="text-xs font-bold text-white">Share this stream</p>
+                        <p className="mt-0.5 text-[11px] text-zinc-500">Invite others to watch live</p>
+                      </div>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={handleCopyStreamLink}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-zinc-200 transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70"
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-400/15 bg-indigo-400/10 text-indigo-300">
+                          <Copy className="h-4 w-4" />
+                        </span>
+                        <span>Copy link</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={handleNativeShare}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-zinc-200 transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70"
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-400/15 bg-emerald-400/10 text-emerald-300">
+                          <Share2 className="h-4 w-4" />
+                        </span>
+                        <span>Share with others</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {role === 'creator' && (
+                <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-zinc-950/75 p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/creator/dashboard');
+                    }}
+                    className="group inline-flex min-h-9 items-center gap-2 rounded-lg border border-emerald-400/15 bg-emerald-400/[0.08] px-3 py-1.5 text-xs font-semibold text-zinc-100 transition-colors duration-200 hover:border-emerald-400/30 hover:bg-emerald-400/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                    title="Open creator dashboard"
+                    aria-label="Open creator dashboard"
+                  >
+                    <Activity className="h-4 w-4 text-emerald-400 transition-transform duration-200 group-hover:scale-110" />
+                    <span>Dashboard</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-200 hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                    title="End stream"
+                    aria-label="End stream"
+                  >
+                    <StopCircle className="h-4 w-4" />
+                    <span>End</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -605,14 +733,20 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                 </div>
               </div>
               
-              <button 
+              <button
+                type="button"
                 onClick={!isAtLiveEdge ? seekToLive : undefined}
-                className={`flex items-center gap-1.5 ml-1 lg:ml-2 transition-all duration-300 ${
-                  isAtLiveEdge 
-                    ? 'cursor-default' 
-                    : 'cursor-pointer px-2 py-1 bg-white/10 hover:bg-white/20 rounded-md border border-white/10 backdrop-blur-sm shadow-sm'
-                }`}
+                disabled={isAtLiveEdge}
+                className={`ml-1 lg:ml-2 inline-flex items-center gap-1.5 rounded-md border border-transparent px-2 py-1
+                  outline-none transition-colors duration-200
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black
+                  ${
+                    isAtLiveEdge
+                      ? 'cursor-default'
+                      : 'cursor-pointer bg-white/10 hover:bg-white/20 active:bg-white/15'
+                  }`}
                 title={isAtLiveEdge ? "At live edge" : "Click to catch up to live"}
+                aria-label={isAtLiveEdge ? "At live edge" : "Go to live"}
               >
                 {isAtLiveEdge ? (
                   <>
@@ -653,27 +787,34 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                 </button>
               )}
 
-              {/* 🛠️ Integrated StreamSettingsMenu Component */}
-              <div className="relative flex items-center h-full">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setIsSettingsOpen(!isSettingsOpen); }} 
-                  className={`p-1 rounded transition-colors text-white ${isSettingsOpen ? 'bg-white/20' : 'hover:bg-white/20'}`}
-                >
-                  <Settings className="w-4 h-4 lg:w-5 lg:h-5" />
-                </button>
+              {/* Focused timeline actions: report and picture-in-picture only */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setReportReason('');
+                  setReportDetails('');
+                  setIsReportOpen(true);
+                }}
+                className="p-1.5 rounded-md text-white/85 hover:text-white hover:bg-white/15 transition-colors"
+                title="Report stream"
+                aria-label="Report stream"
+              >
+                <Flag className="w-4 h-4 lg:w-5 lg:h-5" />
+              </button>
 
-                <StreamSettingsMenu 
-                  isOpen={isSettingsOpen}
-                  onClose={() => setIsSettingsOpen(false)}
-                  quality={streamQuality}
-                  setQuality={setStreamQuality}
-                  isLowLatency={isLowLatency}
-                  setIsLowLatency={setIsLowLatency}
-                  onPiP={handleTogglePiP}
-                  onReport={() => alert("Report dialog opened. Trust & Safety team notified.")}
-                  // onBlock={() => alert("Creator blocked. They will be hidden from your feed.")}
-                />
-              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleTogglePiP();
+                }}
+                className="p-1.5 rounded-md text-white/85 hover:text-white hover:bg-white/15 transition-colors"
+                title="Picture-in-Picture"
+                aria-label="Picture-in-Picture"
+              >
+                <PictureInPicture2 className="w-4 h-4 lg:w-5 lg:h-5" />
+              </button>
 
               <button onClick={toggleFullscreen} className="p-1 hover:bg-white/20 rounded transition-colors text-white">
                 {isFullscreen ? <Minimize className="w-4 h-4 lg:w-5 lg:h-5" /> : <Maximize className="w-4 h-4 lg:w-5 lg:h-5" />}
@@ -681,6 +822,140 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Responsive report dialog */}
+        {isReportOpen && (
+          <div
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/75 p-0 backdrop-blur-md sm:items-center sm:p-5"
+            role="presentation"
+            onClick={() => setIsReportOpen(false)}
+          >
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="report-stream-title"
+              aria-describedby="report-stream-description"
+              onClick={(e) => e.stopPropagation()}
+              className="flex max-h-[calc(100dvh-12px)] w-full flex-col overflow-hidden rounded-t-[1.6rem] border border-white/10 bg-[#171719] shadow-[0_24px_80px_rgba(0,0,0,0.6),inset_1px_1px_2px_rgba(255,255,255,0.05)] sm:max-h-[88dvh] sm:max-w-lg sm:rounded-[1.6rem]"
+            >
+              {/* Mobile grabber + fixed header */}
+              <div className="shrink-0 px-5 pb-4 pt-3 sm:px-6 sm:pt-6">
+                <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20 sm:hidden" />
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-red-400/20 bg-red-500/10 text-red-400 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.25)]">
+                      <Flag className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 pt-0.5">
+                      <h2 id="report-stream-title" className="text-base font-bold text-white sm:text-xl">
+                        Report this stream
+                      </h2>
+                      <p id="report-stream-description" className="mt-1 text-xs leading-relaxed text-zinc-400 sm:text-sm">
+                        Tell us what’s wrong so our team can review it.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsReportOpen(false)}
+                    className="shrink-0 rounded-full p-2 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close report dialog"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              <form
+                className="flex min-h-0 flex-1 flex-col"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!reportReason) return;
+                  setIsReportOpen(false);
+                  window.alert('The report form is ready, but report submission is not connected to the backend yet.');
+                }}
+              >
+                {/* Scrollable form content */}
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 sm:px-6">
+                  <fieldset>
+                    <legend className="mb-3 text-sm font-semibold text-zinc-200">
+                      Select a reason
+                    </legend>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {[
+                        'Harassment or bullying',
+                        'Hate speech',
+                        'Sexual or nudity content',
+                        'Violence or dangerous acts',
+                        'Spam, scam or misleading content',
+                        'Copyright infringement',
+                        'Underage user safety',
+                        'Something else',
+                      ].map((reason) => (
+                        <label
+                          key={reason}
+                          className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-[13px] transition-colors sm:text-sm ${
+                            reportReason === reason
+                              ? 'border-indigo-400/60 bg-indigo-500/10 text-white'
+                              : 'border-white/10 bg-black/20 text-zinc-300 hover:border-white/20 hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="report-reason"
+                            value={reason}
+                            checked={reportReason === reason}
+                            onChange={() => setReportReason(reason)}
+                            className="h-4 w-4 shrink-0 accent-indigo-500"
+                          />
+                          <span>{reason}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  <div className="mt-4">
+                    <label htmlFor="report-details" className="mb-2 block text-sm font-semibold text-zinc-200">
+                      More details <span className="font-normal text-zinc-500">(optional)</span>
+                    </label>
+                    <textarea
+                      id="report-details"
+                      value={reportDetails}
+                      onChange={(e) => setReportDetails(e.target.value.slice(0, 500))}
+                      placeholder="Add context to help us review…"
+                      rows={3}
+                      className="w-full resize-y rounded-xl border border-white/10 bg-black/25 px-3.5 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-indigo-400/60 focus:ring-2 focus:ring-indigo-500/15"
+                    />
+                    <p className="mt-1 text-right text-[11px] text-zinc-500">{reportDetails.length}/500</p>
+                  </div>
+                </div>
+
+                {/* Fixed action area stays visible on short screens */}
+                <div className="shrink-0 border-t border-white/[0.07] bg-[#171719] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-6">
+                  <p className="mb-3 text-[11px] leading-relaxed text-zinc-500">
+                    Reports are reviewed by our team. Please only submit accurate information.
+                  </p>
+                  <div className="flex flex-row gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsReportOpen(false)}
+                      className="min-h-11 flex-1 rounded-xl border border-white/10 px-4 text-sm font-semibold text-zinc-300 transition hover:bg-white/5"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!reportReason}
+                      className="min-h-11 flex-[1.35] rounded-xl bg-red-600 px-4 text-sm font-bold text-white shadow-[0_5px_16px_rgba(220,38,38,0.2)] transition hover:bg-red-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Submit report
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </section>
+          </div>
+        )}
       </div>
 
       {/* --- RIGHT COLUMN: Chat Sidebar --- */}

@@ -12,7 +12,7 @@ import {
   Loader2, Save, User, AtSign, AlignLeft, 
   Users, MessageSquare, Edit2, X, MapPin, Activity,
   LogOut, UserPlus, Search, Check, Share2, CheckCircle2, Lock, RefreshCw, ChevronDown,
-  Video, Star, Clock, Plus 
+  Video, Star, Clock, Plus, History 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createAvatar } from '@dicebear/core';
@@ -80,7 +80,7 @@ export default function Profile() {
   const [offset, setOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   // "Find people" searches everyone or only your friends (name or username).
-  const [searchScope, setSearchScope] = useState<'everyone' | 'friends'>('everyone');
+  const [searchScope] = useState<'everyone' | 'friends'>('everyone');
   const peopleSearch = useDebouncedSearch(
     searchQuery,
     activeTab === 'search' && !authUser?.is_guest
@@ -558,9 +558,27 @@ export default function Profile() {
                   <p className="mt-1 text-sm font-medium text-[var(--text-muted)] drop-shadow-sm">@{username || 'choose_username'}</p>
                 </div>
 
-                <button onClick={openPurchaseModal} className="mb-5 inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3.5 py-2 text-amber-300 transition-all hover:border-amber-400/40 hover:bg-amber-500/15 active:scale-95 shadow-[4px_4px_10px_rgba(0,0,0,0.2),-1px_-1px_3px_rgba(255,255,255,0.02)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]">
-                  <span className="text-base drop-shadow-sm">🪙</span><span className="text-sm font-black text-amber-700 drop-shadow-sm">{balanceCoins?.toLocaleString() || 0} zCoins</span><span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-amber-950 shadow-inner"><Plus className="h-3 w-3" /></span>
-                </button>
+                <div className="mb-5 flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+                  <button
+                    type="button"
+                    onClick={openPurchaseModal}
+                    className="inline-flex w-fit items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3.5 py-2 text-amber-300 transition-all hover:border-amber-400/40 hover:bg-amber-500/15 active:scale-[0.98] shadow-[4px_4px_10px_rgba(0,0,0,0.2),-1px_-1px_3px_rgba(255,255,255,0.02)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]"
+                  >
+                    <span className="text-base drop-shadow-sm">🪙</span>
+                    <span className="text-sm font-black text-amber-700 drop-shadow-sm">{balanceCoins?.toLocaleString() || 0} zCoins</span>
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-amber-950 shadow-inner"><Plus className="h-3 w-3" /></span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate('/wallet/history')}
+                    aria-label="View transaction history"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--card)] px-3.5 py-2.5 text-sm font-bold text-[var(--text-main)] shadow-[3px_3px_8px_rgba(0,0,0,0.22),-2px_-2px_6px_rgba(255,255,255,0.025),inset_1px_1px_2px_rgba(255,255,255,0.035)] transition-all duration-200 hover:border-blue-400/40 hover:text-blue-400 active:translate-y-px active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.25)] sm:w-fit sm:justify-start"
+                  >
+                    <History className="h-4 w-4 shrink-0" />
+                    Transaction history
+                  </button>
+                </div>
 
                 <div className="mb-5 grid grid-cols-2 gap-2.5">
                   {country && <div className="flex min-w-0 items-center gap-2 rounded-[1.25rem] border border-[var(--border-color)] bg-[var(--card)] px-3 py-2.5 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.4),inset_-1px_-1px_3px_rgba(255,255,255,0.02)]"><MapPin className="h-4 w-4 shrink-0 text-blue-400" /><span className="truncate text-xs font-bold text-[var(--text-main)] drop-shadow-sm">{country}</span></div>}
