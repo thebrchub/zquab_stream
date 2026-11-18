@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
 import protobuf from 'protobufjs';
 import { useAuth } from './AuthContext';
+import { apiClient, API_HOST } from '../api/client';
 import { wsConnection } from '../utils/wsConnection';
 import chatProtoSrc from '../proto/chat.proto?raw';
 import eventsProtoSrc from '../proto/events.proto?raw';
@@ -172,9 +173,26 @@ const RECONNECT_MIN_MS = 500;
 // A connection that stayed open this long counts as healthy: the next drop
 // starts again from the shortest wait.
 const CONNECTION_STABLE_MS = 10_000;
+// The browser hides why a connect failed (a 401 just looks like a close). After
+// this many connects in a row that never opened, ask the API whether the login
+// still works: if it doesn't, stop instead of retrying forever.
+const FAILED_OPENS_BEFORE_CHECK = 3;
+// Still failing after this many (the login is fine but the server keeps
+// refusing this tab — longer than any restart takes): wait up to 5 minutes.
+const FAILED_OPENS_BEFORE_SLOW = 10;
+const RECONNECT_SLOW_MAX_MS = 5 * 60_000;
 
-const reconnectDelay = (attempt: number) =>
-  RECONNECT_MIN_MS + Math.random() * Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** attempt);
+const reconnectDelay = (attempt: number, slow: boolean) =>
+  RECONNECT_MIN_MS + Math.random() * Math.min(slow ? RECONNECT_SLOW_MAX_MS : RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** attempt);
+
+// The socket talks to the same server as the API (so it carries the same login
+// cookie): VITE_WS_BASE_URL if set, else the API host with http(s) -> ws(s),
+// else the production API.
+const wsBase = () => {
+  if (import.meta.env.VITE_WS_BASE_URL) return import.meta.env.VITE_WS_BASE_URL;
+  if (API_HOST) return API_HOST.replace(/^http/, 'ws');
+  return 'wss://aarpaar-api.brchub.tech';
+};
 
 interface WebSocketContextType {
   isConnected: boolean;
@@ -192,16 +210,20 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   // server refuses /ws without a login, so trying would just fail forever. The
   // socket is logged in as whoever the cookie was for when it opened, so a
   // login switch closes it and opens a new one.
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: isAuthLoading, clearSession } = useAuth();
   const userKey = user ? `${user.user_id}:${user.is_guest}` : '';
+  const clearSessionRef = useRef(clearSession);
+  useLayoutEffect(() => {
+    clearSessionRef.current = clearSession;
+  });
 
   useEffect(() => {
     if (isAuthLoading || !userKey) return;
 
-    const WS_BASE = import.meta.env.VITE_WS_BASE_URL ?? 'wss://aarpaar-api.brchub.tech';
-    const wsUrl = `${WS_BASE}/ws`;
+    const wsUrl = `${wsBase()}/ws`;
     let stopped = false;
     let attempt = 0;
+    let failedOpens = 0;
     let openedAt = 0;
     let timer: number | null = null;
     let current: WebSocket | null = null;
@@ -249,12 +271,35 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         wsConnection.detach(ws);
         setIsConnected(false);
         if (stopped) return;
+        failedOpens = openedAt ? 0 : failedOpens + 1;
         if (openedAt && Date.now() - openedAt >= CONNECTION_STABLE_MS) attempt = 0;
         openedAt = 0;
-        const delay = reconnectDelay(attempt);
+        const delay = reconnectDelay(attempt, failedOpens >= FAILED_OPENS_BEFORE_SLOW);
         attempt += 1;
-        console.log(`WebSocket disconnected. Reconnecting in ${Math.round(delay / 100) / 10}s...`);
-        timer = window.setTimeout(open, delay);
+        const retry = () => {
+          if (stopped) return;
+          console.log(`WebSocket disconnected. Reconnecting in ${Math.round(delay / 100) / 10}s...`);
+          timer = window.setTimeout(open, delay);
+        };
+        if (failedOpens !== FAILED_OPENS_BEFORE_CHECK) {
+          retry();
+          return;
+        }
+        // 401 = the login is gone (expired or missing): stop and log out
+        // locally. 200 / 403 (a guest) = the login works; a network error =
+        // the server is down. Either way keep retrying.
+        apiClient.get('/users/me')
+          .then(retry)
+          .catch((err: { status?: number }) => {
+            if (stopped) return;
+            if (err?.status === 401) {
+              stopped = true;
+              console.log('WebSocket: login expired, not reconnecting.');
+              clearSessionRef.current();
+              return;
+            }
+            retry();
+          });
       };
 
       ws.onerror = () => {

@@ -21,6 +21,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   devMockLogin: () => void; 
   refreshSession: () => Promise<void>; // 🛠️ NEW: Expose this to your apps
+  // Forget the login without calling the server (it already said the session is gone).
+  clearSession: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -93,12 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const clearSession = () => setUser(null);
+
   useEffect(() => {
     refreshSession().finally(() => setIsLoading(false));
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, sessionError, loginAsGuest, logout, devMockLogin, refreshSession }}>
+    <AuthContext.Provider value={{ user, isLoading, sessionError, loginAsGuest, logout, devMockLogin, refreshSession, clearSession }}>
       {children}
     </AuthContext.Provider>
   );
