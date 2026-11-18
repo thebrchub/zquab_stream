@@ -61,22 +61,7 @@ export default function UserProfile() {
   const upcomingLoadingRef = useRef(false);
   const upcomingOffsetRef = useRef(0);
   const isCreator = Boolean(profile?.is_creator);
-
-  useEffect(() => {
-    setCreatorProfile(null);
-    if (!isCreator || !username) return;
-    let active = true;
-    creatorService.getProfile(username)
-      .then((cp) => {
-        if (!active) return;
-        setCreatorProfile(cp);
-        setFollowState({ isFollowing: cp.is_following, liveAlerts: cp.live_alerts ?? true });
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [isCreator, username]);
+  const isMember = Boolean(user && !user.is_guest);
 
   const loadUpcoming = useCallback(async (reset: boolean) => {
     if (!username || (upcomingLoadingRef.current && !reset)) return;
@@ -137,19 +122,47 @@ export default function UserProfile() {
         setLoading(true);
         setError(null);
 
-        const [profileData, friendsData] = await Promise.all([
-          usersApi.getUserProfile(username),
+        // The card is the same for everyone (edge-cached); the relation
+        // (friend / follow / blocked) is only this viewer's and needs login.
+        const [card, relation, friendsData] = await Promise.all([
+          usersApi.getProfileCard(username),
+          isMember ? usersApi.getRelation(username).catch(() => null) : Promise.resolve(null),
           usersApi.getUserFriends(username).catch(() => []),
         ]);
 
         if (!active) return;
 
-        setProfile(profileData);
+        if (relation?.blocked) {
+          setError('User not found');
+          setProfile(null);
+          setCreatorProfile(null);
+          return;
+        }
+        setProfile({ ...card, friend_request_status: relation?.friend_request_status });
         setFriendsList(friendsData);
+        if (card.is_creator) {
+          setCreatorProfile({
+            username: card.username,
+            name: card.name,
+            avatar_url: card.avatar_url,
+            category: card.category,
+            headline: card.headline,
+            verified: card.verified,
+            follower_count: card.follower_count,
+            stream_count: card.stream_count,
+            is_following: relation?.is_following ?? false,
+            live_alerts: relation?.live_alerts ?? false,
+            live_stream: card.live_stream,
+          });
+          setFollowState({ isFollowing: relation?.is_following ?? false, liveAlerts: relation?.live_alerts ?? true });
+        } else {
+          setCreatorProfile(null);
+        }
       } catch (err: any) {
         if (active) {
           setError(err?.message || 'User not found');
           setProfile(null);
+          setCreatorProfile(null);
         }
       } finally {
         if (active) setLoading(false);
@@ -161,7 +174,7 @@ export default function UserProfile() {
     return () => {
       active = false;
     };
-  }, [username]);
+  }, [username, isMember]);
 
   const handleFriendAction = async () => {
     if (!profile || !username) return;

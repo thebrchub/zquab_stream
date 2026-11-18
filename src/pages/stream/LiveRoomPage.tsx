@@ -125,11 +125,12 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
     return () => { isCurrent = false; };
   }, [resolvedStreamId]);
 
+  const isMember = Boolean(user && !user.is_guest);
   useEffect(() => {
     if (!stream?.creator.username) return;
     let isCurrent = true;
 
-    creatorService.getProfile(stream.creator.username)
+    creatorService.getProfile(stream.creator.username, isMember)
       .then((profile) => {
         if (!isCurrent) return;
         setCreatorProfile(profile);
@@ -140,7 +141,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
       });
 
     return () => { isCurrent = false; };
-  }, [stream?.creator.username]);
+  }, [stream?.creator.username, isMember]);
 
   const seekToLive = () => {
     const video = videoRef.current;

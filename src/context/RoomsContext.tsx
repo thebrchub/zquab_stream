@@ -45,6 +45,11 @@ export const LAST_ROOM_STORAGE_KEY = 'zquab_last_active_room';
 
 const LIVE_REQUEST_KEEP_MS = 60_000;
 
+// How long friends' online dots stay as last known after our own socket drops.
+// Short drops (a network blip) don't flicker; after this every dot goes grey
+// until the snapshot sent on reconnect says who is online.
+const PRESENCE_GRACE_MS = 10_000;
+
 export function RoomsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { sendMessage, isConnected } = useWebSocket(); 
@@ -72,11 +77,52 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const roomsRef = useRef(rooms);
   useEffect(() => { roomsRef.current = rooms; }, [rooms]);
 
+  // Friends online right now, as the socket last told us: the snapshot sent on
+  // every connect, then live presence_batch changes. presenceKnownRef is true
+  // once this connection's full snapshot has arrived; until then the server's
+  // is_online from GET /rooms is used as is.
+  const onlineRef = useRef<Set<string>>(new Set());
+  const presenceKnownRef = useRef(false);
+  // Snapshot parts collected so far (a big snapshot comes in parts of 1000).
+  const snapshotPartsRef = useRef<string[] | null>(null);
+
+  // While our socket is down nothing tells us who comes and goes. The next
+  // connection sends a fresh snapshot, so forget this one's; and if the drop
+  // lasts longer than PRESENCE_GRACE_MS, grey every dot rather than show stale ones.
+  useEffect(() => {
+    if (isConnected) return;
+    presenceKnownRef.current = false;
+    snapshotPartsRef.current = null;
+    const timer = window.setTimeout(() => {
+      onlineRef.current = new Set();
+      setUsersMap(prev => {
+        let changed = false;
+        const next = { ...prev };
+        for (const id of Object.keys(next)) {
+          if (next[id].is_online) {
+            next[id] = { ...next[id], is_online: false };
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, PRESENCE_GRACE_MS);
+    return () => window.clearTimeout(timer);
+  }, [isConnected]);
+
   const refreshRooms = useCallback(async () => {
     try {
       const data = await roomsApi.getRooms();
       setRooms(data.rooms || []);
-      setUsersMap(prev => ({ ...prev, ...(data.users || {}) }));
+      const users: Record<string, RoomUser> = data.users || {};
+      const known = presenceKnownRef.current;
+      setUsersMap(prev => {
+        const next = { ...prev };
+        for (const [id, u] of Object.entries(users)) {
+          next[id] = known ? { ...u, is_online: onlineRef.current.has(id) } : u;
+        }
+        return next;
+      });
     } catch (err) {
       console.error('Failed to refresh rooms:', err);
     }
@@ -167,7 +213,8 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
               username: otherUsername, 
               name: payload.name || otherUsername,
               avatar_url: payload.avatar_url,
-              is_online: true,
+              // The DM's presence_batch arrives just before this event.
+              is_online: onlineRef.current.has(otherUserId),
             }
           }));
         }
@@ -290,16 +337,58 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // 6. Presence Events
-      if (type === 'presence_online' || type === 'presence_offline') {
-        const presenceUserId = msg.from || msg.sender_id;
-        if (presenceUserId) {
+      // 6. Presence: friends' online status (DMs only)
+      if (type === 'presence_snapshot' && Array.isArray(payload?.online)) {
+        // Sent once per connection, in parts; the last part has complete=true.
+        const parts = snapshotPartsRef.current ?? [];
+        parts.push(...payload.online);
+        if (!payload.complete) {
+          snapshotPartsRef.current = parts;
+        } else {
+          snapshotPartsRef.current = null;
+          const myId = user?.user_id;
+          const online = new Set(parts);
+          if (myId) online.delete(myId);
+          onlineRef.current = online;
+          presenceKnownRef.current = true;
           setUsersMap(prev => {
-            if (!prev[presenceUserId]) return prev;
-            return {
-              ...prev,
-              [presenceUserId]: { ...prev[presenceUserId], is_online: type === 'presence_online' },
-            };
+            let changed = false;
+            const next = { ...prev };
+            for (const id of Object.keys(next)) {
+              const isOnline = online.has(id);
+              if (Boolean(next[id].is_online) !== isOnline) {
+                next[id] = { ...next[id], is_online: isOnline };
+                changed = true;
+              }
+            }
+            return changed ? next : prev;
+          });
+        }
+      }
+
+      if (type === 'presence_batch' && payload && (Array.isArray(payload.online) || Array.isArray(payload.offline))) {
+        // One DM's changes since the last batch. Our own ID shows up when our
+        // other devices connect or leave; it says nothing about friends.
+        const myId = user?.user_id;
+        const changes: Array<[string, boolean]> = [
+          ...(payload.online || []).map((id: string): [string, boolean] => [id, true]),
+          ...(payload.offline || []).map((id: string): [string, boolean] => [id, false]),
+        ].filter(([id]) => id && id !== myId);
+        for (const [id, isOnline] of changes) {
+          if (isOnline) onlineRef.current.add(id);
+          else onlineRef.current.delete(id);
+        }
+        if (changes.length > 0) {
+          setUsersMap(prev => {
+            let changed = false;
+            const next = { ...prev };
+            for (const [id, isOnline] of changes) {
+              if (next[id] && Boolean(next[id].is_online) !== isOnline) {
+                next[id] = { ...next[id], is_online: isOnline };
+                changed = true;
+              }
+            }
+            return changed ? next : prev;
           });
         }
       }

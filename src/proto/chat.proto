@@ -6,6 +6,7 @@ message MetaData {
     string from_name = 2;
     string from_avatar_url = 3;
     string conn_id = 4;
+    bool   is_guest = 5; // sender logged in as a guest
 }
 
 message Envelope {
@@ -49,6 +50,18 @@ message Receipt {
 message SystemEvent {
     string code    = 1;
     string message = 2;
+}
+
+// Online status of many users in one message.
+//   type="presence_snapshot": sent once after the socket connects, in parts of
+//     up to 1000 users; together the parts list every friend (DM partner) online
+//     right now. complete is true on the last part.
+//   type="presence_batch" (room_id set): users of that DM who came online or went
+//     offline since the previous batch. Our own ID can appear (other devices); ignore it.
+message PresenceList {
+    repeated string online   = 1;
+    repeated string offline  = 2;
+    bool            complete = 3;
 }
 
 // MsgType "recent_messages" — live-stream chat history sent after join_room

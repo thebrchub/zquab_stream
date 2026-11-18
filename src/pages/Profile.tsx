@@ -21,6 +21,7 @@ import { CreatorApplicationModal } from '../components/studio/CreatorApplication
 import { creatorService } from '../services/creatorService';
 import { LiveAlertsSetting } from '../components/stream/LiveAlertsSetting';
 import { createZAvatarURL, MAX_AVATAR_URL_LENGTH, MAX_USERNAME_LENGTH } from '../utils/avatar';
+import { useDebouncedSearch } from '../hooks/usePublicLists';
 
 const GENDER_OPTIONS = ['Prefer not to say', 'Male', 'Female', 'Other'];
 type Tab = 'friends' | 'requests' | 'search' | 'blocked' | 'followers';
@@ -78,6 +79,15 @@ export default function Profile() {
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  // "Find people" searches everyone or only your friends (name or username).
+  const [searchScope, setSearchScope] = useState<'everyone' | 'friends'>('everyone');
+  const peopleSearch = useDebouncedSearch(
+    searchQuery,
+    activeTab === 'search' && !authUser?.is_guest
+      ? (q, signal) => (searchScope === 'friends' ? friendsApi.searchFriends(q, signal) : usersApi.searchUsers(q, signal))
+      : null,
+    searchScope,
+  );
   const [followerCount, setFollowerCount] = useState<number | null>(null);
   const [followerCountLoading, setFollowerCountLoading] = useState(false);
   const [followerCountError, setFollowerCountError] = useState<string | null>(null);
@@ -192,13 +202,10 @@ export default function Profile() {
         results = await creatorService.getFollowers(username, LIMIT, currentOffset);
       } else if (activeTab === 'blocked') {
         results = await friendsApi.getBlockedUsers(LIMIT, currentOffset);
-      } else if (activeTab === 'search' && searchQuery.trim()) {
-        results = await usersApi.searchUsers(searchQuery);
-        setHasMore(false); 
       }
 
       setNetworkData(prev => reset ? results : [...prev, ...results]);
-      if (results.length < LIMIT && activeTab !== 'search') setHasMore(false);
+      if (results.length < LIMIT) setHasMore(false);
       setOffset(currentOffset + LIMIT);
     } catch (err) {
       console.error('Failed to fetch network data:', err);
@@ -209,23 +216,12 @@ export default function Profile() {
   };
 
   useEffect(() => {
-    if (activeTab === 'requests') {
-       // Data handled by Context natively
-    } else if (activeTab !== 'search' || searchQuery) {
-      fetchNetworkData(true);
+    if (activeTab === 'requests' || activeTab === 'search') {
+       // Requests come from Context; search results from peopleSearch.
     } else {
-      setNetworkData([]);
+      fetchNetworkData(true);
     }
   }, [activeTab]);
-
-  useEffect(() => {
-    if (activeTab !== 'search') return;
-    const timer = setTimeout(() => {
-      if (searchQuery.trim()) fetchNetworkData(true);
-      else setNetworkData([]);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -391,9 +387,9 @@ export default function Profile() {
     );
   }
 
-  const displayData = activeTab === 'requests' ? friendRequests : networkData;
-  const isDisplayLoading = activeTab === 'requests' ? false : networkLoading;
-  const currentHasMore = activeTab === 'requests' ? false : hasMore;
+  const displayData = activeTab === 'requests' ? friendRequests : activeTab === 'search' ? peopleSearch.results : networkData;
+  const isDisplayLoading = activeTab === 'requests' ? false : activeTab === 'search' ? peopleSearch.isSearching : networkLoading;
+  const currentHasMore = activeTab === 'requests' || activeTab === 'search' ? false : hasMore;
 
   return (
     <div className="max-w-7xl mx-auto w-full p-4 md:p-6 lg:p-8 pb-24 relative">
@@ -629,7 +625,7 @@ export default function Profile() {
             </div>
 
             {/* 🛠️ Claymorphic Recessed Search Input */}
-            {activeTab === 'search' && <div className="px-5 pt-5 sm:px-7"><div className="relative"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)] drop-shadow-sm" /><input autoFocus type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by username..." className="w-full rounded-[1.25rem] border border-[var(--border-color)] bg-[var(--background)] py-3.5 pl-11 pr-4 text-sm text-[var(--text-main)] outline-none transition-all placeholder:text-[var(--text-muted)] focus:border-[#3B82F6] shadow-[inset_2px_2px_5px_rgba(0,0,0,0.4),inset_-1px_-1px_3px_rgba(255,255,255,0.02)]" /></div></div>}
+            {activeTab === 'search' && <div className="px-5 pt-5 sm:px-7"><div className="relative"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 drop-shadow-sm" /><input autoFocus type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by username..." className="w-full rounded-[1.25rem] border border-white/[0.04] bg-[#0b0c0f] py-3.5 pl-11 pr-4 text-sm text-white outline-none transition-all placeholder:text-zinc-600 focus:border-[#3B82F6] shadow-[inset_2px_2px_5px_rgba(0,0,0,0.4),inset_-1px_-1px_3px_rgba(255,255,255,0.02)]" /></div></div>}
 
             <div className="flex-1 p-5 sm:p-7">
               {activeTab === 'followers' && followerCountError && <p className="mb-4 text-sm text-red-400">{followerCountError}</p>}
@@ -639,9 +635,9 @@ export default function Profile() {
                 // 🛠️ Claymorphic Recessed Empty State
                 <div className="relative flex min-h-[270px] flex-col items-center justify-center overflow-hidden rounded-[1.5rem] border border-[var(--border-color)] bg-[var(--background)] px-5 py-12 text-center shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4),inset_-2px_-2px_6px_rgba(255,255,255,0.02)]">
                   <div className="pointer-events-none absolute -left-10 -top-16 h-40 w-40 rounded-full bg-blue-500/[0.07] blur-3xl" /><div className="pointer-events-none absolute -bottom-16 -right-10 h-40 w-40 rounded-full bg-violet-500/[0.07] blur-3xl" />
-                  <div className="relative mb-5 flex h-16 w-16 items-center justify-center rounded-[1.25rem] border border-[var(--border-color)] bg-[var(--card)] text-[var(--text-muted)] shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02)]"><Users className="h-7 w-7 drop-shadow-sm" />{activeTab === 'requests' && <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-[#17181d] bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]" />}</div>
-                  <h3 className="relative text-lg font-black text-[var(--text-main)] drop-shadow-sm">{activeTab === 'friends' ? 'Your circle starts here.' : activeTab === 'followers' ? 'No followers yet.' : activeTab === 'requests' ? 'You’re all caught up.' : activeTab === 'blocked' ? 'No blocked accounts.' : searchQuery.trim() ? 'No people found.' : 'Find your people.'}</h3>
-                  <p className="relative mt-2 max-w-md text-sm leading-6 text-[var(--text-muted)] drop-shadow-sm">{activeTab === 'friends' ? 'Find people and send a friend request. When they accept, you become mutual friends.' : activeTab === 'followers' ? 'People who follow your creator profile will appear here.' : activeTab === 'requests' ? 'Incoming friend requests will appear here. Accepting creates a friendship; following remains separate.' : activeTab === 'blocked' ? 'Accounts you block will appear here.' : searchQuery.trim() ? 'Try another username or check the spelling.' : 'Search the zQuab community by username and open profiles to connect.'}</p>
+                  <div className="relative mb-5 flex h-16 w-16 items-center justify-center rounded-[1.25rem] border border-white/[0.08] bg-[#17181d] text-zinc-500 shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02)]"><Users className="h-7 w-7 drop-shadow-sm" />{activeTab === 'requests' && <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-[#17181d] bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]" />}</div>
+                  <h3 className="relative text-lg font-black text-white drop-shadow-sm">{activeTab === 'friends' ? 'Your circle starts here.' : activeTab === 'followers' ? 'No followers yet.' : activeTab === 'requests' ? 'You’re all caught up.' : activeTab === 'blocked' ? 'No blocked accounts.' : searchQuery.trim() ? 'No people found.' : 'Find your people.'}</h3>
+                  <p className="relative mt-2 max-w-md text-sm leading-6 text-zinc-400 drop-shadow-sm">{activeTab === 'friends' ? 'Find people and send a friend request. When they accept, you become mutual friends.' : activeTab === 'followers' ? 'People who follow your creator profile will appear here.' : activeTab === 'requests' ? 'Incoming friend requests will appear here. Accepting creates a friendship; following remains separate.' : activeTab === 'blocked' ? 'Accounts you block will appear here.' : searchQuery.trim() ? 'Try another username or check the spelling.' : 'Search the zQuab community by username and open profiles to connect.'}</p>
                   {activeTab === 'friends' && <button onClick={() => setActiveTab('search')} className="relative mt-5 inline-flex items-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-2.5 text-xs font-black text-white transition-all hover:brightness-110 active:scale-95 shadow-[4px_4px_10px_rgba(0,0,0,0.4),-2px_-2px_6px_rgba(255,255,255,0.05),inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)] active:shadow-[inset_2px_2px_6px_rgba(0,0,0,0.4)] border-none"><Search className="h-4 w-4 drop-shadow-sm" /> Find people</button>}
                 </div>
               ) : (

@@ -17,7 +17,7 @@ interface AuthContextType {
   isLoading: boolean;
   // True when the session check failed for a reason other than "not logged in" (network, server error).
   sessionError: boolean;
-  loginAsGuest: () => Promise<void>;
+  loginAsGuest: () => Promise<AuthUser>;
   logout: () => Promise<void>;
   devMockLogin: () => void; 
   refreshSession: () => Promise<void>; // 🛠️ NEW: Expose this to your apps
@@ -65,7 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginAsGuest = async () => {
     try {
       const response = await apiClient.post('/auth/guest');
-      setUser(response.data as AuthUser);
+      const guest = response.data as AuthUser;
+      setUser(guest);
+      return guest;
     } catch (error) {
       console.error('Guest login failed:', error);
       throw error;

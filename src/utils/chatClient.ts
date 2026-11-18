@@ -1,10 +1,14 @@
 import protobuf from 'protobufjs'; 
 import chatProtoSrc from '../proto/chat.proto?raw';
 import eventsProtoSrc from '../proto/events.proto?raw';
+import { wsEvents } from '../context/WebSocketContext';
+import { wsConnection } from './wsConnection';
 
 type Status = 'searching' | 'connected' | 'disconnected';
 
 type ChatCallbackOptions = {
+  // Makes sure someone is logged in (a guest if nobody is) and returns their user ID.
+  ensureLogin: () => Promise<string>;
   onStatusChange: (status: Status) => void;
   onIncomingMessage: (message: ChatMessage) => void;
   onSystemMessage: (text: string) => void;
@@ -31,15 +35,25 @@ type ChatMessage = {
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'https://aarpaar-api.brchub.tech';
-const WS_BASE = import.meta.env.VITE_WS_BASE_URL ?? 'wss://api.zquab.com';
 
+// One message from the shared socket (see WebSocketContext): the envelope's
+// fields plus its undecoded payload bytes.
+type InboundEnvelope = {
+  type?: string;
+  roomId?: string;
+  id?: string;
+  from?: string;
+  metaData?: { from?: string };
+  rawPayload?: Uint8Array;
+};
+
+// ChatClient runs stranger chat over the app's one WebSocket (wsConnection):
+// it never opens a socket of its own, so a chatting tab holds one connection.
 export class ChatClient {
-  private socket: WebSocket | null = null;
   private currentRoomId: string | null = null;
   private userId: string | null = null;
-  private reconnectAttempts = 0;
-  private reconnectTimer: number | null = null;
   private isShuttingDown = false;
+  private unsubscribers: Array<() => void> = [];
   private knownMessageIds = new Set<string>();
   private callbacks: ChatCallbackOptions;
 
@@ -127,21 +141,7 @@ export class ChatClient {
 
   async ensureGuest() {
     try {
-      const response = await fetch(`${API_BASE}/api/v1/auth/guest`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-
-      if (!response.ok) {
-        throw new Error('Guest login failed');
-      }
-
-      const data = await response.json();
-      if (typeof data.user_id === 'string') {
-        this.userId = data.user_id;
-      }
+      this.userId = await this.callbacks.ensureLogin();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Guest login error';
       this.callbacks.onError?.(message);
@@ -149,31 +149,44 @@ export class ChatClient {
     }
   }
 
+  // connect listens on the shared socket. Every time it opens (now, or after a
+  // login or a reconnect) the client re-enters matching, as a fresh socket did before.
   private connect() {
-    if (!this.Envelope) return; 
+    if (!this.Envelope) return;
+    this.stopListening();
 
-    this.clearReconnectTimer();
-    this.socket = new WebSocket(`${WS_BASE}/ws`);
-    this.socket.binaryType = 'arraybuffer';
-
-    this.socket.onopen = () => {
-      this.reconnectAttempts = 0;
+    const onOpen = () => {
       this.callbacks.onSocketOpen?.();
       this.enterMatch().catch((error) => {
         this.callbacks.onError?.(String(error));
       });
     };
 
-    this.socket.onmessage = (event) => {
-      const data = event.data;
-      if (!(data instanceof ArrayBuffer) || !this.Envelope) {
-        return;
+    this.unsubscribers.push(wsConnection.onStatus((open) => {
+      if (this.isShuttingDown) return;
+      if (open) {
+        onOpen();
+      } else {
+        this.callbacks.onSocketClose?.(1006, '');
+        this.callbacks.onStatusChange('searching');
       }
+    }));
+    this.unsubscribers.push(wsEvents.subscribe((msg) => this.handleMessage(msg)));
+
+    if (wsConnection.isOpen()) onOpen();
+  }
+
+  private stopListening() {
+    this.unsubscribers.forEach((unsubscribe) => unsubscribe());
+    this.unsubscribers = [];
+  }
+
+  private handleMessage(msg: InboundEnvelope) {
+    if (!msg || this.isShuttingDown || !this.Envelope) return;
 
       try {
-        const bytes = new Uint8Array(data);
-        const envelope = this.Envelope.decode(bytes) as any;
-        const payload = envelope.payload as Uint8Array;
+        const envelope = msg;
+        const payload = (msg.rawPayload ?? new Uint8Array()) as Uint8Array;
         const type = envelope.type as string;
 
         switch (type) {
@@ -191,7 +204,8 @@ export class ChatClient {
 
               if ((!partnerLocation || partnerLocation === 'Unknown location' || partnerLocation.trim() === '') && partnerUsername) {
                 try {
-                  const res = await fetch(`${API_BASE}/api/v1/users/${partnerUsername}`, { credentials: 'include' });
+                  // Public card: edge-cached and the same for everyone, so no cookies.
+                  const res = await fetch(`${API_BASE}/public/v1/users/${encodeURIComponent(partnerUsername)}`, { credentials: 'omit' });
                   if (res.ok) {
                     const profile = await res.json();
                     if (profile?.country) partnerLocation = profile.country;
@@ -226,7 +240,7 @@ export class ChatClient {
             
             this.knownMessageIds.add(messageId);
             const text = msg.text as string;
-            const from = envelope.from as string;
+            const from = (envelope.metaData?.from ?? envelope.from) as string | undefined;
             
             this.callbacks.onPartnerTyping?.(false);
 
@@ -332,38 +346,6 @@ export class ChatClient {
       } catch (error) {
         this.callbacks.onError?.(String(error));
       }
-    };
-
-    this.socket.onclose = (event) => {
-      this.callbacks.onSocketClose?.(event.code, event.reason);
-      if (this.isShuttingDown) {
-        return;
-      }
-      this.callbacks.onStatusChange('searching');
-      this.scheduleReconnect();
-    };
-
-    this.socket.onerror = () => {
-      this.callbacks.onError?.('WebSocket error occurred.');
-    };
-  }
-
-  private scheduleReconnect() {
-    this.reconnectAttempts += 1;
-    const delay = Math.min(3000, 500 + this.reconnectAttempts * 500);
-    this.clearReconnectTimer();
-    this.reconnectTimer = window.setTimeout(() => {
-      if (!this.isShuttingDown) {
-        this.connect();
-      }
-    }, delay);
-  }
-
-  private clearReconnectTimer() {
-    if (this.reconnectTimer !== null) {
-      window.clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
   }
 
   async enterMatch() {
@@ -408,7 +390,7 @@ export class ChatClient {
 
   // 🛠️ THE FIX: Accept the replyToId in the function arguments
   sendChatMessage(text: string, replyToId?: string): string | null {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || !this.currentRoomId || !this.Envelope || !this.ChatMessageProto) {
+    if (!wsConnection.isOpen() || !this.currentRoomId || !this.Envelope || !this.ChatMessageProto) {
       return null;
     }
 
@@ -429,44 +411,29 @@ export class ChatClient {
       id,
     });
     const bytes = this.Envelope.encode(envelope).finish();
-    const payloadBuffer = bytes.buffer instanceof ArrayBuffer
-      ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-      : new Uint8Array(bytes).slice().buffer;
-
-    this.socket.send(payloadBuffer);
+    if (!wsConnection.sendBytes(bytes)) return null;
     this.knownMessageIds.add(id);
     return id;
   }
   
   sendTypingStart() {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || !this.currentRoomId || !this.Envelope) {
-      return;
-    }
-    try {
-      const envelope = this.Envelope.create({ type: 'typing_start', roomId: this.currentRoomId });
-      const bytes = this.Envelope.encode(envelope).finish();
-      const payloadBuffer = bytes.buffer instanceof ArrayBuffer
-        ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-        : new Uint8Array(bytes).slice().buffer;
-      this.socket.send(payloadBuffer);
-    } catch (e) { 
-      console.error('Failed to send typing_start:', e); 
-    }
+    this.sendRoomSignal('typing_start');
   }
 
   sendTypingEnd() {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || !this.currentRoomId || !this.Envelope) {
+    this.sendRoomSignal('typing_end');
+  }
+
+  // sendRoomSignal sends a payload-less envelope (typing start/end) to the current room.
+  private sendRoomSignal(type: 'typing_start' | 'typing_end') {
+    if (!wsConnection.isOpen() || !this.currentRoomId || !this.Envelope) {
       return;
     }
     try {
-      const envelope = this.Envelope.create({ type: 'typing_end', roomId: this.currentRoomId });
-      const bytes = this.Envelope.encode(envelope).finish();
-      const payloadBuffer = bytes.buffer instanceof ArrayBuffer
-        ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-        : new Uint8Array(bytes).slice().buffer;
-      this.socket.send(payloadBuffer);
+      const envelope = this.Envelope.create({ type, roomId: this.currentRoomId });
+      wsConnection.sendBytes(this.Envelope.encode(envelope).finish());
     } catch (e) { 
-      console.error('Failed to send typing_end:', e); 
+      console.error(`Failed to send ${type}:`, e); 
     }
   }
 
@@ -539,12 +506,10 @@ export class ChatClient {
     });
   }
 
+  // shutdown stops listening. The shared socket stays open for the rest of the app.
   shutdown() {
     this.isShuttingDown = true;
-    this.clearReconnectTimer();
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.close();
-    }
+    this.stopListening();
   }
 
   private async restPost(endpoint: string, body: unknown) {

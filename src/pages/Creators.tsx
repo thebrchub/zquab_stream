@@ -1,29 +1,11 @@
 
 import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  BadgeCheck,
-  Sparkles,
-  Video,
-  Gamepad2,
-  Headphones,
-  Hash,
-  ArrowRight,
-  Search,
-} from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-
-import { useAuth } from '../context/AuthContext';
-import { CreatorApplicationModal } from '../components/studio/CreatorApplicationModal';
+import { BadgeCheck, Sparkles, Video, Gamepad2, Headphones, Hash, ArrowRight, Search } from 'lucide-react';
 
 // --- MOCK DATA ---
-const CATEGORIES = [
-  'All',
-  'Gaming',
-  'Just Chatting',
-  'Music',
-  'Tech & Code',
-];
+const CATEGORIES = ['All', 'Gaming', 'Just Chatting', 'Music', 'Tech & Code'];
 
 const MOCK_CREATORS = [
   {
@@ -73,71 +55,24 @@ const MOCK_CREATORS = [
 ];
 
 export default function Creators() {
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
-  /*
-   * The creator application response contains is_creator.
-   * The structural type here avoids assuming unrelated auth fields.
-   */
-  const currentUser = user as
-    | {
-        is_creator?: boolean;
-        username?: string;
-        handle?: string;
-      }
-    | null;
-
-  const isCreator = currentUser?.is_creator === true;
-
-  const username =
-    currentUser?.username ||
-    currentUser?.handle?.replace(/^@/, '') ||
-    '';
-
-  const filteredCreators = MOCK_CREATORS.filter((creator) => {
-    const matchesCategory =
-      activeCategory === 'All' ||
-      creator.category === activeCategory;
-
-    const query = searchQuery.toLowerCase();
-
-    const matchesSearch =
-      creator.name.toLowerCase().includes(query) ||
-      creator.handle.toLowerCase().includes(query);
-
+  const filteredCreators = MOCK_CREATORS.filter(c => {
+    const matchesCategory = activeCategory === 'All' || c.category === activeCategory;
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          c.handle.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
-  const handleApplyClick = () => {
-    if (!user) {
-      navigate('/auth?next=%2Fcreators');
-      return;
-    }
-
-    setIsModalOpen(true);
-  };
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'Gaming':
-        return <Gamepad2 className="w-4 h-4" />;
-
-      case 'Music':
-        return <Headphones className="w-4 h-4" />;
-
-      case 'Tech & Code':
-        return <Hash className="w-4 h-4" />;
-
-      case 'Just Chatting':
-        return <Video className="w-4 h-4" />;
-
-      default:
-        return <Sparkles className="w-4 h-4" />;
+  const getCategoryIcon = (cat: string) => {
+    switch (cat) {
+      case 'Gaming': return <Gamepad2 className="w-4 h-4" />;
+      case 'Music': return <Headphones className="w-4 h-4" />;
+      case 'Tech & Code': return <Hash className="w-4 h-4" />;
+      case 'Just Chatting': return <Video className="w-4 h-4" />;
+      default: return <Sparkles className="w-4 h-4" />;
     }
   };
 
@@ -172,13 +107,8 @@ export default function Creators() {
                 Creators
               </span>
             </h1>
-
-            <p className="
-              text-sm sm:text-lg text-[var(--text-muted)]
-              max-w-2xl mx-auto leading-relaxed
-            ">
-              Connect with verified hosts, gamers, and experts.
-              Join their live rooms or discover their content.
+            <p className="text-sm sm:text-lg text-[var(--text-muted)] max-w-2xl mx-auto leading-relaxed">
+              Connect with verified hosts, gamers, and experts. Join their live rooms or book exclusive 1-on-1 sessions.
             </p>
           </motion.div>
         </div>
@@ -198,43 +128,18 @@ export default function Creators() {
               type="text"
               placeholder="Search creators..."
               value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              className="
-                w-full bg-[var(--background)]
-                text-[var(--text-main)] pl-12 pr-4 py-3.5
-                rounded-full border border-[var(--border-color)]
-                shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2),inset_-1px_-1px_3px_rgba(255,255,255,0.02)]
-                focus:outline-none focus:border-[#4F46E5]
-                transition-colors text-sm font-medium
-                placeholder:text-[var(--text-muted)]
-              "
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[var(--background)] text-[var(--text-main)] pl-12 pr-4 py-3.5 rounded-full border border-[var(--border-color)] shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2),inset_-1px_-1px_3px_rgba(255,255,255,0.02)] focus:outline-none focus:border-[#4F46E5] transition-colors text-sm font-medium placeholder:text-[var(--text-muted)]"
             />
           </div>
 
-          {/* Only non-creators see this button */}
-          {!isCreator && (
-            <motion.button
-              type="button"
-              onClick={handleApplyClick}
-              whileTap={{ scale: 0.97 }}
-              className="
-                group w-full md:w-auto
-                flex items-center justify-center gap-2
-                bg-[var(--card)] text-[var(--text-main)]
-                px-6 py-3.5 rounded-full font-bold
-                text-sm border border-[var(--border-color)]
-                shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)]
-                hover:text-[#4F46E5] transition-all duration-200
-              "
-            >
-              Apply to be a Creator
-
-              <ArrowRight className="
-                w-4 h-4 group-hover:translate-x-1
-                transition-transform
-              " />
-            </motion.button>
-          )}
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="group w-full md:w-auto flex items-center justify-center gap-2 bg-[var(--card)] text-[var(--text-main)] px-6 py-3.5 rounded-full font-bold transition-all duration-200 active:scale-95 text-sm border border-[var(--border-color)] shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] hover:text-[#4F46E5]"
+          >
+            Apply to be a Creator
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </button>
         </div>
 
         {/* CATEGORY FILTERS */}
@@ -246,33 +151,24 @@ export default function Creators() {
               <button
                 key={category}
                 onClick={() => setActiveCategory(category)}
-                className={`
-                  flex items-center gap-2
-                  px-4 sm:px-5 py-2.5 rounded-full
-                  font-bold text-xs sm:text-sm
-                  transition-all whitespace-nowrap border
-                  ${
-                    activeCategory === category
-                      ? 'bg-[#4F46E5] text-white border-[#4F46E5] shadow-[inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)]'
-                      : 'bg-[var(--card)] text-[var(--text-muted)] border-[var(--border-color)] shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.05),inset_-1px_-1px_2px_rgba(0,0,0,0.2)] hover:text-[var(--text-main)]'
-                  }
-                `}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-full font-bold text-xs sm:text-sm transition-all whitespace-nowrap border ${
+                  activeCategory === category
+                    ? 'bg-[#4F46E5] text-white border-[#4F46E5] shadow-[inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)]'
+                    : 'bg-[var(--card)] text-[var(--text-muted)] border-[var(--border-color)] shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.05),inset_-1px_-1px_2px_rgba(0,0,0,0.2)] hover:text-[var(--text-main)]'
+                }`}
               >
-                {getCategoryIcon(category)}
-                {category}
+                {getCategoryIcon(category.id)}
+                {category.label}
               </button>
             ))}
           </div>
         </div>
 
         {/* CREATOR GRID */}
-        <motion.div
+        {/* 🛠️ FIX: Layout prop correctly drives the animation, but expansion is safely contained by the parent wrapper */}
+        <motion.div 
           layout
-          className="
-            grid grid-cols-1 sm:grid-cols-2
-            lg:grid-cols-3 xl:grid-cols-4
-            gap-6 lg:gap-8 w-full
-          "
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8 w-full"
         >
           <AnimatePresence>
             {filteredCreators.map((creator, index) => (
@@ -281,116 +177,52 @@ export default function Creators() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                transition={{
-                  duration: 0.3,
-                  delay: index * 0.05,
-                }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
                 key={creator.id}
-                className="
-                  flex flex-col bg-[var(--card)]
-                  border border-[var(--border-color)]
-                  rounded-[2rem] p-6
-                  shadow-[8px_8px_20px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)]
-                  relative group
-                "
+                className="flex flex-col bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 shadow-[8px_8px_20px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] relative group"
               >
                 {creator.isLive && (
-                  <div className="
-                    absolute top-4 right-4
-                    flex items-center gap-1.5
-                    bg-red-500/10 text-red-500
-                    px-3 py-1 rounded-full text-[10px]
-                    font-black uppercase tracking-wider
-                    border border-red-500/20 shadow-sm z-10
-                  ">
-                    <span className="
-                      w-1.5 h-1.5 bg-red-500
-                      rounded-full animate-pulse
-                    " />
+                  <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-red-500/10 text-red-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-red-500/20 shadow-sm z-10">
+                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
                     Live Now
                   </div>
                 )}
 
-                <div className="
-                  flex flex-col items-center
-                  mt-4 mb-4
-                ">
+                <div className="flex flex-col items-center mt-4 mb-4">
                   <div className="relative mb-4">
-                    <div className="
-                      w-24 h-24 rounded-full p-1
-                      bg-gradient-to-tr from-[#4F46E5] to-[#818CF8]
-                      shadow-lg
-                    ">
-                      <img
-                        src={creator.avatar}
-                        alt={creator.name}
-                        className="
-                          w-full h-full rounded-full
-                          object-cover border-4 border-[var(--card)]
-                        "
+                    <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-[#4F46E5] to-[#818CF8] shadow-lg">
+                      <img 
+                        src={creator.avatar} 
+                        alt={creator.name} 
+                        className="w-full h-full rounded-full object-cover border-4 border-[var(--card)]"
                       />
                     </div>
                   </div>
-
-                  <div className="
-                    flex items-center gap-1.5
-                    text-xl font-black text-[var(--text-main)]
-                  ">
+                  
+                  <div className="flex items-center gap-1.5 text-xl font-black text-[var(--text-main)]">
                     {creator.name}
                     <BadgeCheck className="w-5 h-5 text-[#4F46E5]" />
                   </div>
-
-                  <span className="
-                    text-sm font-bold text-[var(--text-muted)] mt-1
-                  ">
-                    {creator.handle}
-                  </span>
+                  <span className="text-sm font-bold text-[var(--text-muted)] mt-1">{creator.handle}</span>
                 </div>
 
-                <p className="
-                  text-sm text-[var(--text-muted)]
-                  text-center line-clamp-3 mb-6
-                  flex-grow leading-relaxed
-                ">
+                <p className="text-sm text-[var(--text-muted)] text-center line-clamp-3 mb-6 flex-grow leading-relaxed">
                   {creator.bio}
                 </p>
 
                 <div className="flex flex-col gap-3 mt-auto">
                   {creator.acceptingCalls ? (
-                    <button className="
-                      w-full flex items-center justify-center gap-2
-                      bg-[#4F46E5] text-white py-3 px-4
-                      rounded-xl font-bold text-sm
-                      transition-transform active:scale-95
-                      shadow-[4px_4px_10px_rgba(0,0,0,0.4),-2px_-2px_6px_rgba(255,255,255,0.05),inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)]
-                    ">
+                    <button className="w-full flex items-center justify-center gap-2 bg-[#4F46E5] text-white py-3 px-4 rounded-xl font-bold transition-transform active:scale-95 text-sm shadow-[4px_4px_10px_rgba(0,0,0,0.4),-2px_-2px_6px_rgba(255,255,255,0.05),inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)] hover:shadow-[2px_2px_6px_rgba(0,0,0,0.4),-1px_-1px_4px_rgba(255,255,255,0.05),inset_1px_1px_3px_rgba(255,255,255,0.3),inset_-1px_-1px_3px_rgba(0,0,0,0.4)]">
                       <Video className="w-4 h-4" />
                       Request 1-on-1 • {creator.price} zCoins
                     </button>
                   ) : (
-                    <button
-                      disabled
-                      className="
-                        w-full py-3 px-4 rounded-xl
-                        font-bold text-[var(--text-muted)]
-                        bg-[var(--background)]
-                        border border-[var(--border-color)]
-                        shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2),inset_-2px_-2px_4px_rgba(255,255,255,0.02)]
-                        cursor-not-allowed text-sm
-                      "
-                    >
+                    <button className="w-full py-3 px-4 rounded-xl font-bold text-[var(--text-muted)] bg-[var(--background)] border border-[var(--border-color)] shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2),inset_-2px_-2px_4px_rgba(255,255,255,0.02)] cursor-not-allowed text-sm">
                       Not taking calls
                     </button>
                   )}
-
-                  <button className="
-                    w-full py-3 px-4 rounded-xl
-                    font-bold text-[var(--text-main)]
-                    hover:bg-[var(--text-main)]/5
-                    transition-colors text-sm
-                    border border-transparent
-                    hover:border-[var(--border-color)]
-                  ">
+                  
+                  <button className="w-full py-3 px-4 rounded-xl font-bold text-[var(--text-main)] hover:bg-[var(--text-main)]/5 transition-colors text-sm border border-transparent hover:border-[var(--border-color)]">
                     View Profile
                   </button>
                 </div>
@@ -399,35 +231,43 @@ export default function Creators() {
           </AnimatePresence>
         </motion.div>
 
-        {/* EMPTY STATE */}
         {filteredCreators.length === 0 && (
-          <motion.div
+          <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="
-              flex flex-col items-center
-              justify-center py-20 opacity-50 w-full
-            "
+            className="flex flex-col items-center justify-center py-20 opacity-50 w-full"
           >
-            <Search className="
-              w-12 h-12 mb-4 text-[var(--text-muted)]
-            " />
-
-            <h3 className="
-              text-xl font-bold text-[var(--text-main)] mb-2
-            ">
-              No creators found
-            </h3>
-
-            <p className="
-              text-[var(--text-muted)] text-center
-            ">
-              We couldn't find anyone matching "{searchQuery}".
-              <br />
-              Try a different name or category.
-            </p>
+            <Search className="w-12 h-12 mb-4 text-[var(--text-muted)]" />
+            <h3 className="text-xl font-bold text-[var(--text-main)] mb-2">No creators found</h3>
+            <p className="text-[var(--text-muted)] text-center">We couldn't find anyone matching "{searchQuery}".<br/>Try a different name or category.</p>
           </motion.div>
         )}
+
+        <AnimatePresence>
+          {isModalOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            >
+              <div className="bg-[var(--card)] p-8 rounded-[2rem] border border-[var(--border-color)] shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02)] max-w-md w-full text-center relative">
+                <Sparkles className="w-12 h-12 text-[#3B82F6] mx-auto mb-4" />
+                <h3 className="text-2xl font-bold text-[var(--text-main)] mb-2">Creator Application</h3>
+                <p className="text-[var(--text-muted)] mb-8">
+                  Your custom application form component will load here!
+                </p>
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="w-full py-4 bg-[#3B82F6] hover:bg-blue-600 text-white rounded-xl font-bold active:scale-95 transition-all shadow-md shadow-blue-500/20"
+                >
+                  Close Placeholder
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
 
       {/* REAL CREATOR APPLICATION MODAL */}

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Loader2, User, ChevronRight, X, Copy, CheckCircle2, History, Lock } from 'lucide-react'; // 🛠️ Added Lock icon
 import { usersApi } from '../api/users'; 
 import { useAuth } from '../context/AuthContext';
+import { useDebouncedSearch, SEARCH_MIN_CHARS } from '../hooks/usePublicLists';
 
 interface SearchResult {
   id: string;
@@ -15,9 +16,6 @@ interface SearchResult {
 export default function SearchPage() {
   const { user } = useAuth();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Recent Searches state initialized from localStorage
@@ -30,38 +28,13 @@ export default function SearchPage() {
     }
   });
 
-  useEffect(() => {
-    const trimmedQuery = query.trim();
-    
-    if (!trimmedQuery) {
-      setResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    // 🛠️ NEW: Block the API call immediately if the user is a guest or not logged in
-    if (!user || user.is_guest) {
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-    setError(null);
-
-    const delayDebounceFn = setTimeout(async () => {
-      try {
-        const data = await usersApi.searchUsers(trimmedQuery);
-        setResults(data || []);
-      } catch (err: any) {
-        console.error('Search failed:', err);
-        setError('Failed to fetch results. Please try again.');
-      } finally {
-        setIsSearching(false);
-      }
-    }, 500); 
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [query, user]); // Added user to dependency array
+  // Members only; from 2 characters, once typing pauses, cancelling the previous request.
+  const canSearch = Boolean(user && !user.is_guest);
+  const search = useDebouncedSearch<SearchResult>(query, canSearch ? (q, signal) => usersApi.searchUsers(q, signal) : null);
+  const results = search.results;
+  const isSearching = search.isSearching;
+  const error = search.failed ? 'Failed to fetch results. Please try again.' : null;
+  const tooShort = query.trim() !== '' && !search.active && canSearch;
 
   const handleSelectUser = (clickedUser: SearchResult) => {
     setRecentSearches((prev) => {
@@ -100,7 +73,7 @@ export default function SearchPage() {
           Find Someone
         </h1>
         <p className="text-lg text-[var(--text-muted)] font-medium">
-          Search for friends using their unique username.
+          Search for people by name or username.
         </p>
       </div>
 
@@ -112,9 +85,9 @@ export default function SearchPage() {
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-          maxLength={30}
-          placeholder="Search exact username..."
+          onChange={(e) => setQuery(e.target.value)}
+          maxLength={40}
+          placeholder="Search name or username..."
           className="w-full pl-14 pr-12 py-5 bg-[var(--card)] border border-[var(--border-color)] rounded-2xl text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all shadow-sm text-lg font-medium"
         />
         {query && (
@@ -158,6 +131,10 @@ export default function SearchPage() {
           <div className="flex flex-col items-center justify-center py-16 text-[var(--text-muted)]">
             <Loader2 className="w-8 h-8 text-[#3B82F6] animate-spin mb-4" />
           </div>
+        ) : tooShort ? (
+          <div className="flex flex-col items-center justify-center py-16 text-[var(--text-muted)]">
+            <p className="text-base text-center">Type at least {SEARCH_MIN_CHARS} characters.</p>
+          </div>
         ) : query.trim() !== '' ? (
           
           // SEARCH RESULTS
@@ -193,7 +170,7 @@ export default function SearchPage() {
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-[var(--text-muted)]">
               <p className="text-lg font-bold text-[var(--text-main)] mb-1">No users found</p>
-              <p className="text-base text-center">Make sure the username is spelled correctly.</p>
+              <p className="text-base text-center">Try a different name or username.</p>
             </div>
           )
         ) : (
@@ -247,9 +224,9 @@ export default function SearchPage() {
 
             <div className="px-2 sm:px-4 space-y-10 pt-4">
               <div className="text-center sm:text-left">
-                <p className="text-[var(--text-main)] text-lg font-bold mb-1">Search by exact username.</p>
+                <p className="text-[var(--text-main)] text-lg font-bold mb-1">Search by name or username.</p>
                 <p className="text-[var(--text-muted)] text-base">
-                  Usernames don't contain spaces. Example: <span className="text-[var(--text-main)] font-semibold">robertdowney</span>
+                  Type the start of a name or username. Example: <span className="text-[var(--text-main)] font-semibold">robert</span>
                 </p>
               </div>
 

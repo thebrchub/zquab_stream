@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react';
 import protobuf from 'protobufjs';
 import { useAuth } from './AuthContext';
+import { wsConnection } from '../utils/wsConnection';
 import chatProtoSrc from '../proto/chat.proto?raw';
 import eventsProtoSrc from '../proto/events.proto?raw';
 
@@ -38,6 +39,7 @@ const RetractMessageRequestProto = safeLookup('eventspb.RetractMessageRequest', 
 const MessageRetractedProto = safeLookup('eventspb.MessageRetracted', 'MessageRetracted');
 const MuteUserRequestProto = safeLookup('eventspb.MuteUserRequest', 'MuteUserRequest');
 const RecentMessagesProto = safeLookup('chatpb.RecentMessages', 'RecentMessages');
+const PresenceListProto = safeLookup('chatpb.PresenceList', 'PresenceList');
 const StreamPausedProto = safeLookup('eventspb.StreamPaused', 'StreamPaused');
 const StreamResumedProto = safeLookup('eventspb.StreamResumed', 'StreamResumed');
 const StreamEnterRequestProto = safeLookup('eventspb.StreamEnterRequest', 'StreamEnterRequest');
@@ -103,6 +105,12 @@ const decodePayload = (t: string, payload: Uint8Array): any => {
     if (t === 'message_retracted' && MessageRetractedProto) return MessageRetractedProto.decode(payload);
     if (t === 'stream_paused' && StreamPausedProto) return StreamPausedProto.decode(payload);
     if (t === 'stream_resumed' && StreamResumedProto) return StreamResumedProto.decode(payload);
+    // The /discover list changed: JSON { added: [card], updated: [card], removed: [stream_id] }.
+    if (t === 'discover_streams_changed') return JSON.parse(new TextDecoder().decode(payload));
+    // Friends' online status: { online: string[], offline: string[], complete: boolean }.
+    if ((t === 'presence_snapshot' || t === 'presence_batch') && PresenceListProto) {
+      return PresenceListProto.toObject(PresenceListProto.decode(payload), { arrays: true, defaults: true });
+    }
     if (t === 'recent_messages' && RecentMessagesProto) {
       const history: any = RecentMessagesProto.decode(payload);
       const messages = (history.envelopes || []).map((raw: Uint8Array) => {
@@ -152,6 +160,22 @@ class WSEmitter {
 }
 export const wsEvents = new WSEmitter();
 
+
+
+// Reconnect timing. After a server restart every open tab reconnects; a random
+// wait spreads them out instead of all arriving in the same second (the server
+// also turns away connects above its per-second limit). The wait doubles after
+// each failed try, up to RECONNECT_MAX_MS.
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 30_000;
+const RECONNECT_MIN_MS = 500;
+// A connection that stayed open this long counts as healthy: the next drop
+// starts again from the shortest wait.
+const CONNECTION_STABLE_MS = 10_000;
+
+const reconnectDelay = (attempt: number) =>
+  RECONNECT_MIN_MS + Math.random() * Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** attempt);
+
 interface WebSocketContextType {
   isConnected: boolean;
   sendMessage: (type: string, payload?: any, roomId?: string, to?: string, id?: string) => string | undefined;
@@ -163,95 +187,98 @@ const WebSocketContext = createContext<WebSocketContextType | null>(null);
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<any | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<number | null>(null);
-  const isProviderMountedRef = useRef(false);
 
-  const connect = () => {
-    if (import.meta.env.DEV || window.location.hostname === 'localhost') {
-      console.info('🛠️ DEV MODE: Connecting to WebSocket for local testing.');
-    }
-    
-    const WS_BASE = import.meta.env.VITE_WS_BASE_URL ?? 'wss://aarpaar-api.brchub.tech';
-    const wsUrl = `${WS_BASE}/ws`;
-    
-    const ws = new WebSocket(wsUrl);
-    ws.binaryType = 'arraybuffer'; 
-
-    ws.onopen = () => {
-      if (!isProviderMountedRef.current || wsRef.current !== ws) {
-        ws.close();
-        return;
-      }
-      console.log('WebSocket connected');
-      setIsConnected(true);
-      
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        if (!(event.data instanceof ArrayBuffer)) return;
-
-        const bytes = new Uint8Array(event.data);
-        const envelope = Envelope.decode(bytes) as any;
-
-        const finalMessage = {
-          ...envelope,
-          payload: decodePayload(envelope.type || '', envelope.payload),
-        };
-
-        wsEvents.emit(finalMessage);
-        setLastMessage(finalMessage);
-
-      } catch (err) {
-        console.error('Failed to decode WS message:', err);
-      }
-    };
-
-    ws.onclose = () => {
-      if (!isProviderMountedRef.current || wsRef.current !== ws) return;
-      console.log('WebSocket disconnected. Reconnecting in 3s...');
-      setIsConnected(false);
-      reconnectTimeoutRef.current = window.setTimeout(connect, 3000);
-    };
-
-    ws.onerror = (err) => {
-      console.error('WebSocket error:', err);
-      ws.close(); 
-    };
-
-    wsRef.current = ws;
-  };
-
-  useEffect(() => {
-    isProviderMountedRef.current = true;
-    connect();
-    return () => {
-      isProviderMountedRef.current = false;
-      if (wsRef.current) wsRef.current.close();
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-    };
-  }, []);
-
-  // The socket is logged in as whoever the cookie was for when it opened, so reopen it after a login switch.
+  // Connect only while someone is logged in (a full account or a guest): the
+  // server refuses /ws without a login, so trying would just fail forever. The
+  // socket is logged in as whoever the cookie was for when it opened, so a
+  // login switch closes it and opens a new one.
   const { user, isLoading: isAuthLoading } = useAuth();
   const userKey = user ? `${user.user_id}:${user.is_guest}` : '';
-  const prevUserKeyRef = useRef(userKey);
+
   useEffect(() => {
-    if (isAuthLoading || prevUserKeyRef.current === userKey) {
-      prevUserKeyRef.current = userKey;
-      return;
-    }
-    prevUserKeyRef.current = userKey;
-    wsRef.current?.close();
+    if (isAuthLoading || !userKey) return;
+
+    const WS_BASE = import.meta.env.VITE_WS_BASE_URL ?? 'wss://aarpaar-api.brchub.tech';
+    const wsUrl = `${WS_BASE}/ws`;
+    let stopped = false;
+    let attempt = 0;
+    let openedAt = 0;
+    let timer: number | null = null;
+    let current: WebSocket | null = null;
+
+    const open = () => {
+      timer = null;
+      const ws = new WebSocket(wsUrl);
+      ws.binaryType = 'arraybuffer';
+      current = ws;
+
+      ws.onopen = () => {
+        if (stopped || current !== ws) {
+          ws.close();
+          return;
+        }
+        openedAt = Date.now();
+        wsConnection.attach(ws);
+        setIsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          if (!(event.data instanceof ArrayBuffer)) return;
+
+          const bytes = new Uint8Array(event.data);
+          const envelope = Envelope.decode(bytes) as any;
+
+          const finalMessage = {
+            ...envelope,
+            payload: decodePayload(envelope.type || '', envelope.payload),
+            // The undecoded payload bytes, for code that decodes them itself (stranger chat).
+            rawPayload: envelope.payload,
+          };
+
+          wsEvents.emit(finalMessage);
+          setLastMessage(finalMessage);
+        } catch (err) {
+          console.error('Failed to decode WS message:', err);
+        }
+      };
+
+      ws.onclose = () => {
+        if (current !== ws) return;
+        current = null;
+        wsConnection.detach(ws);
+        setIsConnected(false);
+        if (stopped) return;
+        if (openedAt && Date.now() - openedAt >= CONNECTION_STABLE_MS) attempt = 0;
+        openedAt = 0;
+        const delay = reconnectDelay(attempt);
+        attempt += 1;
+        console.log(`WebSocket disconnected. Reconnecting in ${Math.round(delay / 100) / 10}s...`);
+        timer = window.setTimeout(open, delay);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+    };
+
+    open();
+
+    return () => {
+      stopped = true;
+      if (timer !== null) window.clearTimeout(timer);
+      const ws = current;
+      current = null;
+      if (ws) {
+        wsConnection.detach(ws);
+        ws.close();
+      }
+      setIsConnected(false);
+    };
   }, [userKey, isAuthLoading]);
 
   const sendMessage = useCallback((type: string, payload?: any, roomId?: string, to?: string, id?: string) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (!wsConnection.isOpen()) {
       console.warn('Cannot send message: WebSocket is not open');
       return undefined;
     }
@@ -304,11 +331,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       });
       
       const bytes = Envelope.encode(envelope).finish();
-      const buffer = bytes.buffer instanceof ArrayBuffer
-        ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-        : new Uint8Array(bytes).slice().buffer;
-        
-      wsRef.current.send(buffer);
+      if (!wsConnection.sendBytes(bytes)) return undefined;
       return msgId;
     } catch (err) {
       console.error('Failed to encode/send message:', err);
