@@ -92,7 +92,7 @@ export default function DevMenu() {
               {/* 🚀 New Public Profile Testing Route */}
               <Link to="/user/shadow_ninja" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-md transition-colors">👥 UI: View Public User</Link>
               
-              <Link to="/waitlist" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-amber-400 hover:text-amber-300 hover:bg-gray-800 p-2 rounded-md transition-colors">⏳ UI: Waitlist Preview</Link>
+              <Link to="/dev/waitlist" onClick={() => setIsOpen(false)} className="block text-sm font-medium text-amber-400 hover:text-amber-300 hover:bg-gray-800 p-2 rounded-md transition-colors">⏳ UI: Waitlist Preview</Link>
             </div>
 
             <div className="mt-1 pt-1 space-y-2">

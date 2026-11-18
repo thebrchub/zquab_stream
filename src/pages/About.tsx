@@ -1,348 +1,540 @@
-import { useState } from 'react';
-import { 
-  Globe, Heart, Shield, MessageCircle, 
-  UserX, Zap, Lock, ChevronDown, CheckCircle2 
+import { useMemo, useState } from 'react';
+import {
+  ArrowRight,
+  BadgeCheck,
+  CheckCircle2,
+  ChevronDown,
+  Coins,
+  Compass,
+  Gift,
+  Globe2,
+  Heart,
+  LockKeyhole,
+  MessageCircle,
+  Radio,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Users,
+  Video,
+  Wallet,
 } from 'lucide-react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import SEO from '../components/SEO';
 
-const values = [
+const features = [
   {
-    icon: Globe,
-    title: "Global Reach, Local Presence",
-    description: "Bridging geographical divides in milliseconds. Connect with diverse perspectives from every corner of the planet instantly through anonymous text chat."
+    icon: Compass,
+    title: 'Discover',
+    text: 'Explore live spaces, discover creators, and find conversations that catch your interest.',
+    tone: 'blue',
   },
+  {
+    icon: MessageCircle,
+    title: 'Join the moment',
+    text: 'Enter a stream, follow the conversation, and interact with the people bringing the room to life.',
+    tone: 'violet',
+  },
+  {
+    icon: Gift,
+    title: 'Show your support',
+    text: 'Use zCoins for supported virtual gifts and access to eligible premium streams.',
+    tone: 'amber',
+  },
+  {
+    icon: Users,
+    title: 'Build your circle',
+    text: 'Follow creators you enjoy and make it easier to find their content again.',
+    tone: 'green',
+  },
+];
+
+const principles = [
   {
     icon: Heart,
-    title: "Pure Human Element",
-    description: "No algorithms feeding you curated echo chambers. Just raw, unpredictable, and authentic human-to-human conversation on the zQuab platform."
+    title: 'People before metrics',
+    text: 'We want interactions to feel human. The best moments come from people, not numbers on a screen.',
   },
   {
-    icon: Shield,
-    title: "Privacy First Architecture",
-    description: "Designed from the ground up to respect your digital footprint. No unnecessary tracking, no public profiles, and total ephemerality."
-  }
+    icon: ShieldCheck,
+    title: 'A respectful community',
+    text: 'Everyone should be able to participate without harassment, hate, scams, or deliberate disruption.',
+  },
+  {
+    icon: Sparkles,
+    title: 'Room to be discovered',
+    text: 'Whether you are here to watch, chat, or create, discovering people and content should feel simple.',
+  },
 ];
 
 const faqs = [
   {
-    question: "Do I need to register to use zQuab?",
-    answer: "No registration or login is required to start chatting. You can connect anonymously with strangers instantly. We believe in reducing friction so you can jump right into a text chat without handing over your email."
+    question: 'What is zQuab?',
+    answer:
+      'zQuab is a social platform built around live content and real-time interaction. You can discover live streams, join conversations, follow creators, and use zCoins for supported in-app experiences.',
   },
   {
-    question: "Is zQuab a video chat app?",
-    answer: "No, zQuab is strictly a text-only stranger chat web app. We intentionally designed the platform without cameras to strip away physical judgments and create a safer, lower-pressure environment. No camera, audio, or video permissions are ever requested."
+    question: 'Can anyone start a live stream?',
+    answer:
+      'Live-streaming access is reserved for approved creators. Creator access is reviewed, so creating an account does not automatically grant permission to go live.',
   },
   {
-    question: "Does zQuab show ads or require payment?",
-    answer: "No. zQuab is completely free with no paid ads, subscription walls, or hidden fees. Connecting with other human beings shouldn't be locked behind a paywall."
+    question: 'What are zCoins used for?',
+    answer:
+      'zCoins are zQuab’s in-app virtual currency. They can be used for supported virtual gifts and access to eligible premium streams. They are not a bank balance or a general-purpose payment method.',
   },
   {
-    question: "Is my anonymous chat data safe?",
-    answer: "Absolutely. We do not permanently store your chat logs or personal information. Once a session ends, the digital footprint of that conversation vanishes."
+    question: 'Can I withdraw zCoins as cash?',
+    answer:
+      'No. zCoins are an in-app currency and should not be treated as cash or as a withdrawable wallet balance. Any future creator payout feature will be communicated separately when it is available.',
   },
   {
-    question: "How do you handle moderation and safety online?",
-    answer: "While we value anonymity, we do not tolerate abuse. We employ automated systems to block spam, illicit content, and severe harassment. If someone breaks the community rules, they will be banned. We want this to feel like a friendly, safe text chat."
-  }
+    question: 'Do I need to be a creator to use zQuab?',
+    answer:
+      'No. You can discover and watch live content, take part in conversations, follow creators, and use supported in-app features without being an approved creator.',
+  },
+  {
+    question: 'Does zQuab offer paid one-to-one sessions?',
+    answer:
+      'Paid one-to-one sessions are not currently part of the available feature set. zQuab’s current experience focuses on live streams and interactions within those spaces.',
+  },
+  {
+    question: 'How should I behave in the community?',
+    answer:
+      'Be respectful. Do not harass, threaten, impersonate, share hateful content, run scams, or use the platform to exploit others. Respect other people’s boundaries and privacy.',
+  },
 ];
 
 const rules = [
-  "No begging for money or financial scams.",
-  "No promoting external links or businesses.",
-  "Zero tolerance for bullying, harassment, or hate speech.",
-  "Treat strangers with the same respect you expect in return."
+  'Treat creators and viewers with respect. Disagreement is never an excuse for harassment.',
+  'No hate speech, bullying, threats, sexual harassment, or targeted abuse.',
+  'No impersonation, scams, misleading offers, or attempts to exploit other users.',
+  'Respect privacy. Do not publish someone else’s personal or private information.',
+  'Do not spam streams, conversations, or the platform with disruptive content.',
 ];
 
-// Animation Variants for staggered, springy reveals
-const staggerContainer: Variants = {
+const stagger: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1, delayChildren: 0.1 }
-  }
+    transition: { staggerChildren: 0.08, delayChildren: 0.05 },
+  },
 };
 
-const springItem: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
+const rise: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
     y: 0,
-    transition: { type: "spring", stiffness: 300, damping: 24 }
-  }
+    transition: { type: 'spring', stiffness: 280, damping: 26 },
+  },
 };
+
+const tones: Record<string, string> = {
+  blue: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+  violet: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300',
+  amber: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+  green: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+};
+
+const clayShadow =
+  'shadow-[8px_8px_18px_rgba(0,0,0,0.09),-7px_-7px_18px_rgba(255,255,255,0.82),inset_1px_1px_2px_rgba(255,255,255,0.65)] dark:shadow-[8px_8px_18px_rgba(0,0,0,0.32),-5px_-5px_14px_rgba(255,255,255,0.035),inset_1px_1px_2px_rgba(255,255,255,0.035)]';
+
+const clayInset =
+  'shadow-[inset_4px_4px_9px_rgba(0,0,0,0.07),inset_-4px_-4px_9px_rgba(255,255,255,0.75)] dark:shadow-[inset_4px_4px_9px_rgba(0,0,0,0.28),inset_-3px_-3px_8px_rgba(255,255,255,0.025)]';
+
 export default function AboutPage() {
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
   const navigate = useNavigate();
 
-  const toggleFaq = (index: number) => {
-    setOpenFaq(openFaq === index ? null : index);
-  };
-
-  const faqSchema = JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": faqs.map(faq => ({
-      "@type": "Question",
-      "name": faq.question,
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": faq.answer
-      }
-    }))
-  });
+  const faqSchema = useMemo(
+    () =>
+      JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqs.map((faq) => ({
+          '@type': 'Question',
+          name: faq.question,
+          acceptedAnswer: { '@type': 'Answer', text: faq.answer },
+        })),
+      }),
+    [],
+  );
 
   return (
     <>
-      <SEO 
-        title="About zQuab | Anonymous Text Chat With Strangers, No Video"
-        description="zQuab is a fast, text-only stranger chat platform. Learn about our strict privacy standards, no-ad policy, and how to talk to strangers online anonymously."
+      <SEO
+        title="About zQuab | Live Streams, Creators & Communities"
+        description="Learn about zQuab: discover live streams, join real-time conversations, follow creators, and use zCoins for supported in-app experiences."
         path="/about"
         schema={faqSchema}
       />
 
-      <main className="min-h-[100dvh] pt-10 pb-24 relative w-full bg-[var(--background)] z-20 font-sans overflow-hidden">
-        <div className="w-full max-w-[1400px] mx-auto px-4 md:px-8 lg:px-12">
-          
-          {/* --- HERO SECTION --- */}
-          <motion.div 
-            variants={staggerContainer}
-            initial="hidden"
-            animate="visible"
-            className="max-w-5xl mx-auto text-center mb-24 mt-12"
+      <main className="min-h-[100dvh] w-full bg-[var(--background)] pb-24 pt-10 font-sans text-[var(--text-main)] md:pt-14">
+        <div className="mx-auto w-full max-w-[1180px] px-4 md:px-8">
+          {/* Simple page heading — intentionally no hero */}
+          <motion.header
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mx-auto mb-16 max-w-3xl text-center"
           >
-            <motion.h1 
-              variants={springItem}
-              className="text-5xl md:text-6xl lg:text-7xl font-black mb-8 text-[var(--text-main)] tracking-tight leading-tight"
-            >
-              Reclaiming the lost art of <br className="hidden md:block" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#3B82F6] to-cyan-400 inline-block animate-gradient-x">
-                anonymous text chat.
-              </span>
-            </motion.h1>
             
-            <motion.p 
-              variants={springItem}
-              className="text-lg md:text-xl text-[var(--text-muted)] leading-relaxed max-w-3xl mx-auto mb-10"
-            >
-              The internet used to be a place of serendipitous discovery. <strong>zQuab, the text-only stranger chat app,</strong> strips away the performance metrics, cameras, and friction of modern social networks. We give you a clean, secure window to talk to strangers online anonymously.
-            </motion.p>
+            <p className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">
+              A little about us
+            </p>
+            <h1 className="mb-5 text-4xl font-black tracking-tight sm:text-5xl">
+              Meet <span className="text-blue-600 dark:text-blue-400">zQuab.</span>
+            </h1>
+            <p className="mx-auto max-w-2xl text-base leading-relaxed text-[var(--text-muted)] md:text-lg">
+              A social space for live content, real-time conversations, creators,
+              and the communities that grow around them.
+            </p>
+          </motion.header>
 
-            <motion.button
-              variants={springItem}
-              onClick={() => navigate('/chat')}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 bg-[#3B82F6] text-white font-bold rounded-full transition-all duration-200 shadow-[4px_4px_16px_rgba(59,130,246,0.3),-2px_-2px_6px_rgba(255,255,255,0.05),inset_1px_1px_2px_rgba(255,255,255,0.2),inset_-1px_-1px_2px_rgba(0,0,0,0.2)] hover:bg-blue-600"
-            >
-              <MessageCircle className="w-5 h-5 relative z-10 group-hover:rotate-12 transition-transform" />
-              <span className="relative z-10 text-lg">Start a zQuab Chat</span>
-            </motion.button>
-          </motion.div>
-
-          {/* --- 3 VALUE PILLARS --- */}
-          <motion.div 
-            variants={staggerContainer}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6 xl:gap-8 w-full mb-32"
-          >
-            {values.map((item, index) => (
-              <motion.div
-                key={index}
-                variants={springItem}
-                whileHover={{ 
-                  y: -5,
-                  transition: { type: "spring", stiffness: 400, damping: 25 }
-                }}
-                className="p-8 md:p-10 rounded-[2rem] bg-[var(--card)] border border-[var(--border-color)] flex flex-col items-start transition-all duration-300 hover:border-[#3B82F6]/50 hover:shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.03),inset_-1px_-1px_2px_rgba(0,0,0,0.08)]"
-              >
-                <div className="p-4 rounded-2xl bg-[#3B82F6]/10 text-[#3B82F6] mb-6 border border-[#3B82F6]/20 shadow-sm">
-                  <item.icon className="w-7 h-7" strokeWidth={2.5} />
-                </div>
-                <h3 className="text-xl font-black text-[var(--text-main)] mb-3 tracking-tight">
-                  {item.title}
-                </h3>
-                <p className="text-[var(--text-muted)] leading-relaxed text-base">
-                  {item.description}
+          {/* What is zQuab */}
+          <section className={`mb-20 rounded-[2rem] border border-[var(--border-color)] bg-[var(--card)] p-7 md:p-10 ${clayShadow}`}>
+            <div className="grid items-center gap-8 md:grid-cols-[1fr_auto]">
+              <div className="max-w-3xl">
+                <p className="mb-3 text-sm font-black uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400">
+                  What is zQuab?
                 </p>
-              </motion.div>
-            ))}
-          </motion.div>
-
-          {/* --- OUR STORY & VISION --- */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center mb-32 w-full">
-            <motion.div 
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ type: "spring", stiffness: 200, damping: 30 }}
-              className="space-y-6"
-            >
-              <h2 className="text-3xl md:text-5xl font-black text-[var(--text-main)] tracking-tight leading-tight">
-                A safer Omegle text chat alternative.
-              </h2>
-              <p className="text-[var(--text-muted)] leading-relaxed text-lg">
-                We built this platform because we noticed a massive gap in modern social media. Today, you mostly interact with people you already know, or you navigate video-chat platforms riddled with bots and inappropriate content.
-              </p>
-              <p className="text-[var(--text-muted)] leading-relaxed text-lg">
-                zQuab fixes that by removing the camera entirely. Whether you want to discuss a dilemma completely honestly with a neutral third party, meet people from across the globe, or just practice your conversational skills—we provide the safest, fastest environment to do it. No profiles to judge, just text to read.
-              </p>
-              <div className="pt-6 flex flex-wrap gap-4">
-                {[
-                  { icon: UserX, text: "Anonymous", color: "text-[#3B82F6]" },
-                  { icon: Lock, text: "No Video", color: "text-emerald-500" },
-                  { icon: Zap, text: "Instant", color: "text-amber-500" }
-                ].map((tag, i) => (
-                  <motion.div 
-                    key={i}
-                    whileHover={{ scale: 1.05 }}
-                    className="flex items-center gap-2 text-sm font-bold text-[var(--text-main)] bg-[var(--card)] border border-[var(--border-color)] px-5 py-3 rounded-xl shadow-sm"
-                  >
-                    <tag.icon className={`w-5 h-5 ${tag.color}`} /> {tag.text}
-                  </motion.div>
-                ))}
+                <h2 className="mb-4 text-2xl font-black tracking-tight md:text-3xl">
+                  Not just another place to scroll.
+                </h2>
+                <p className="text-base leading-relaxed text-[var(--text-muted)] md:text-lg">
+                  zQuab brings live content and real-time interaction together.
+                  Discover creators, join conversations, follow the people you
+                  enjoy, and support the moments that make you stay.
+                </p>
               </div>
-            </motion.div>
+              <div className={`mx-auto flex h-28 w-28 items-center justify-center rounded-[2rem] bg-[var(--background)] text-blue-600 dark:text-blue-400 ${clayInset}`}>
+                <Radio className="h-12 w-12" />
+              </div>
+            </div>
+          </section>
 
-            <motion.div 
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ type: "spring", stiffness: 200, damping: 30, delay: 0.2 }}
-              className="bg-[var(--card)] p-8 md:p-12 rounded-[2rem] border border-[var(--border-color)] shadow-[4px_4px_16px_rgba(0,0,0,0.15),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.03),inset_-1px_-1px_2px_rgba(0,0,0,0.08)]"
-            >
-              <h3 className="text-2xl font-black text-[var(--text-main)] mb-6">Community Guidelines</h3>
-              <p className="text-[var(--text-muted)] mb-8 text-lg">
-                To keep zQuab an incredible place for everyone, we ask our users to treat others with the same respect they would in real life.
+          {/* Features */}
+          <section className="mb-24">
+            <div className="mb-9">
+              <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400">
+                The experience
               </p>
-              <motion.ul 
-                variants={staggerContainer}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                className="space-y-5"
-              >
-                {rules.map((rule, i) => (
-                  <motion.li 
-                    key={i} 
-                    variants={springItem}
-                    className="flex items-start gap-4 text-[var(--text-main)]"
-                  >
-                    <CheckCircle2 className="w-6 h-6 text-[#3B82F6] shrink-0 mt-0.5" />
-                    <span className="leading-relaxed font-medium">{rule}</span>
-                  </motion.li>
-                ))}
-              </motion.ul>
-            </motion.div>
-          </div>
-
-          {/* --- FAQ SECTION (Fluid Layout Springs) --- */}
-          <div className="max-w-4xl mx-auto mb-32 w-full">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-center mb-12"
-            >
-              <h2 className="text-3xl md:text-4xl font-black text-[var(--text-main)] mb-4 tracking-tight">
-                Frequently Asked Questions
+              <h2 className="text-3xl font-black tracking-tight md:text-4xl">
+                A little more than watching.
               </h2>
-              <p className="text-[var(--text-muted)] text-lg">Everything you need to know about how the zQuab text chat platform works.</p>
-            </motion.div>
-            
-            <motion.div layout className="space-y-4">
-              {faqs.map((faq, index) => (
-                <motion.div 
-                  layout
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`border border-[var(--border-color)] rounded-[1.5rem] overflow-hidden transition-colors duration-300 ${openFaq === index ? 'bg-[var(--card)] shadow-[inset_1px_1px_4px_rgba(0,0,0,0.1)] border-[#3B82F6]/30' : 'bg-[var(--card)] hover:border-[#3B82F6]/50'}`}
+              <p className="mt-3 max-w-2xl text-[var(--text-muted)]">
+                Discover content, interact in real time, and stay connected to
+                the creators you enjoy.
+              </p>
+            </div>
+
+            <motion.div
+              variants={stagger}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: '-70px' }}
+              className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4"
+            >
+              {features.map((item, index) => (
+                <motion.article
+                  key={item.title}
+                  variants={rise}
+                  whileHover={{ y: -5 }}
+                  className={`rounded-[1.8rem] border border-[var(--border-color)] bg-[var(--card)] p-7 transition-shadow duration-300 hover:shadow-[10px_10px_22px_rgba(0,0,0,0.12),-8px_-8px_20px_rgba(255,255,255,0.85)] dark:hover:shadow-[10px_10px_22px_rgba(0,0,0,0.38),-5px_-5px_16px_rgba(255,255,255,0.04)] ${clayShadow}`}
                 >
-                  <motion.button 
-                    layout
-                    aria-label="Toggle FAQ"
-                    onClick={() => toggleFaq(index)}
-                    className="w-full flex items-center justify-between p-6 md:p-8 text-left focus:outline-none"
-                  >
-                    <span className={`font-bold text-lg md:text-xl pr-4 transition-colors ${openFaq === index ? 'text-[#3B82F6]' : 'text-[var(--text-main)]'}`}>
-                      {faq.question}
+                  <div className="mb-7 flex items-center justify-between">
+                    <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${tones[item.tone]} ${clayShadow}`}>
+                      <item.icon className="h-6 w-6" strokeWidth={2.2} />
+                    </div>
+                    <span className="text-sm font-black tracking-widest text-[var(--text-muted)]">
+                      0{index + 1}
                     </span>
-                    <motion.div
-                      animate={{ rotate: openFaq === index ? 180 : 0 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                    >
-                      <ChevronDown className="w-6 h-6 text-[#3B82F6] shrink-0" />
-                    </motion.div>
-                  </motion.button>
-                  <AnimatePresence>
-                    {openFaq === index && (
-                      <motion.div
-                        layout
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                      >
-                        <div className="p-6 md:p-8 pt-0 text-[var(--text-muted)] text-lg leading-relaxed">
-                          {faq.answer}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+                  </div>
+                  <h3 className="mb-3 text-xl font-black tracking-tight">
+                    {item.title}
+                  </h3>
+                  <p className="text-sm leading-relaxed text-[var(--text-muted)]">
+                    {item.text}
+                  </p>
+                </motion.article>
               ))}
             </motion.div>
-          </div>
+          </section>
 
-          {/* --- BOTTOM CTA --- */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 30 }}
-            whileInView={{ opacity: 1, scale: 1, y: 0 }}
-            viewport={{ once: true, margin: "-50px" }}
-            transition={{ type: "spring", stiffness: 200, damping: 25 }}
-            className="w-full max-w-5xl mx-auto bg-[#3B82F6] rounded-[2rem] p-10 md:p-16 text-center text-white relative overflow-hidden"
-          >
-            {/* Animated Background Orbs */}
-            <motion.div 
-              animate={{ 
-                scale: [1, 1.2, 1],
-                opacity: [0.3, 0.5, 0.3] 
-              }}
-              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute top-0 right-0 w-64 h-64 bg-white/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" 
-            />
-            <motion.div 
-              animate={{ 
-                scale: [1, 1.3, 1],
-                opacity: [0.2, 0.4, 0.2] 
-              }}
-              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-              className="absolute bottom-0 left-0 w-64 h-64 bg-black/30 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" 
-            />
-            
-            <div className="relative z-10">
-              <h2 className="text-3xl md:text-5xl font-black mb-6 tracking-tight">Ready to meet someone new?</h2>
-              <p className="text-blue-100 text-lg md:text-xl mb-10 max-w-2xl mx-auto leading-relaxed">
-                Join thousands of users connecting right now on zQuab. No signup required. Completely anonymous text chat.
+          {/* How it works */}
+          <section className="mb-24 grid items-center gap-10 lg:grid-cols-[0.85fr_1.15fr]">
+            <div>
+              <p className="mb-3 text-sm font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
+                Find your way around
               </p>
-              <motion.button
-                onClick={() => navigate('/chat')}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="inline-flex items-center justify-center gap-3 px-8 py-4 bg-[var(--card)] text-[var(--text-main)] font-bold rounded-full transition-all shadow-[4px_4px_16px_rgba(0,0,0,0.2),-2px_-2px_6px_rgba(255,255,255,0.1),inset_1px_1px_2px_rgba(255,255,255,0.05),inset_-1px_-1px_2px_rgba(0,0,0,0.1)] hover:text-[#3B82F6]"
-              >
-                <MessageCircle className="w-6 h-6" />
-                <span className="text-lg">Start a Conversation</span>
-              </motion.button>
+              <h2 className="mb-5 text-3xl font-black leading-tight tracking-tight md:text-4xl">
+                Your next favourite moment is out there.
+              </h2>
+              <p className="text-lg leading-relaxed text-[var(--text-muted)]">
+                Getting started is simple. Explore what’s live, join a space
+                that interests you, and keep up with the creators you want to
+                see again.
+              </p>
             </div>
-          </motion.div>
+            <div className="space-y-5">
+              {[
+                {
+                  icon: Globe2,
+                  title: 'Discover',
+                  text: 'Browse live content and find creators or conversations that interest you.',
+                  tone: 'blue',
+                },
+                {
+                  icon: Video,
+                  title: 'Join',
+                  text: 'Enter a live stream, watch, and participate in its real-time chat.',
+                  tone: 'violet',
+                },
+                {
+                  icon: Star,
+                  title: 'Stay connected',
+                  text: 'Follow creators, send supported gifts, and return to the spaces you enjoy.',
+                  tone: 'amber',
+                },
+              ].map((step, index) => (
+                <motion.div
+                  key={step.title}
+                  initial={{ opacity: 0, x: 16 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.08 }}
+                  className={`flex gap-5 rounded-[1.6rem] border border-[var(--border-color)] bg-[var(--card)] p-5 md:p-6 ${clayShadow}`}
+                >
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${tones[step.tone]}`}>
+                    <step.icon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="mb-1 text-lg font-black">{step.title}</h3>
+                    <p className="text-sm leading-relaxed text-[var(--text-muted)]">
+                      {step.text}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </section>
 
+          {/* Creator section */}
+          <section className={`mb-24 rounded-[2rem] border border-violet-300/50 bg-[var(--card)] p-7 md:p-11 ${clayShadow}`}>
+            <div className="grid items-center gap-8 lg:grid-cols-[1fr_auto]">
+              <div className="max-w-2xl">
+                <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-violet-100 px-4 py-2 text-sm font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                  <Radio className="h-4 w-4" /> For creators
+                </div>
+                <h2 className="mb-4 text-3xl font-black leading-tight tracking-tight md:text-4xl">
+                  Bring your people together, live.
+                </h2>
+                <p className="mb-6 text-base leading-relaxed text-[var(--text-muted)] md:text-lg">
+                  zQuab gives creators a space to go live and interact with
+                  their audience. Creator access is reviewed and approved to
+                  help maintain the quality of the platform.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <span className="inline-flex items-center gap-2 rounded-xl bg-[var(--background)] px-4 py-3 text-sm font-bold">
+                    <BadgeCheck className="h-4 w-4 text-emerald-600" />
+                    Approval-based access
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-xl bg-[var(--background)] px-4 py-3 text-sm font-bold">
+                    <MessageCircle className="h-4 w-4 text-blue-600" />
+                    Real-time interaction
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-xl bg-[var(--background)] px-4 py-3 text-sm font-bold">
+                    <Gift className="h-4 w-4 text-amber-600" />
+                    Virtual gifts
+                  </span>
+                </div>
+              </div>
+              <div className={`mx-auto flex h-36 w-36 items-center justify-center rounded-[2.2rem] bg-[var(--background)] text-violet-600 dark:text-violet-400 md:h-40 md:w-40 ${clayInset}`}>
+                <Video className="h-16 w-16" />
+              </div>
+            </div>
+          </section>
+
+          {/* zCoins */}
+          <section className={`mb-24 grid items-center gap-8 rounded-[2rem] border border-[var(--border-color)] bg-[var(--card)] p-7 md:p-10 lg:grid-cols-[auto_1fr] lg:gap-12 ${clayShadow}`}>
+            <div className={`mx-auto flex h-28 w-28 items-center justify-center rounded-[2rem] bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 md:h-36 md:w-36 ${clayShadow}`}>
+              <Coins className="h-14 w-14 md:h-16 md:w-16" strokeWidth={1.8} />
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-amber-700 dark:text-amber-400">
+                The zQuab economy
+              </p>
+              <h2 className="mb-4 text-3xl font-black tracking-tight md:text-4xl">
+                Meet zCoins.
+              </h2>
+              <p className="mb-6 max-w-3xl text-base leading-relaxed text-[var(--text-muted)] md:text-lg">
+                zCoins are the in-app currency used for supported experiences
+                on zQuab. Send virtual gifts to show appreciation and access
+                eligible premium streams. They are designed for use within
+                zQuab—not as cash or a withdrawable bank balance.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <span className="inline-flex items-center gap-2 rounded-xl bg-[var(--background)] px-4 py-3 text-sm font-bold">
+                  <Gift className="h-4 w-4 text-amber-600" /> Virtual gifts
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-xl bg-[var(--background)] px-4 py-3 text-sm font-bold">
+                  <LockKeyhole className="h-4 w-4 text-violet-600" /> Eligible premium streams
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-xl bg-[var(--background)] px-4 py-3 text-sm font-bold">
+                  <Wallet className="h-4 w-4 text-blue-600" /> In-app currency
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* Values */}
+          <section className="mb-24">
+            <div className="mx-auto mb-10 max-w-2xl text-center">
+              <p className="mb-3 text-sm font-black uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+                What matters here
+              </p>
+              <h2 className="mb-4 text-3xl font-black tracking-tight md:text-4xl">
+                The kind of community we want to build.
+              </h2>
+              <p className="text-[var(--text-muted)]">
+                Features make a platform. People make it worth coming back to.
+              </p>
+            </div>
+            <div className="grid gap-6 md:grid-cols-3">
+              {principles.map((item) => (
+                <motion.article
+                  key={item.title}
+                  whileHover={{ y: -4 }}
+                  className={`rounded-[1.8rem] border border-[var(--border-color)] bg-[var(--card)] p-7 ${clayShadow}`}
+                >
+                  <div className={`mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 ${clayShadow}`}>
+                    <item.icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="mb-3 text-xl font-black">{item.title}</h3>
+                  <p className="text-sm leading-relaxed text-[var(--text-muted)]">
+                    {item.text}
+                  </p>
+                </motion.article>
+              ))}
+            </div>
+          </section>
+
+          {/* Community standards */}
+          <section className="mb-24 grid gap-9 lg:grid-cols-[0.8fr_1.2fr]">
+            <div className="lg:pt-4">
+              <p className="mb-3 text-sm font-black uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+                Community first
+              </p>
+              <h2 className="mb-5 text-3xl font-black leading-tight tracking-tight md:text-4xl">
+                Good spaces are built by everyone in them.
+              </h2>
+              <p className="text-lg leading-relaxed text-[var(--text-muted)]">
+                A great live community needs more than good content. It needs
+                people who respect one another, creators who set a positive
+                tone, and viewers who help keep conversations constructive.
+              </p>
+            </div>
+            <div className={`rounded-[2rem] border border-[var(--border-color)] bg-[var(--card)] p-7 md:p-9 ${clayShadow}`}>
+              <div className="mb-7 flex items-center gap-3">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 ${clayShadow}`}>
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+                <h3 className="text-xl font-black">Our community standards</h3>
+              </div>
+              <ul className="space-y-5">
+                {rules.map((rule) => (
+                  <li key={rule} className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                    <span className="text-sm leading-relaxed text-[var(--text-muted)] md:text-base">
+                      {rule}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+
+          {/* FAQ */}
+          <section className="mx-auto mb-24 max-w-4xl">
+            <div className="mb-10 text-center">
+              <p className="mb-3 text-sm font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
+                A few answers
+              </p>
+              <h2 className="mb-4 text-3xl font-black tracking-tight md:text-4xl">
+                Frequently asked questions
+              </h2>
+              <p className="text-[var(--text-muted)]">
+                The essentials about using zQuab.
+              </p>
+            </div>
+            <div className="space-y-5">
+              {faqs.map((faq, index) => {
+                const isOpen = openFaq === index;
+                return (
+                  <div
+                    key={faq.question}
+                    className={`overflow-hidden rounded-[1.5rem] border border-[var(--border-color)] bg-[var(--card)] ${clayShadow}`}
+                  >
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      onClick={() => setOpenFaq(isOpen ? null : index)}
+                      className="flex w-full items-center justify-between gap-5 px-5 py-5 text-left md:px-7"
+                    >
+                      <span className={`text-base font-bold md:text-lg ${isOpen ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--text-main)]'}`}>
+                        {faq.question}
+                      </span>
+                      <motion.span
+                        animate={{ rotate: isOpen ? 180 : 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="shrink-0 text-blue-600 dark:text-blue-400"
+                      >
+                        <ChevronDown className="h-5 w-5" />
+                      </motion.span>
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.22, ease: 'easeInOut' }}
+                        >
+                          <p className="px-5 pb-6 text-sm leading-relaxed text-[var(--text-muted)] md:px-7 md:text-base">
+                            {faq.answer}
+                          </p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Closing CTA */}
+          <section className={`rounded-[2rem] border border-[var(--border-color)] bg-[var(--card)] px-6 py-12 text-center md:px-12 md:py-14 ${clayShadow}`}>
+            <div className={`mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 ${clayShadow}`}>
+              <ArrowRight className="h-7 w-7" />
+            </div>
+            <h2 className="mb-4 text-3xl font-black tracking-tight md:text-4xl">
+              Your next connection starts here.
+            </h2>
+            <p className="mx-auto mb-8 max-w-2xl text-base leading-relaxed text-[var(--text-muted)] md:text-lg">
+              Explore what’s live, meet creators, and become part of the
+              conversation on zQuab.
+            </p>
+            <motion.button
+              type="button"
+              onClick={() => navigate('/')}
+              whileHover={{ y: -2, scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="inline-flex items-center justify-center gap-3 rounded-full bg-blue-600 px-8 py-4 font-black text-white shadow-[5px_5px_12px_rgba(37,99,235,0.28),-3px_-3px_8px_rgba(255,255,255,0.8)] transition-colors hover:bg-blue-700 dark:shadow-[5px_5px_12px_rgba(0,0,0,0.28),-2px_-2px_6px_rgba(255,255,255,0.04)]"
+            >
+              Explore zQuab <ArrowRight className="h-5 w-5" />
+            </motion.button>
+          </section>
         </div>
       </main>
     </>

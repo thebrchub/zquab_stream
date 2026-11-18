@@ -59,7 +59,15 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
   const [application, setApplication] = useState<CreatorApplication | null>(null);
   const [applicationError, setApplicationError] = useState<string | null>(null);
 
-  const verificationCode = application?.verification_code || `zQuab-${username}`;
+  
+type CreatorApplicationWithVerificationUrl = CreatorApplication & {
+  verification_url?: string;
+};
+
+const verificationUrl =
+  (application as CreatorApplicationWithVerificationUrl | null)?.verification_url ||
+  `https://zquab.com/verify/${encodeURIComponent(username)}/demo-token`;
+
 
   useEffect(() => {
     if (!isOpen) return;
@@ -133,11 +141,17 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
     }
   };
 
-  const copyCode = () => {
-    navigator.clipboard.writeText(verificationCode);
+  
+const copyVerificationUrl = async () => {
+  try {
+    await navigator.clipboard.writeText(verificationUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
+  } catch {
+    setApplicationError('Unable to copy the link. Please copy it manually.');
+  }
+};
+
 
   const resetAndClose = () => {
     onClose();
@@ -251,24 +265,60 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
         )}
         {applicationError && <p className="mb-4 text-xs text-red-400">{applicationError}</p>}
 
-                {/* Verification Code Block */}
-                <div className="flex items-center justify-between bg-[var(--card)] border border-[#3B82F6]/30 rounded-[1rem] p-3 mb-4 shadow-[inset_2px_2px_4px_rgba(0,0,0,0.05)] w-full overflow-hidden">
-                  <div className="flex flex-col gap-0.5 pl-2 truncate pr-3">
-                    <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Verification Code</span>
-                    <span className="font-mono font-bold text-[#3B82F6] text-sm truncate">{verificationCode}</span>
-                  </div>
-                  <button 
-                    onClick={copyCode}
-                    className="shrink-0 p-2.5 bg-[#3B82F6]/10 hover:bg-[#3B82F6]/20 text-[#3B82F6] rounded-xl transition-colors flex items-center gap-2 active:scale-95"
-                  >
-                    {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    <span className="text-xs font-bold hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
-                  </button>
-                </div>
                 
-                <p className="text-[var(--text-muted)] text-[11px] leading-relaxed mb-6 px-1 font-medium">
-                  * Paste the code above into the bios of the accounts you link below. You can remove it after approval.
-                </p>
+{/* Creator Profile Verification Link */}
+<div className="rounded-[1rem] border border-[#3B82F6]/30 bg-[var(--card)] p-4 mb-4 shadow-[inset_2px_2px_4px_rgba(0,0,0,0.05)]">
+
+  <div className="flex items-center justify-between gap-2 mb-3">
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+        Your zQuab Profile Link
+      </span>
+      <span className="text-xs text-[var(--text-muted)]">
+        Add this to your social media bio
+      </span>
+    </div>
+
+    <button
+      type="button"
+      onClick={copyVerificationUrl}
+      className="shrink-0 p-2.5 bg-[#3B82F6]/10 hover:bg-[#3B82F6]/20 text-[#3B82F6] rounded-xl transition-colors flex items-center gap-2 active:scale-95"
+    >
+      {copied ? (
+        <CheckCircle2 className="w-4 h-4" />
+      ) : (
+        <Copy className="w-4 h-4" />
+      )}
+
+      <span className="text-xs font-bold">
+        {copied ? 'Copied' : 'Copy Link'}
+      </span>
+    </button>
+  </div>
+
+  <div className="rounded-xl bg-[var(--background)] border border-[var(--border-color)] px-3 py-3">
+    <a
+      href={verificationUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-sm font-semibold text-[#3B82F6] break-all hover:underline"
+    >
+      {verificationUrl}
+    </a>
+  </div>
+
+  <span className="inline-flex items-center gap-1.5 mt-3 text-[9px] font-bold uppercase tracking-wider text-amber-500">
+    <ShieldCheck className="w-3.5 h-3.5" />
+    Demo verification link
+  </span>
+</div>
+
+<p className="text-[var(--text-muted)] text-[11px] leading-relaxed mb-6 px-1 font-medium">
+  Add your unique zQuab profile link to the bio of each social account
+  you submit. This helps us verify that you own those accounts.
+  You can remove the link after your application is approved.
+</p>
+
 
                 <div className="space-y-3 pb-2">
                   <div className="relative group">
@@ -341,12 +391,33 @@ export function CreatorApplicationModal({ isOpen, onClose, username }: CreatorAp
                 <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mb-6 border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)]">
                   <CheckCircle2 className="w-10 h-10" />
                 </div>
-                <h4 className="text-2xl font-black text-[var(--text-main)] mb-3">Verification Pending</h4>
-                <p className="text-[var(--text-muted)] text-sm leading-relaxed mb-8 max-w-[280px]">
-				  {application?.approval_status === 'approved'
-					? 'Your creator application is approved. You can now use creator tools.'
-					: <>Our team is reviewing your connected profiles. <br/><br/><span className="text-[var(--text-main)] font-bold">Do not remove the code from your bios</span> until you are officially approved.</>}
-                </p>
+                <h4 className="text-2xl font-black text-[var(--text-main)] mb-3">
+  {application?.approval_status === 'approved'
+    ? "You're now a Creator!"
+    : application?.approval_status === 'rejected'
+      ? 'Application Declined'
+      : 'Verification Pending'}
+</h4>
+                
+<p className="text-[var(--text-muted)] text-sm leading-relaxed mb-8 max-w-[280px]">
+  {application?.approval_status === 'approved'
+    ? 'Your creator application is approved. You can now use creator tools.'
+    : application?.approval_status === 'rejected'
+      ? `Your application was declined. ${application.rejection_reason || 'Please review your application and try again.'}`
+      : (
+        <>
+          Our team is reviewing your linked social profiles.
+
+          <br /><br />
+
+          <span className="text-[var(--text-main)] font-bold">
+            Keep your zQuab profile link in your social bios
+          </span>
+          {' '}until your application is reviewed.
+        </>
+      )}
+</p>
+
               </motion.div>
             )}
           </AnimatePresence>
