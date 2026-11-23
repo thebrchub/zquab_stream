@@ -7,6 +7,7 @@ import { streamService, type CreatorStream, type StreamStatus } from '../../serv
 import { GoLiveModal } from '../../components/studio/GoLiveModal'; 
 import { wsEvents } from '../../context/WebSocketContext';
 import PaginationLoader from '../../components/PaginationLoader';
+import { coinUnit, formatCoins } from '../../utils/coins';
 
 const TIMELINE_DAYS = 30;
 const PAST_STREAMS_PAGE = 20;
@@ -81,6 +82,31 @@ export const CreatorDashboardPage: React.FC = () => {
     };
     fetchEarnings();
   }, []);
+
+  // How long a stream waits for the creator to reconnect if their video drops
+  // (seconds); copied into every new stream. null until loaded.
+  const [pauseTimeout, setPauseTimeout] = useState<number | null>(null);
+  const [isSavingPauseTimeout, setIsSavingPauseTimeout] = useState(false);
+  useEffect(() => {
+    creatorService.getMyApplication()
+      .then((app) => setPauseTimeout(app?.pause_timeout ?? 600))
+      .catch(() => setPauseTimeout(600));
+  }, []);
+
+  const changePauseTimeout = async (next: number) => {
+    const before = pauseTimeout;
+    setPauseTimeout(next);
+    setIsSavingPauseTimeout(true);
+    try {
+      await creatorService.updateSettings({ pause_timeout: next });
+    } catch (err) {
+      console.error('Failed to save pause timeout', err);
+      setPauseTimeout(before);
+      setStreamNotice('Could not save the setting. Please try again.');
+    } finally {
+      setIsSavingPauseTimeout(false);
+    }
+  };
 
   // Past streams load page by page as the creator scrolls.
   const [pastStreams, setPastStreams] = useState<CreatorStream[]>([]);
@@ -176,7 +202,7 @@ export const CreatorDashboardPage: React.FC = () => {
 
     if (message.type === 'stream_earnings') {
       const earnings = Number(payload.earnings_coins || payload.earningsCoins || 0);
-      if (earnings > 0) setStreamNotice(`You earned ${earnings.toLocaleString()} zCoins from your stream.`);
+      if (earnings > 0) setStreamNotice(`You earned ${formatCoins(earnings)} from your stream.`);
     }
   }), []);
 
@@ -260,6 +286,7 @@ export const CreatorDashboardPage: React.FC = () => {
   }, [earnings]);
 
   const maxDailyEarning = Math.max(1, ...timeline.map((d) => d.coins));
+  const timelineTotal = timeline.reduce((sum, d) => sum + d.coins, 0);
   const hasTimelineData = timeline.some((d) => d.coins > 0);
 
   // Summary over the latest streams loaded (up to one page).
@@ -472,9 +499,9 @@ export const CreatorDashboardPage: React.FC = () => {
                   <div className="pt-6">
                     <div className="flex items-baseline gap-2">
                       <span className="text-5xl font-light tracking-tighter text-zinc-900 dark:text-white">
-                        {timeline.reduce((sum, d) => sum + d.coins, 0).toLocaleString()}
+                        {timelineTotal.toLocaleString()}
                       </span>
-                      <span className="text-lg text-zinc-500 font-medium">zCoins</span>
+                      <span className="text-lg text-zinc-500 font-medium">{coinUnit(timelineTotal)}</span>
                     </div>
                   </div>
                 )}
@@ -511,7 +538,7 @@ export const CreatorDashboardPage: React.FC = () => {
                             {/* Tooltip */}
                             <div className="absolute -top-12 scale-0 group-hover:scale-100 transition-transform bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white px-2.5 py-1.5 rounded shadow-lg whitespace-nowrap z-10 pointer-events-none text-center">
                               <div className="text-[10px] text-zinc-500">{dayData.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</div>
-                              <span className="font-semibold">{dayData.coins.toLocaleString()}</span> zCoins
+                              <span className="font-semibold">{dayData.coins.toLocaleString()}</span> {coinUnit(dayData.coins)}
                             </div>
                           </div>
                         );
@@ -587,7 +614,7 @@ export const CreatorDashboardPage: React.FC = () => {
                             </div>
                           </div>
                           {stream.status === 'ended' ? (
-                            <div className="shrink-0 text-sm font-medium text-zinc-900 dark:text-white">{(stream.total_earnings_coins || 0).toLocaleString()} <span className="text-xs text-zinc-500">zCoins</span></div>
+                            <div className="shrink-0 text-sm font-medium text-zinc-900 dark:text-white">{(stream.total_earnings_coins || 0).toLocaleString()} <span className="text-xs text-zinc-500">{coinUnit(stream.total_earnings_coins || 0)}</span></div>
                           ) : (
                             <span className="shrink-0 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">{STATUS_LABELS[stream.status] ?? stream.status}</span>
                           )}
@@ -660,6 +687,29 @@ export const CreatorDashboardPage: React.FC = () => {
                   View Full Ledger
                   <ArrowRight className="w-4 h-4" />
                 </button>
+              </div>
+
+              <div className="bg-white dark:bg-[#0a0a0a] border border-zinc-200 dark:border-zinc-800/80 p-8 rounded-2xl shadow-sm">
+                <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-4">
+                  Stream Settings
+                </h3>
+                <label htmlFor="pause-timeout" className="block text-sm font-medium text-zinc-900 dark:text-zinc-200">
+                  If my video drops, end the stream after
+                </label>
+                <div className="text-xs text-zinc-500 mt-1 mb-3">Viewers see "Paused" meanwhile. Applies to streams you create from now on.</div>
+                <select
+                  id="pause-timeout"
+                  value={pauseTimeout ?? ''}
+                  disabled={pauseTimeout === null || isSavingPauseTimeout}
+                  onChange={(e) => void changePauseTimeout(Number(e.target.value))}
+                  className="w-full bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 focus:border-blue-500 rounded-lg py-2.5 px-4 text-sm text-zinc-900 dark:text-white outline-none transition-colors"
+                >
+                  {pauseTimeout === null && <option value="">Loading…</option>}
+                  <option value={300}>5 minutes</option>
+                  <option value={600}>10 minutes</option>
+                  <option value={900}>15 minutes</option>
+                  <option value={1800}>30 minutes</option>
+                </select>
               </div>
             </div>
           </div>

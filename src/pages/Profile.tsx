@@ -22,6 +22,7 @@ import { creatorService } from '../services/creatorService';
 import { LiveAlertsSetting } from '../components/stream/LiveAlertsSetting';
 import { createZAvatarURL, MAX_AVATAR_URL_LENGTH, MAX_USERNAME_LENGTH } from '../utils/avatar';
 import { useDebouncedSearch } from '../hooks/usePublicLists';
+import { formatCoins } from '../utils/coins';
 
 const GENDER_OPTIONS = ['Prefer not to say', 'Male', 'Female', 'Other'];
 type Tab = 'friends' | 'requests' | 'search' | 'blocked' | 'followers';
@@ -565,7 +566,7 @@ export default function Profile() {
                     className="inline-flex w-fit items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3.5 py-2 text-amber-300 transition-all hover:border-amber-400/40 hover:bg-amber-500/15 active:scale-[0.98] shadow-[4px_4px_10px_rgba(0,0,0,0.2),-1px_-1px_3px_rgba(255,255,255,0.02)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]"
                   >
                     <span className="text-base drop-shadow-sm">🪙</span>
-                    <span className="text-sm font-black text-amber-700 drop-shadow-sm">{balanceCoins?.toLocaleString() || 0} zCoins</span>
+                    <span className="text-sm font-black text-amber-700 drop-shadow-sm">{formatCoins(balanceCoins || 0)}</span>
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-amber-950 shadow-inner"><Plus className="h-3 w-3" /></span>
                   </button>
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Coins, Loader2, Sparkles, History } from 'lucide-react';
 import { useWallet } from '../../context/WalletContext';
+import { formatCoins } from '../../utils/coins';
 
 export const CoinPurchaseModal: React.FC = () => {
   const navigate = useNavigate();
@@ -75,7 +76,7 @@ export const CoinPurchaseModal: React.FC = () => {
                   </div>
                   <div>
                     <div className="text-sm font-bold text-[var(--text-main)] group-hover:text-[#3B82F6] transition-colors">
-                      {pkg.coins.toLocaleString()} zCoins
+                      {formatCoins(pkg.coins)}
                     </div>
                     <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mt-0.5">
                       ₹{pkg.price_amount.toFixed(2)} {pkg.currency}

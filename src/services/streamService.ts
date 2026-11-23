@@ -20,8 +20,6 @@ export interface CreateStreamPayload {
   planned_end_at: string;
   is_premium: boolean;
   entry_price_coins: number;
-  // Seconds the stream may stay paused after the video drops before it is ended (300–1800, default 600).
-  pause_timeout?: number;
 }
 
 export interface StreamCreationResponse {

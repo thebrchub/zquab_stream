@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { useAuth } from './AuthContext';
 import { wsEvents } from './WebSocketContext';
 import type { PurchaseCompletedEvent } from '../types/wallet';
+import { formatCoins } from '../utils/coins';
 
 // How long to wait for the webhook's "purchase_completed" push before refetching the wallet once.
 const PURCHASE_PUSH_TIMEOUT_MS = 30000;
@@ -177,7 +178,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         amount: orderData.amount, 
         currency: orderData.currency,
         name: "zQuab",
-        description: `${orderData.coins} zCoins`,
+        description: formatCoins(orderData.coins),
         order_id: orderData.razorpay_order_id,
         theme: {
           color: "#3B82F6"

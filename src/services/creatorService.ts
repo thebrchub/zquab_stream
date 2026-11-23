@@ -111,6 +111,13 @@ export interface CreatorApplication {
   rejection_reason: string;
   application_submitted_at: string;
   verification_code: string;
+  // Seconds a live stream may stay paused (video dropped) before it is ended; copied into each new stream.
+  pause_timeout?: number;
+}
+
+// Creator settings that can be changed (PATCH /users/me/creator); send only what changes.
+export interface CreatorSettings {
+  pause_timeout?: number;
 }
 
 interface CreatorAvatarUpload {
@@ -289,6 +296,11 @@ export const creatorService = {
     if (error?.status === 404) return null;
     throw error;
   }
+  },
+
+  async updateSettings(settings: CreatorSettings): Promise<CreatorSettings> {
+    const res = await apiClient.patch('/users/me/creator', settings);
+    return res.data;
   },
 
   async presignAvatar(contentType: string): Promise<CreatorAvatarUpload> {
