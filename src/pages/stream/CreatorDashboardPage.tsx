@@ -3,14 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { BarChart2, Settings, TrendingUp, Loader2, DollarSign, ArrowRight, Play, Copy, Radio, X, Clock3, RefreshCw, AlertTriangle, History, Eye, Users } from 'lucide-react';
 import { creatorService, type CreatorEarnings } from '../../services/creatorService';
-import { streamService, type CreatorStream, type StreamStatus } from '../../services/streamService';
+import { streamService, type CreatorStream, type CreatorStreamsSummary, type StreamStatus } from '../../services/streamService';
 import { GoLiveModal } from '../../components/studio/GoLiveModal'; 
 import { wsEvents } from '../../context/WebSocketContext';
-import PaginationLoader from '../../components/PaginationLoader';
 import { coinUnit, formatCoins } from '../../utils/coins';
 
 const TIMELINE_DAYS = 30;
-const PAST_STREAMS_PAGE = 20;
+const PAST_STREAMS_PAGE = 5;
 
 const STATUS_LABELS: Record<StreamStatus, string> = {
   scheduled: 'Scheduled',
@@ -110,6 +109,8 @@ export const CreatorDashboardPage: React.FC = () => {
 
   // Past streams load page by page as the creator scrolls.
   const [pastStreams, setPastStreams] = useState<CreatorStream[]>([]);
+  // Totals over all ended streams; comes with the first page of ended streams.
+  const [pastSummary, setPastSummary] = useState<CreatorStreamsSummary | null>(null);
   const [pastHasMore, setPastHasMore] = useState(true);
   const [isLoadingPast, setIsLoadingPast] = useState(false);
   const [pastStatus, setPastStatus] = useState<PastStatus>('ended');
@@ -130,6 +131,7 @@ export const CreatorDashboardPage: React.FC = () => {
       const page = data.streams || [];
       pastOffsetRef.current = offset + page.length;
       setPastStreams((prev) => (reset ? page : [...prev, ...page]));
+      if (reset) setPastSummary(data.summary ?? null);
       setPastHasMore(page.length === PAST_STREAMS_PAGE);
     } catch (err) {
       if (requestId !== pastRequestRef.current) return;
@@ -288,19 +290,6 @@ export const CreatorDashboardPage: React.FC = () => {
   const maxDailyEarning = Math.max(1, ...timeline.map((d) => d.coins));
   const timelineTotal = timeline.reduce((sum, d) => sum + d.coins, 0);
   const hasTimelineData = timeline.some((d) => d.coins > 0);
-
-  // Summary over the latest streams loaded (up to one page).
-  const pastSummary = useMemo(() => {
-    const recent = pastStreams.slice(0, PAST_STREAMS_PAGE);
-    const withUnique = recent.filter((s) => s.unique_viewer_count !== null && s.unique_viewer_count !== undefined);
-    const avg = (nums: number[]) => (nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null);
-    return {
-      count: recent.length,
-      avgPeak: avg(recent.map((s) => s.peak_viewer_count)),
-      avgUnique: avg(withUnique.map((s) => s.unique_viewer_count as number)),
-      totalEarned: recent.reduce((sum, s) => sum + (s.total_earnings_coins || 0), 0),
-    };
-  }, [pastStreams]);
 
   // Prevent rendering the dashboard momentarily before redirect
   if (user?.approval_status !== 'approved') return null;
@@ -576,22 +565,22 @@ export const CreatorDashboardPage: React.FC = () => {
                   </div>
                 </div>
 
-                {pastStatus === 'ended' && pastStreams.length > 0 && (
+                {pastStatus === 'ended' && pastSummary && pastSummary.count > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
                     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Avg peak viewers</div>
-                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.avgPeak ?? '—'}</div>
+                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.avg_peak ?? '—'}</div>
                       <div className="text-[11px] text-zinc-500 mt-1">Most people watching at the same time.</div>
                     </div>
                     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Avg unique viewers</div>
-                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.avgUnique ?? '—'}</div>
+                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.avg_unique ?? '—'}</div>
                       <div className="text-[11px] text-zinc-500 mt-1">How many different people joined.</div>
                     </div>
                     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Total earned</div>
-                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.totalEarned.toLocaleString()}</div>
-                      <div className="text-[11px] text-zinc-500 mt-1">zCoins from your last {pastSummary.count} stream{pastSummary.count === 1 ? '' : 's'}.</div>
+                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.total_earned.toLocaleString()}</div>
+                      <div className="text-[11px] text-zinc-500 mt-1">{coinUnit(pastSummary.total_earned)} from {pastSummary.count === 1 ? 'your 1 past stream' : `all ${pastSummary.count.toLocaleString()} of your past streams`}.</div>
                     </div>
                   </div>
                 )}
@@ -633,7 +622,20 @@ export const CreatorDashboardPage: React.FC = () => {
                     ))}
                   </div>
                 )}
-                <PaginationLoader onLoadMore={loadMorePastStreams} hasMore={pastHasMore} isLoading={isLoadingPast} />
+                {pastHasMore && pastStreams.length === 0 && isLoadingPast && (
+                  <div className="w-full py-6 flex justify-center items-center">
+                    <Loader2 className="w-6 h-6 text-[#3B82F6] animate-spin" />
+                  </div>
+                )}
+                {pastHasMore && pastStreams.length > 0 && (
+                  <button
+                    onClick={loadMorePastStreams}
+                    disabled={isLoadingPast}
+                    className="w-full mt-4 flex items-center justify-center gap-2 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors disabled:opacity-60"
+                  >
+                    {isLoadingPast ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Show more'}
+                  </button>
+                )}
               </div>
             </div>
 
