@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usersApi } from '../api/users';
 import { friendsApi } from '../api/friends';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, type AuthUser } from '../context/AuthContext';
 import { useRooms } from '../context/RoomsContext';
 import { useWallet } from '../context/WalletContext'; 
 import UserCard from '../components/UserCard';
@@ -29,7 +29,7 @@ type Tab = 'friends' | 'requests' | 'search' | 'blocked' | 'followers';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user: authUser, logout: logoutUser, refreshSession } = useAuth();
+  const { user: authUser, logout: logoutUser, updateUser } = useAuth();
   
   const { friendRequests, setFriendRequests } = useRooms();
   const { balanceCoins, openPurchaseModal } = useWallet();
@@ -94,14 +94,11 @@ export default function Profile() {
   const [followerCountError, setFollowerCountError] = useState<string | null>(null);
   const LIMIT = 15;
 
+  // The profile comes from the app's bootstrap (AuthContext): no request here.
+  // Loaded once per user; later saves update both this page and AuthContext.
+  const loadedProfileForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (authUser && !authUser.is_guest && authUser.user_id !== 'dev_mock_999') {
-      refreshSession().catch(console.error);
-    }
-  }, []);
-
-  useEffect(() => {
-    const fetchProfile = async () => {
+    const loadProfile = async () => {
       if (authUser?.is_guest) {
         setProfileLoading(false);
         return;
@@ -114,8 +111,10 @@ export default function Profile() {
         return;
       }
 
+      if (!authUser || loadedProfileForRef.current === authUser.user_id) return;
+      loadedProfileForRef.current = authUser.user_id;
       try {
-        const data = await usersApi.getMe();
+        const data: AuthUser & { age?: string } = authUser;
         setProfile(data);
         setUsername(data.username || '');
         setBio(data.bio || '');
@@ -148,7 +147,7 @@ export default function Profile() {
         setProfileLoading(false);
       }
     };
-    fetchProfile();
+    loadProfile();
   }, [authUser]);
 
   useEffect(() => {
@@ -260,6 +259,7 @@ export default function Profile() {
       const updated = await usersApi.updateMePartial(payload);
       
       setProfile({ ...updated, age, country, avatar_url: newAvatarUrl }); 
+      updateUser({ ...updated, country, avatar_url: newAvatarUrl });
       setCountry(country);
       if (updated.username) setHasExistingUsername(true);
       
@@ -296,7 +296,7 @@ export default function Profile() {
       const { avatar_url } = await creatorService.completeAvatar(object_key);
       setProfile((current: any) => ({ ...current, avatar_url }));
       setZAvatarRequested(false);
-      await refreshSession();
+      updateUser({ avatar_url });
     } catch (err: any) {
       setError(err.message || 'Failed to upload avatar.');
     } finally {

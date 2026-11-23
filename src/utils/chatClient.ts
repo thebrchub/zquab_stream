@@ -22,6 +22,8 @@ type ChatCallbackOptions = {
   onPhotoReady?: (roomId: string, from: string, url: string, expiresAt: number) => void;
   onFriendAccepted?: (dmRoomId: string) => void;
   onLocationDetected?: (country: { name: string; code: string } | null) => void;
+  // The logged-in user's profile country (from the app's bootstrap), if any.
+  getProfileCountry?: () => string | undefined;
   onPartnerTyping?: (isTyping: boolean) => void; 
 };
 
@@ -89,18 +91,11 @@ export class ChatClient {
   }
 
   private async detectLocation() {
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/users/me`, { credentials: 'include' });
-      if (res.ok) {
-        const profile = await res.json();
-        if (profile && profile.country && !profile.is_guest) {
-          this.locationCode = profile.country;
-          this.callbacks.onLocationDetected?.({ name: profile.country, code: profile.country });
-          return; 
-        }
-      }
-    } catch (e) {
-      // Silently catch network/auth errors and proceed to the guest fallback
+    const country = this.callbacks.getProfileCountry?.();
+    if (country) {
+      this.locationCode = country;
+      this.callbacks.onLocationDetected?.({ name: country, code: country });
+      return;
     }
 
     try {

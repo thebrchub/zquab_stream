@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { roomsApi } from '../api/rooms';
-import { friendsApi } from '../api/friends'; 
-import { useAuth } from './AuthContext';
+import { useAuth, type FriendRequestItem } from './AuthContext';
 import { useWebSocket, wsEvents } from './WebSocketContext';
 
 export interface RoomUser {
@@ -51,7 +50,7 @@ const LIVE_REQUEST_KEEP_MS = 60_000;
 const PRESENCE_GRACE_MS = 10_000;
 
 export function RoomsProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, bootstrap, refreshSession } = useAuth();
   const { sendMessage, isConnected } = useWebSocket(); 
   const isFullUser = Boolean(user && !user.is_guest);
 
@@ -79,8 +78,8 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
 
   // Friends online right now, as the socket last told us: the snapshot sent on
   // every connect, then live presence_batch changes. presenceKnownRef is true
-  // once this connection's full snapshot has arrived; until then the server's
-  // is_online from GET /rooms is used as is.
+  // once this connection's full snapshot has arrived; until then dots stay grey
+  // (the rooms list carries no online status).
   const onlineRef = useRef<Set<string>>(new Set());
   const presenceKnownRef = useRef(false);
   // Snapshot parts collected so far (a big snapshot comes in parts of 1000).
@@ -110,47 +109,47 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [isConnected]);
 
+  const applyRooms = useCallback((data: { rooms?: Room[]; users?: Record<string, RoomUser> }) => {
+    setRooms(data.rooms || []);
+    const users: Record<string, RoomUser> = data.users || {};
+    const known = presenceKnownRef.current;
+    setUsersMap(prev => {
+      const next = { ...prev };
+      for (const [id, u] of Object.entries(users)) {
+        next[id] = { ...u, is_online: known ? onlineRef.current.has(id) : Boolean(prev[id]?.is_online) };
+      }
+      return next;
+    });
+  }, []);
+
   const refreshRooms = useCallback(async () => {
     try {
-      const data = await roomsApi.getRooms();
-      setRooms(data.rooms || []);
-      const users: Record<string, RoomUser> = data.users || {};
-      const known = presenceKnownRef.current;
-      setUsersMap(prev => {
-        const next = { ...prev };
-        for (const [id, u] of Object.entries(users)) {
-          next[id] = known ? { ...u, is_online: onlineRef.current.has(id) } : u;
-        }
-        return next;
-      });
+      applyRooms(await roomsApi.getRooms());
     } catch (err) {
       console.error('Failed to refresh rooms:', err);
     }
+  }, [applyRooms]);
+
+  // data: the received requests from the bootstrap (first 100, the server's order).
+  const applyFriendRequests = useCallback((data: FriendRequestItem[]) => {
+    const onServer = new Set(data.map((r) => r.username));
+    // Gone from the list means the user already accepted, rejected or it was withdrawn.
+    const stillShown = new Set(friendRequestsRef.current.map((r) => r.username));
+    const kept: FriendRequestItem[] = [];
+    const now = Date.now();
+    liveRequestsRef.current.forEach((entry, username) => {
+      // The server saves new requests within seconds; after a minute trust the server list.
+      if (onServer.has(username) || !stillShown.has(username) || now - entry.at > LIVE_REQUEST_KEEP_MS) {
+        liveRequestsRef.current.delete(username);
+      } else {
+        kept.push(entry.req);
+      }
+    });
+    setFriendRequests([...kept, ...data]);
   }, []);
 
-  const refreshFriendRequests = useCallback(async () => {
-    try {
-      // 100 is a page size the server clears from its cache on every change.
-      const data: any[] = (await friendsApi.getRequests('received', 100, 0)) || [];
-      const onServer = new Set(data.map((r) => r.username));
-      // Gone from the list means the user already accepted, rejected or it was withdrawn.
-      const stillShown = new Set(friendRequestsRef.current.map((r) => r.username));
-      const kept: any[] = [];
-      const now = Date.now();
-      liveRequestsRef.current.forEach((entry, username) => {
-        // The server saves new requests within seconds; after a minute trust the server list.
-        if (onServer.has(username) || !stillShown.has(username) || now - entry.at > LIVE_REQUEST_KEEP_MS) {
-          liveRequestsRef.current.delete(username);
-        } else {
-          kept.push(entry.req);
-        }
-      });
-      setFriendRequests([...kept, ...data]);
-    } catch (err) {
-      console.error('Failed to refresh friend requests:', err);
-    }
-  }, []);
-
+  // Rooms and friend requests come with the bootstrap (app start, and every
+  // reload of it, e.g. the reconciliations after friend events below).
   useEffect(() => {
     if (!isFullUser) {
       setRooms([]);
@@ -159,12 +158,17 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    (async () => {
-      setLoading(true);
-      await Promise.all([refreshRooms(), refreshFriendRequests()]);
-      setLoading(false);
-    })();
-  }, [isFullUser, refreshRooms, refreshFriendRequests]);
+    if (bootstrap) {
+      applyRooms(bootstrap.rooms || {});
+      applyFriendRequests(bootstrap.friend_requests || []);
+    }
+    setLoading(false);
+  }, [isFullUser, bootstrap, applyRooms, applyFriendRequests]);
+
+  // Re-reads the friend requests (and everything else in the bootstrap).
+  const refreshFriendRequests = useCallback(() => {
+    void refreshSession();
+  }, [refreshSession]);
 
   useEffect(() => {
     const unsubscribe = wsEvents.subscribe((msg: any) => {
@@ -236,10 +240,10 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
           });
         }
 
-        // 🛠️ THE FIX: Give the DB time to lock in the new room
+        // Give the server a moment to save the new room, then reload (the
+        // bootstrap carries both the rooms and the friend requests).
         setTimeout(() => {
           refreshFriendRequests();
-          refreshRooms();
         }, 1000);
       }
 
@@ -292,7 +296,6 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         }
 
         setTimeout(() => {
-          refreshRooms();
           refreshFriendRequests();
         }, 1000);
       }
@@ -413,7 +416,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [user, refreshFriendRequests, refreshRooms]);
+  }, [user, refreshFriendRequests]);
 
   const markRoomRead = useCallback((roomId: string) => {
     if (!isConnected || document.visibilityState !== 'visible') return;

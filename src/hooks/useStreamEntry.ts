@@ -46,7 +46,7 @@ type EntryChanges = Partial<EntryState> | ((current: EntryState) => Partial<Entr
 // Gets (and keeps renewing) the playback ticket over the WebSocket with "stream_enter".
 export const useStreamEntry = (streamId: string | undefined, enabled = true) => {
   const { isConnected, sendMessage } = useWebSocket();
-  const { balanceCoins, updateBalanceLocally, refreshBalance } = useWallet();
+  const { balanceCoins, updateBalanceLocally } = useWallet();
   const [state, setState] = useState<EntryState>(() => initialState(streamId));
 
   const renewTimerRef = useRef<number | undefined>(undefined);
@@ -54,11 +54,11 @@ export const useStreamEntry = (streamId: string | undefined, enabled = true) => 
   const answerWaitersRef = useRef<Array<() => void>>([]);
   const hasTicketRef = useRef(false);
   const sendEnterRef = useRef<(confirm: boolean) => boolean>(() => false);
-  const walletRef = useRef({ balanceCoins, updateBalanceLocally, refreshBalance });
+  const walletRef = useRef({ balanceCoins, updateBalanceLocally });
 
   useEffect(() => {
-    walletRef.current = { balanceCoins, updateBalanceLocally, refreshBalance };
-  }, [balanceCoins, updateBalanceLocally, refreshBalance]);
+    walletRef.current = { balanceCoins, updateBalanceLocally };
+  }, [balanceCoins, updateBalanceLocally]);
 
   const update = useCallback((id: string, changes: EntryChanges) => {
     setState((s) => {
@@ -146,8 +146,10 @@ export const useStreamEntry = (streamId: string | undefined, enabled = true) => 
 
       const failure = msg.payload as StreamEnterErrorEvent;
       if (failure.code === 'INSUFFICIENT_BALANCE') {
-        update(id, { isAnswered: true, paywallBalance: walletRef.current.balanceCoins, isUnlocking: false });
-        void walletRef.current.refreshBalance();
+        // The server sends the balance it refused at: no extra request.
+        const balance = failure.has_balance ? Number(failure.balance_coins) : walletRef.current.balanceCoins;
+        if (failure.has_balance) walletRef.current.updateBalanceLocally(balance);
+        update(id, { isAnswered: true, paywallBalance: balance, isUnlocking: false });
         return;
       }
       if (failure.code === 'LOGIN_REQUIRED') {

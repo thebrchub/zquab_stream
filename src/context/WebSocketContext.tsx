@@ -288,7 +288,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         // 401 = the login is gone (expired or missing): stop and log out
         // locally. 200 / 403 (a guest) = the login works; a network error =
         // the server is down. Either way keep retrying.
-        apiClient.get('/users/me')
+        apiClient.get('/users/me/bootstrap')
           .then(retry)
           .catch((err: { status?: number }) => {
             if (stopped) return;

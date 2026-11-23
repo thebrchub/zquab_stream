@@ -1,5 +1,5 @@
-// Define the base URL for local vs Vercel production
-export const API_HOST = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? '' : 'https://aarpaar-api.brchub.tech');
+// The API host, decided once in vite.config.ts (also used by index.html's early bootstrap request).
+export const API_HOST = __ZQ_API_HOST__;
 
 const API_BASE = `${API_HOST}/api/v1`;
 const PUBLIC_BASE = `${API_HOST}/public/v1`;

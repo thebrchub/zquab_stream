@@ -53,11 +53,6 @@ export interface PublicFriend extends PersonResult {
 }
 
 export const usersApi = {
-  getMe: async () => {
-    const res = await apiClient.get('/users/me');
-    return res.data;
-  },
-  
   updateMePartial: async (data: { username?: string; name?: string; mobile?: string; gender?: string; avatar_url?: string; show_last_seen?: boolean; bio?: string; country?: string }) => {
     const res = await apiClient.patch('/users/me', data);
     return res.data;
