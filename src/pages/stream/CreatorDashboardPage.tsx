@@ -161,7 +161,9 @@ export const CreatorDashboardPage: React.FC = () => {
     }
 
     if (message.type === 'stream_auto_ended') {
-      setStreamNotice('Your stream was ended because it reached its planned end time.');
+      setStreamNotice(payload.reason === 'publisher_gone'
+        ? 'Your stream was ended because your video stayed disconnected for too long.'
+        : 'Your stream was ended because it reached its planned end time.');
       fetchStreams();
       void loadPastStreams(true);
     }

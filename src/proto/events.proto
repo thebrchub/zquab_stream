@@ -127,6 +127,9 @@ message StreamEndingSoonEvent {
 message StreamAutoEndedEvent {
     string stream_id = 1;
     string room_id   = 2;
+    // "planned_end": ran past its planned end + grace period.
+    // "publisher_gone": the publisher stayed disconnected past the stream's pause timeout.
+    string reason    = 3;
 }
 
 // MsgType "gift_confirm" — sent only to gift sender (private ack)

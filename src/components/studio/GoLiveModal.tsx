@@ -26,6 +26,8 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
   const [plannedEndAt, setPlannedEndAt] = useState(() => toDateTimeLocal(new Date(Date.now() + 60 * 60 * 1000)));
   const [isPremium, setIsPremium] = useState(false);
   const [price, setPrice] = useState(100);
+  // Seconds the stream waits for the streamer to reconnect if their video drops.
+  const [pauseTimeout, setPauseTimeout] = useState(600);
 
   // Step 2 OBS Setup State
   const [streamData, setStreamData] = useState<StreamCreationResponse | null>(null);
@@ -68,6 +70,7 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
         planned_end_at: plannedEnd.toISOString(),
         is_premium: isPremium,
         entry_price_coins: isPremium ? price : 0,
+        pause_timeout: pauseTimeout,
       };
       if (scheduledStart) payload.scheduled_at = scheduledStart.toISOString();
 
@@ -109,6 +112,7 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
       setStep(1);
       setTitle('');
       setIsPremium(false);
+      setPauseTimeout(600);
 		  setIsScheduled(false);
 		  setScheduledAt('');
 		  setPlannedEndAt(toDateTimeLocal(new Date(Date.now() + 60 * 60 * 1000)));
@@ -200,6 +204,26 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
                     className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-[1.25rem] px-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#3B82F6] transition-all shadow-sm"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-[var(--text-main)] ml-1">If my video drops, end the stream after</label>
+                <select
+                  value={pauseTimeout}
+                  onChange={(e) => setPauseTimeout(Number(e.target.value))}
+                  className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-[1.25rem] px-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#3B82F6] transition-all shadow-sm cursor-pointer appearance-none"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                    backgroundPosition: 'right 1rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1.25em 1.25em'
+                  }}
+                >
+                  <option value={300}>5 minutes</option>
+                  <option value={600}>10 minutes</option>
+                  <option value={900}>15 minutes</option>
+                  <option value={1800}>30 minutes</option>
+                </select>
               </div>
 
               <div className="p-5 rounded-[1.5rem] bg-[var(--background)] border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-4">

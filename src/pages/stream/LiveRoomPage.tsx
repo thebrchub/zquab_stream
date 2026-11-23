@@ -586,7 +586,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                 onClick={() => setShowProfileOverlay(true)}
               >
                 <img src={creator.avatar_url} alt={creator.name} className="w-14 h-14 rounded-full object-cover border border-gray-600 shadow-md" />
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm">Live</div>
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm">{isPaused && !isStreamEnded ? 'Paused' : 'Live'}</div>
               </div>
               <div className="flex flex-col drop-shadow-md">
                 <h1 className="text-base lg:text-xl font-bold text-white leading-tight mb-0.5 line-clamp-1">{stream.title}</h1>
