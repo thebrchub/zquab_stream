@@ -639,7 +639,7 @@ export const CreatorDashboardPage: React.FC = () => {
 
             {/* Right Column: Breakdown */}
             <div className="lg:col-span-1 flex flex-col gap-6">
-              <div className="bg-white dark:bg-[#0a0a0a] border border-zinc-200 dark:border-zinc-800/80 p-8 rounded-2xl h-full shadow-sm">
+              <div className="bg-white dark:bg-[#0a0a0a] border border-zinc-200 dark:border-zinc-800/80 p-8 rounded-2xl shadow-sm">
                 <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-8">
                   Revenue Ledger
                 </h3>
