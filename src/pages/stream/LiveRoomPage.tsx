@@ -269,12 +269,15 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
     wasPausedRef.current = isPaused;
   }, [isPaused, isStreamEnded, restartPlayer]);
 
-  // Keep retrying while reconnecting, in case the "resumed" event was missed.
+  // Keep retrying while the streamer is away, in case the "resumed" event was
+  // missed. A stall on its own (pieces arriving late) never restarts the
+  // player: hls.js keeps its buffer and plays on as soon as the next piece
+  // arrives, while a rebuilt player would start loading from scratch.
   useEffect(() => {
-    if (!isReconnecting) return;
+    if (streamMode === 'mock' || !isPaused || isStreamEnded) return;
     const timer = window.setInterval(() => void restartPlayer(), 10000);
     return () => window.clearInterval(timer);
-  }, [isReconnecting, restartPlayer]);
+  }, [streamMode, isPaused, isStreamEnded, restartPlayer]);
 
   useEffect(() => {
     if (isStreamEnded) setIsStalled(false);

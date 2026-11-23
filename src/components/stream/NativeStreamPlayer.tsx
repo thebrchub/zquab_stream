@@ -96,6 +96,9 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
         lowLatencyMode: false, 
         maxBufferLength: 30, 
         maxMaxBufferLength: 60, 
+        // Keep only the last 30 s already watched; without this hls.js keeps
+        // the whole session in the tab's memory.
+        backBufferLength: 30,
         liveSyncDurationCount: 3, 
         fragLoadPolicy: retryBrief4xx(Hls.DefaultConfig.fragLoadPolicy, [403]),
         playlistLoadPolicy: retryBrief4xx(Hls.DefaultConfig.playlistLoadPolicy, [403, 404]),
