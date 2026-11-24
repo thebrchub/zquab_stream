@@ -31,17 +31,15 @@ interface PinnedAd {
 
 const PINNED_AD_MS = 8000;
 
-// Mute choices; 0 means the rest of the stream.
 const MUTE_OPTIONS: { label: string; minutes: number }[] = [
   { label: '10 min', minutes: 10 },
   { label: '30 min', minutes: 30 },
   { label: '60 min', minutes: 60 },
   { label: 'Rest of stream', minutes: 0 },
 ];
-// How close to the bottom (px) still counts as "reading the latest messages".
+
 const NEAR_BOTTOM_PX = 80;
 
-// The gift catalog stores icon names like "heart_icon"; show them as emoji.
 const GIFT_ICON_EMOJI: Record<string, string> = {
   heart: '❤️',
   fire: '🔥',
@@ -56,7 +54,6 @@ const GiftIcon: React.FC<{ icon: string; className?: string }> = ({ icon, classN
     return <img src={value} alt="" className={`inline-block w-[1em] h-[1em] object-contain ${className ?? ''}`} />;
   }
   const key = value.toLowerCase().replace(/_icon$/, '');
-  // Names we don't know, or plain words, fall back to a gift box; real emoji pass through.
   const emoji = GIFT_ICON_EMOJI[key] ?? (value && !/^[\w\s-]+$/.test(value) ? value : '🎁');
   return <span className={className}>{emoji}</span>;
 };
@@ -90,14 +87,16 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   const prevLastIdRef = useRef<string | null>(null);
   const { gifts, ensureGifts } = useWallet();
 
-  // The gift list loads the first time the drawer opens (then once per gifts version).
   useEffect(() => {
     if (showGiftDrawer) ensureGifts();
   }, [showGiftDrawer, ensureGifts]);
 
   const scrollToBottom = () => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+      lastScrollTopRef.current = el.scrollTop;
+    }
     isNearBottomRef.current = true;
     setHasNewBelow(false);
   };
@@ -106,32 +105,31 @@ export const LiveChat: React.FC<LiveChatProps> = ({
     const el = scrollRef.current;
     if (!el) return;
 
-    const currentScrollTop = el.scrollTop;
+    const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
+    // Clamp to ignore iOS/Android elastic bounce at top or bottom
+    const currentScrollTop = Math.min(Math.max(0, el.scrollTop), maxScroll);
     const delta = currentScrollTop - lastScrollTopRef.current;
 
-    if (currentScrollTop <= 16) {
+    if (currentScrollTop <= 20) {
       onHeaderVisibilityChange?.(false);
-    } else if (delta > 8) {
+    } else if (delta > 12) {
       onHeaderVisibilityChange?.(true);
-    } else if (delta < -8) {
+    } else if (delta < -12) {
       onHeaderVisibilityChange?.(false);
     }
 
     lastScrollTopRef.current = currentScrollTop;
 
-    isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
+    isNearBottomRef.current = maxScroll - currentScrollTop < NEAR_BOTTOM_PX;
     if (isNearBottomRef.current) setHasNewBelow(false);
   };
 
-  // Jump (no animation) to the newest message, unless the user scrolled up to read.
-  // Uses the last message id, not the count: the list is capped, so its length stops growing.
   useLayoutEffect(() => {
     const lastId = messages.length > 0 ? messages[messages.length - 1].id : null;
     const prevLastId = prevLastIdRef.current;
     prevLastIdRef.current = lastId;
     if (!lastId || lastId === prevLastId) return;
 
-    // Something was added below the old last message (a retract of the last one doesn't count).
     let appended = prevLastId === null;
     for (let i = messages.length - 2; !appended && i >= 0; i--) {
       if (messages[i].id === prevLastId) appended = true;
@@ -145,7 +143,6 @@ export const LiveChat: React.FC<LiveChatProps> = ({
     }
   }, [messages]);
 
-  // Ads from the Dev Menu show as one pinned card that hides itself after a few seconds.
   useEffect(() => {
     const handleAdTrigger = (e: Event) => setPinnedAd((e as CustomEvent<PinnedAd>).detail);
     window.addEventListener('dev_ad_triggered', handleAdTrigger);
@@ -189,9 +186,9 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   return (
     <div className="flex flex-col h-full bg-[#09090b] relative">
 
-      {/* --- Pinned sponsored card (stays put while chat scrolls) --- */}
+      {/* --- Pinned sponsored card --- */}
       {pinnedAd && (
-        <div className="relative shrink-0 border-b border-white/[0.03]">
+        <div className="relative shrink-0 border-b border-white/[0.03] z-30 bg-[#09090b]">
           <SponsoredChatDrop
             brandName={pinnedAd.brandName}
             brandIcon={pinnedAd.brandIcon}
@@ -213,7 +210,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto pt-2 pb-24 space-y-1.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+        className="flex-1 overflow-y-auto overscroll-y-contain touch-pan-y pt-[96px] pb-24 space-y-1.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
       >
         {messages.map((item) => {
           return (
@@ -239,7 +236,6 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                 
                 <div className="min-w-0">
                   {item.gift ? (
-                    /* Claymorphic High-End Gift Card */
                     <div className="relative bg-[#0c0c0e] border border-zinc-800/50 rounded-xl p-2.5 mt-0.5 shadow-[4px_4px_10px_rgba(0,0,0,0.5),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.05),inset_-1px_-1px_2px_rgba(0,0,0,0.3)] overflow-hidden group-hover:border-amber-500/30 transition-colors">
                       <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-amber-500/0 via-amber-500/40 to-amber-500/0" />
                       
@@ -263,7 +259,6 @@ export const LiveChat: React.FC<LiveChatProps> = ({
                       )}
                     </div>
                   ) : (
-                    /* Standard Text Layout */
                     <div className="leading-snug mt-1">
                       <span className={`inline-flex items-center gap-1 text-[13px] font-bold mr-2.5 align-baseline ${item.isCreator ? 'text-indigo-400' : 'text-zinc-400'}`}>
                         {item.senderName}
@@ -375,19 +370,18 @@ export const LiveChat: React.FC<LiveChatProps> = ({
 
         {!isGuest && !isStreamEnded && (
           <form onSubmit={handleSendMessage} className="flex items-center gap-2 p-1.5 bg-white/[0.02] border border-white/5 hover:border-white/10 focus-within:border-indigo-500/30 focus-within:bg-white/[0.04] rounded-2xl transition-all pointer-events-auto shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3),inset_-1px_-1px_3px_rgba(255,255,255,0.03)]">
-            {/* A creator can't gift their own stream. */}
             {role === 'viewer' && (
-            <button
-              type="button"
-              onClick={() => setShowGiftDrawer((prev) => !prev)}
-              className={`p-2 rounded-xl transition-all shrink-0 active:scale-95 ${
-                showGiftDrawer 
-                  ? 'bg-amber-500/20 text-amber-400 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.2)]' 
-                  : 'text-zinc-400 hover:text-amber-400 hover:bg-white/5 shadow-[2px_2px_4px_rgba(0,0,0,0.2),-1px_-1px_2px_rgba(255,255,255,0.02)] hover:shadow-[3px_3px_6px_rgba(0,0,0,0.3),-1px_-1px_3px_rgba(255,255,255,0.03)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]'
-              }`}
-            >
-              <Gift className="w-4 h-4" />
-            </button>
+              <button
+                type="button"
+                onClick={() => setShowGiftDrawer((prev) => !prev)}
+                className={`p-2 rounded-xl transition-all shrink-0 active:scale-95 ${
+                  showGiftDrawer 
+                    ? 'bg-amber-500/20 text-amber-400 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.2)]' 
+                    : 'text-zinc-400 hover:text-amber-400 hover:bg-white/5 shadow-[2px_2px_4px_rgba(0,0,0,0.2),-1px_-1px_2px_rgba(255,255,255,0.02)] hover:shadow-[3px_3px_6px_rgba(0,0,0,0.3),-1px_-1px_3px_rgba(255,255,255,0.03)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]'
+                }`}
+              >
+                <Gift className="w-4 h-4" />
+              </button>
             )}
 
             <input

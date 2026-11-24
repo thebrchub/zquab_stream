@@ -41,46 +41,42 @@ export const StreamChatSidebar: React.FC<StreamChatSidebarProps> = ({
   const [isHeaderHidden, setIsHeaderHidden] = useState(false);
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#09090b] relative">
-      {/* Collapsible Header + Welcome Strip */}
+    <div className="w-full h-full flex flex-col bg-[#09090b] relative overflow-hidden">
+      {/* Floating Header + Welcome Strip (slides out via transform — zero layout shift) */}
       <div
-        className={`grid shrink-0 z-10 transition-[grid-template-rows,opacity] duration-200 ease-out ${
-          isHeaderHidden
-            ? 'grid-rows-[0fr] opacity-0 pointer-events-none'
-            : 'grid-rows-[1fr] opacity-100'
+        className={`absolute top-0 inset-x-0 z-20 transition-transform duration-300 ease-out will-change-transform ${
+          isHeaderHidden ? '-translate-y-full pointer-events-none' : 'translate-y-0'
         }`}
       >
-        <div className="overflow-hidden">
-          {/* Compact header */}
-          <div className="px-4 py-3.5 flex items-center justify-between bg-[#09090b]">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={onToggleCollapse}
-                className="group -ml-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors duration-200 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70"
-                title="Collapse chat"
-                aria-label="Collapse chat"
-              >
-                <PanelRightClose className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
-              </button>
-              <h2 className="text-[11px] font-bold text-zinc-200 uppercase tracking-widest">
-                Stream Chat
-              </h2>
-            </div>
-            <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
-              <Eye className="w-3.5 h-3.5" />
-              {viewerCount.toLocaleString()}
-            </div>
+        {/* Compact header */}
+        <div className="px-4 py-3.5 flex items-center justify-between bg-[#09090b]/95 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="group -ml-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors duration-200 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70"
+              title="Collapse chat"
+              aria-label="Collapse chat"
+            >
+              <PanelRightClose className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
+            </button>
+            <h2 className="text-[11px] font-bold text-zinc-200 uppercase tracking-widest">
+              Stream Chat
+            </h2>
           </div>
+          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
+            <Eye className="w-3.5 h-3.5" />
+            {viewerCount.toLocaleString()}
+          </div>
+        </div>
 
-          {/* Pinned welcome strip */}
-          <div className="px-4 py-2.5 bg-indigo-500/[0.03] backdrop-blur-md border-b border-white/[0.02] flex items-start gap-3 relative overflow-hidden">
-            <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-indigo-500/50" />
-            <Pin className="w-3.5 h-3.5 text-indigo-400/80 mt-0.5 shrink-0" />
-            <p className="text-xs text-zinc-400 font-medium leading-relaxed pr-2">
-              <span className="text-zinc-200 font-semibold">Welcome!</span> Keep it positive, no spamming.
-            </p>
-          </div>
+        {/* Pinned welcome strip */}
+        <div className="px-4 py-2.5 bg-[#09090b]/95 backdrop-blur-md border-b border-white/[0.04] flex items-start gap-3 relative overflow-hidden">
+          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-indigo-500/50" />
+          <Pin className="w-3.5 h-3.5 text-indigo-400/80 mt-0.5 shrink-0" />
+          <p className="text-xs text-zinc-400 font-medium leading-relaxed pr-2">
+            <span className="text-zinc-200 font-semibold">Welcome!</span> Keep it positive, no spamming.
+          </p>
         </div>
       </div>
 
