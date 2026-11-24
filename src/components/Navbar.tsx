@@ -97,7 +97,23 @@ export default function Navbar() {
 
   const dismissedIds = getDismissedIds();
   const unreadRequestsCount = friendRequests.filter(req => !dismissedIds.includes(req.request_id)).length;
-  const isActive = (path: string) => location.pathname === path;
+  // Match the current route and its nested pages (e.g. /discover/stream-1).
+  const isActive = (path: string) =>
+    location.pathname === path || location.pathname.startsWith(`${path}/`);
+
+  const navLinkClass = (path: string) =>
+    `rounded-full px-5 py-2 text-sm font-bold transition-all ${
+      isActive(path)
+        ? 'bg-[#4F46E5]/15 text-[#818CF8] shadow-[inset_1px_1px_3px_rgba(79,70,229,0.18)]'
+        : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5'
+    }`;
+
+  const mobileNavLinkClass = (path: string) =>
+    `flex lg:hidden items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+      isActive(path)
+        ? 'bg-[#4F46E5]/12 text-[#818CF8]'
+        : 'text-[var(--text-main)] hover:bg-[var(--text-main)]/5'
+    }`;
 
   return (
     <>
@@ -111,18 +127,18 @@ export default function Navbar() {
             
             <Link to="/" aria-label="Home" className="pointer-events-auto flex items-center gap-3 py-2 z-10 group">
               <img src="/logo1.webp" width="32" height="32" alt="zQuab Logo" className="h-10 sm:h-14 w-auto object-contain group-hover:scale-105 transition-transform" />
-              <span className="font-bold text-lg sm:text-xl tracking-tight text-[var(--text-main)] pr-2">zQuab</span>
+              <span className="font-bold text-xl sm:text-2xl tracking-tight text-[var(--text-main)] pr-2">zQuab</span>
             </Link>
 
             {/* Desktop Center Pill */}
             <div className="pointer-events-auto hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 bg-[var(--card)] border border-[var(--border-color)] px-2 py-1.5 rounded-full shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.03),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] z-10">
-              <Link to="/discover" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">Watch Live</Link>
-              <Link to="/creators" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">
+              <Link to="/discover" className={navLinkClass('/discover')} aria-current={isActive('/discover') ? 'page' : undefined}>Watch Live</Link>
+              <Link to="/creators" className={navLinkClass('/creators')} aria-current={isActive('/creators') ? 'page' : undefined}>
                 Creators
               </Link>
               <div className="w-px h-4 bg-[var(--border-color)] mx-2"></div>
-              <Link to="/about" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">About</Link>
-              <Link to="/blog" className="px-5 py-2 text-sm font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/5 rounded-full transition-all">Blog</Link>
+              <Link to="/about" className={navLinkClass('/about')} aria-current={isActive('/about') ? 'page' : undefined}>About</Link>
+              <Link to="/blog" className={navLinkClass('/blog')} aria-current={isActive('/blog') ? 'page' : undefined}>Blog</Link>
             </div>
 
             {/* RIGHT UI ELEMENTS */}
@@ -197,19 +213,19 @@ export default function Navbar() {
                             <div className="w-full flex flex-col pb-3 gap-1 px-2 lg:px-0 lg:items-center">
                               <div className="w-5 h-px bg-[var(--border-color)] opacity-50 mb-1 mx-auto lg:mx-0"></div>
                               
-                              <Link to="/discover" onClick={()=>setIsMenuOpen(false)} className="flex lg:hidden items-center gap-3 px-3 py-2.5 rounded-xl text-[var(--text-main)] hover:bg-[var(--text-main)]/5">
+                              <Link to="/discover" onClick={()=>setIsMenuOpen(false)} className={mobileNavLinkClass('/discover')} aria-current={isActive('/discover') ? 'page' : undefined}>
                                 <span className="font-bold text-sm">Watch Live</span>
                               </Link>
                               
                               {/* 🛠️ FIX: Added Creators link to mobile dropdown */}
-                              <Link to="/creators" onClick={()=>setIsMenuOpen(false)} className="flex lg:hidden items-center gap-3 px-3 py-2.5 rounded-xl text-[var(--text-main)] hover:bg-[var(--text-main)]/5">
+                              <Link to="/creators" onClick={()=>setIsMenuOpen(false)} className={mobileNavLinkClass('/creators')} aria-current={isActive('/creators') ? 'page' : undefined}>
                                 <span className="font-bold text-sm">Creators</span>
                               </Link>
                               
-                              <Link to="/about" onClick={()=>setIsMenuOpen(false)} className="flex lg:hidden items-center gap-3 px-3 py-2.5 rounded-xl text-[var(--text-main)] hover:bg-[var(--text-main)]/5">
+                              <Link to="/about" onClick={()=>setIsMenuOpen(false)} className={mobileNavLinkClass('/about')} aria-current={isActive('/about') ? 'page' : undefined}>
                                 <span className="font-bold text-sm">About</span>
                               </Link>
-                              <Link to="/blog" onClick={()=>setIsMenuOpen(false)} className="flex lg:hidden items-center gap-3 px-3 py-2.5 rounded-xl text-[var(--text-main)] hover:bg-[var(--text-main)]/5">
+                              <Link to="/blog" onClick={()=>setIsMenuOpen(false)} className={mobileNavLinkClass('/blog')} aria-current={isActive('/blog') ? 'page' : undefined}>
                                 <span className="font-bold text-sm">Blog</span>
                               </Link>
                               

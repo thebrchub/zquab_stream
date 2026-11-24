@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageSquarePlus, Send, CheckCircle2, Mail, Sparkles, Link as LinkIcon, Loader2, AlertCircle } from 'lucide-react';
+import { MessageSquarePlus, Send, CheckCircle2, Mail, Link as LinkIcon, Loader2, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   categoryToTopic,
@@ -48,7 +48,7 @@ export default function ContactPage() {
   return (
     <main className="min-h-[calc(100vh-80px)] w-full bg-[var(--background)] z-20 border-none relative overflow-hidden">
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-12 lg:pt-24 pb-24 flex flex-col lg:flex-row gap-12 lg:gap-24 items-start">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-10 sm:pt-12 lg:pt-20 pb-16 lg:pb-20 flex flex-col lg:flex-row gap-10 lg:gap-16 items-start">
         
         {/* LEFT COLUMN: Typography & Context */}
         <div className="w-full lg:w-5/12 flex flex-col pt-4 lg:sticky lg:top-32">
@@ -66,8 +66,8 @@ export default function ContactPage() {
               Found a bug? Have an idea for a new feature? Or just want to share feedback? Send it directly to our team. We read absolutely everything.
             </p>
 
-            <div className="flex items-center gap-4 p-5 bg-[var(--card)] border border-[var(--border-color)] rounded-2xl w-fit shadow-sm">
-               <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-[#3B82F6]">
+            <div className="flex items-center gap-4 p-5 bg-[var(--card)] border border-[var(--border-color)] rounded-2xl w-fit shadow-[6px_6px_14px_rgba(0,0,0,0.16),-4px_-4px_12px_rgba(255,255,255,0.035),inset_1px_1px_2px_rgba(255,255,255,0.035)]">
+               <div className="w-10 h-10 rounded-full bg-blue-500/10 border border-blue-400/15 flex items-center justify-center text-[#3B82F6] shadow-[inset_2px_2px_4px_rgba(255,255,255,0.06),inset_-2px_-2px_5px_rgba(0,0,0,0.16)]">
                  <Mail className="w-5 h-5" />
                </div>
                <div>
@@ -84,7 +84,7 @@ export default function ContactPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="p-6 sm:p-8 md:p-10 rounded-[2rem] bg-[var(--card)] border border-[var(--border-color)] shadow-xl shadow-black/5 dark:shadow-black/20"
+            className="relative p-5 sm:p-7 md:p-9 rounded-[2rem] bg-[var(--card)] border border-[var(--border-color)] shadow-[12px_12px_28px_rgba(0,0,0,0.18),-7px_-7px_22px_rgba(255,255,255,0.035),inset_1px_1px_2px_rgba(255,255,255,0.035)] dark:shadow-[12px_12px_28px_rgba(0,0,0,0.42),-7px_-7px_22px_rgba(255,255,255,0.018),inset_1px_1px_2px_rgba(255,255,255,0.025)]"
           >
             {submitted ? (
               <div className="py-16 flex flex-col items-center text-center">
@@ -103,7 +103,7 @@ export default function ContactPage() {
                     setSocialHandle('');
                     setError(null);
                   }}
-                  className="px-8 py-4 rounded-full bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] font-bold text-base hover:border-[#3B82F6] transition-colors active:scale-95 shadow-sm"
+                  className="px-8 py-4 rounded-full bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] font-bold text-base hover:border-[#3B82F6] transition-all active:scale-95 shadow-[5px_5px_12px_rgba(0,0,0,0.16),-4px_-4px_10px_rgba(255,255,255,0.035),inset_1px_1px_2px_rgba(255,255,255,0.03)]"
                 >
                   Send another message
                 </button>
@@ -128,8 +128,8 @@ export default function ContactPage() {
                         onClick={() => setCategory(item.id as ContactCategory)}
                         className={`py-3.5 px-4 rounded-2xl text-sm font-bold transition-all border ${
                           category === item.id 
-                            ? 'bg-[#3B82F6] text-white border-[#3B82F6] shadow-lg shadow-blue-500/20' 
-                            : 'bg-[var(--background)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)]/50'
+                            ? 'bg-[#3B82F6] text-white border-[#3B82F6] shadow-[inset_3px_3px_6px_rgba(255,255,255,0.22),inset_-3px_-3px_7px_rgba(0,0,0,0.2),0_5px_12px_rgba(59,130,246,0.18)]' 
+                            : 'bg-[var(--background)] text-[var(--text-muted)] border-[var(--border-color)] shadow-[4px_4px_9px_rgba(0,0,0,0.13),-3px_-3px_8px_rgba(255,255,255,0.025),inset_1px_1px_2px_rgba(255,255,255,0.025)] hover:border-[var(--text-muted)]/50 hover:-translate-y-0.5'
                         }`}
                       >
                         {item.label}
@@ -155,7 +155,7 @@ export default function ContactPage() {
                         ? "Describe what went wrong so we can fix it..." 
                         : "Share your thoughts on your experience..."
                     }
-                    className="w-full p-5 rounded-2xl bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] placeholder-[var(--text-muted)]/50 focus:outline-none focus:border-[#3B82F6] transition-colors resize-none text-base leading-relaxed"
+                    className="w-full p-5 rounded-2xl bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] placeholder-[var(--text-muted)]/50 shadow-[inset_4px_4px_9px_rgba(0,0,0,0.16),inset_-3px_-3px_8px_rgba(255,255,255,0.025)] focus:outline-none focus:border-[#3B82F6] focus:ring-2 focus:ring-blue-500/10 transition-all resize-none text-base leading-relaxed"
                   />
                 </div>
 
@@ -171,7 +171,7 @@ export default function ContactPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="name@example.com"
-                      className="w-full p-4 rounded-2xl bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] placeholder-[var(--text-muted)]/50 focus:outline-none focus:border-[#3B82F6] transition-colors text-base"
+                      className="w-full p-4 rounded-2xl bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] placeholder-[var(--text-muted)]/50 shadow-[inset_4px_4px_9px_rgba(0,0,0,0.16),inset_-3px_-3px_8px_rgba(255,255,255,0.025)] focus:outline-none focus:border-[#3B82F6] focus:ring-2 focus:ring-blue-500/10 transition-all text-base"
                     />
                   </div>
 
@@ -189,16 +189,16 @@ export default function ContactPage() {
                         value={socialHandle}
                         onChange={(e) => setSocialHandle(e.target.value)}
                         placeholder="LinkedIn or Instagram URL"
-                        className="w-full pl-11 pr-4 py-4 rounded-2xl bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] placeholder-[var(--text-muted)]/50 focus:outline-none focus:border-[#3B82F6] transition-colors text-base"
+                        className="w-full pl-11 pr-4 py-4 rounded-2xl bg-[var(--background)] border border-[var(--border-color)] text-[var(--text-main)] placeholder-[var(--text-muted)]/50 shadow-[inset_4px_4px_9px_rgba(0,0,0,0.16),inset_-3px_-3px_8px_rgba(255,255,255,0.025)] focus:outline-none focus:border-[#3B82F6] focus:ring-2 focus:ring-blue-500/10 transition-all text-base"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* 🛠️ NEW: Contributor Perks Banner */}
-                <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/20 p-5 rounded-2xl flex gap-4 items-start">
-                  <div className="bg-blue-500/20 p-2 rounded-full flex-shrink-0">
-                    <Sparkles className="w-5 h-5 text-[#3B82F6]" />
+                <div className="bg-[var(--background)] border border-[var(--border-color)] p-5 rounded-2xl flex gap-4 items-start shadow-[5px_5px_12px_rgba(0,0,0,0.13),-4px_-4px_10px_rgba(255,255,255,0.025),inset_1px_1px_2px_rgba(255,255,255,0.025)]">
+                  <div className="h-10 w-10 rounded-xl bg-blue-500/10 border border-blue-500/15 text-[#3B82F6] flex items-center justify-center flex-shrink-0 shadow-[inset_2px_2px_4px_rgba(255,255,255,0.06),inset_-2px_-2px_4px_rgba(0,0,0,0.16)]">
+                    <MessageSquarePlus className="w-5 h-5" />
                   </div>
                   <div>
                     <p className="text-sm text-[var(--text-main)] leading-relaxed font-medium">
@@ -219,7 +219,7 @@ export default function ContactPage() {
                   <button aria-label="Submit"
                     type="submit"
                     disabled={isSubmitting}
-                    className="group flex w-full sm:inline-flex items-center justify-center gap-3 bg-[#3B82F6] hover:bg-blue-600 disabled:opacity-60 disabled:hover:bg-[#3B82F6] disabled:hover:scale-100 text-white px-8 py-4 rounded-full font-bold text-base transition-all duration-300 hover:scale-[1.02] active:scale-95 shadow-xl shadow-blue-500/20"
+                    className="group flex w-full sm:inline-flex items-center justify-center gap-3 bg-[#3B82F6] hover:bg-blue-600 disabled:opacity-60 disabled:hover:bg-[#3B82F6] disabled:hover:scale-100 text-white px-8 py-4 rounded-full font-bold text-base transition-all duration-300 hover:scale-[1.01] active:scale-[0.98] shadow-[7px_7px_15px_rgba(0,0,0,0.25),-4px_-4px_12px_rgba(255,255,255,0.06),inset_3px_3px_6px_rgba(255,255,255,0.22),inset_-3px_-3px_6px_rgba(0,0,0,0.2)]"
                   >
                     {isSubmitting ? (
                       <Loader2 className="w-5 h-5 animate-spin" />

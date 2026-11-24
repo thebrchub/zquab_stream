@@ -107,7 +107,7 @@ export default function Creators() {
               value={searchQuery}
               maxLength={40}
               onChange={(event) => setParam('q', event.target.value)}
-              className="w-full bg-[var(--background)] text-[var(--text-main)] pl-12 pr-4 py-3.5 rounded-full border border-[var(--border-color)] shadow-[inset_2px_2px_4px_rgba(0,0,0,0.2),inset_-1px_-1px_3px_rgba(255,255,255,0.02)] focus:outline-none focus:border-[#4F46E5] transition-colors text-sm font-medium placeholder:text-[var(--text-muted)]"
+              className="w-full bg-[var(--card)] text-[var(--text-main)] pl-12 pr-4 py-3.5 rounded-full border border-[var(--border-color)] shadow-[0_3px_8px_rgba(15,23,42,0.07),0_1px_2px_rgba(15,23,42,0.04),inset_0_1px_1px_rgba(255,255,255,0.85)] dark:shadow-[0_4px_10px_rgba(0,0,0,0.28),0_1px_2px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.045)] placeholder:text-[var(--text-muted)]/80 focus:outline-none focus:border-[#4F46E5]/70 focus:ring-2 focus:ring-[#4F46E5]/10 focus:shadow-[0_4px_12px_rgba(15,23,42,0.08),0_0_0_3px_rgba(79,70,229,0.08)] dark:focus:shadow-[0_4px_12px_rgba(0,0,0,0.3),0_0_0_3px_rgba(79,70,229,0.12)] transition-all duration-200 text-sm font-medium"
             />
           </div>
 
@@ -124,7 +124,7 @@ export default function Creators() {
           )}
         </div>
 
-        <div className="w-full overflow-x-auto pb-6 mb-8 hide-scrollbar">
+        <div className="w-full overflow-x-auto pb-4 pt-1 mb-8 hide-scrollbar">
           <div className="flex items-center gap-2 sm:gap-4 w-max pr-4">
             {CATEGORIES.map((category) => (
               <button
@@ -133,8 +133,8 @@ export default function Creators() {
                 onClick={() => setParam('category', category.id)}
                 className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-full font-bold text-xs sm:text-sm transition-all whitespace-nowrap border ${
                   activeCategory === category.id
-                    ? 'bg-[#4F46E5] text-white border-[#4F46E5] shadow-[inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4)]'
-                    : 'bg-[var(--card)] text-[var(--text-muted)] border-[var(--border-color)] shadow-[4px_4px_10px_rgba(0,0,0,0.3),-2px_-2px_6px_rgba(255,255,255,0.02),inset_1px_1px_2px_rgba(255,255,255,0.05),inset_-1px_-1px_2px_rgba(0,0,0,0.2)] hover:text-[var(--text-main)]'
+                    ? 'bg-[#4F46E5] text-white border-[#4F46E5] shadow-[0_2px_5px_rgba(79,70,229,0.18),inset_1px_1px_3px_rgba(255,255,255,0.24),inset_-1px_-1px_3px_rgba(0,0,0,0.2)]'
+                    : 'bg-[var(--card)] text-[var(--text-muted)] border-[var(--border-color)] shadow-[0_2px_5px_rgba(15,23,42,0.09),inset_1px_1px_2px_rgba(255,255,255,0.5)] dark:shadow-[0_2px_5px_rgba(0,0,0,0.22),inset_1px_1px_2px_rgba(255,255,255,0.035)] hover:text-[var(--text-main)]'
                 }`}
               >
                 {getCategoryIcon(category.id)}
@@ -163,7 +163,7 @@ export default function Creators() {
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={{ duration: 0.3, delay: Math.min(index % 20, 10) * 0.05 }}
                     key={creator.username}
-                    className="flex flex-col bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 shadow-[8px_8px_20px_rgba(0,0,0,0.4),-4px_-4px_10px_rgba(255,255,255,0.02),inset_1px_1px_3px_rgba(255,255,255,0.1),inset_-1px_-1px_3px_rgba(0,0,0,0.2)] relative group"
+                    className="flex flex-col bg-[var(--card)] border border-[var(--border-color)] rounded-[2rem] p-6 shadow-[0_3px_10px_rgba(15,23,42,0.07),0_1px_3px_rgba(15,23,42,0.04),inset_0_1px_1px_rgba(255,255,255,0.65)] dark:shadow-[0_5px_14px_rgba(0,0,0,0.22),0_1px_3px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.035)] relative group"
                   >
                     {liveUsernames.has(creator.username) && (
                       <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-red-500/10 text-red-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-red-500/20 shadow-sm z-10">

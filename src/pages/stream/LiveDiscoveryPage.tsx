@@ -56,22 +56,24 @@ const CLEAN_CARD =
   "dark:hover:shadow-[10px_12px_24px_rgba(0,0,0,0.4),-4px_-4px_12px_rgba(255,255,255,0.045),inset_1px_1px_2px_rgba(255,255,255,0.055)]";
 
 const CLEAN_INPUT =
-  "bg-[var(--background)] border border-[var(--border-color)] rounded-[1.25rem] text-[var(--text-main)] " +
-  "shadow-[inset_3px_3px_7px_rgba(0,0,0,0.08),inset_-3px_-3px_7px_rgba(255,255,255,0.72)] " +
-  "dark:shadow-[inset_3px_3px_7px_rgba(0,0,0,0.3),inset_-2px_-2px_6px_rgba(255,255,255,0.035)] " +
-  "focus:outline-none focus:border-[#3B82F6]/70 focus:ring-2 focus:ring-[#3B82F6]/15 transition-all duration-200";
+  "bg-[var(--card)] border border-[var(--border-color)] rounded-[1.25rem] text-[var(--text-main)] " +
+  "shadow-[0_3px_8px_rgba(15,23,42,0.07),0_1px_2px_rgba(15,23,42,0.04),inset_0_1px_1px_rgba(255,255,255,0.85)] " +
+  "dark:shadow-[0_4px_10px_rgba(0,0,0,0.28),0_1px_2px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.045)] " +
+  "placeholder:text-[var(--text-muted)]/80 focus:outline-none focus:border-[#3B82F6]/60 focus:ring-2 focus:ring-[#3B82F6]/10 " +
+  "focus:shadow-[0_4px_12px_rgba(15,23,42,0.08),0_0_0_3px_rgba(59,130,246,0.08)] " +
+  "dark:focus:shadow-[0_4px_12px_rgba(0,0,0,0.3),0_0_0_3px_rgba(59,130,246,0.12)] transition-all duration-200";
 
 const TAB_BUTTON =
   "bg-[var(--card)] border border-[var(--border-color)] rounded-full text-[var(--text-muted)] " +
-  "shadow-[4px_4px_9px_rgba(0,0,0,0.07),-4px_-4px_9px_rgba(255,255,255,0.72),inset_1px_1px_2px_rgba(255,255,255,0.7)] " +
-  "dark:shadow-[4px_4px_9px_rgba(0,0,0,0.3),-2px_-2px_7px_rgba(255,255,255,0.03),inset_1px_1px_2px_rgba(255,255,255,0.04)] " +
-  "hover:text-[var(--text-main)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 " +
+  "shadow-[2px_2px_4px_rgba(0,0,0,0.055),-2px_-2px_4px_rgba(255,255,255,0.58),inset_1px_1px_1px_rgba(255,255,255,0.55)] " +
+  "dark:shadow-[2px_2px_4px_rgba(0,0,0,0.24),-1px_-1px_4px_rgba(255,255,255,0.025),inset_1px_1px_1px_rgba(255,255,255,0.035)] " +
+  "hover:text-[var(--text-main)] active:scale-[0.98] transition-all duration-200 " +
   "px-5 py-2.5 whitespace-nowrap capitalize text-sm font-semibold";
 
 const TAB_BUTTON_ACTIVE =
   "bg-[#3B82F6] text-white font-bold rounded-full border border-[#3B82F6]/70 " +
-  "shadow-[5px_5px_12px_rgba(59,130,246,0.28),-4px_-4px_10px_rgba(255,255,255,0.72),inset_2px_2px_4px_rgba(255,255,255,0.35),inset_-2px_-2px_4px_rgba(0,0,0,0.12)] " +
-  "dark:shadow-[5px_5px_12px_rgba(0,0,0,0.32),-3px_-3px_8px_rgba(255,255,255,0.045),inset_2px_2px_4px_rgba(255,255,255,0.22),inset_-2px_-2px_4px_rgba(0,0,0,0.2)] " +
+  "shadow-[2px_3px_5px_rgba(59,130,246,0.2),inset_1px_1px_3px_rgba(255,255,255,0.3),inset_-1px_-1px_3px_rgba(0,0,0,0.1)] " +
+  "dark:shadow-[2px_3px_5px_rgba(0,0,0,0.24),inset_1px_1px_3px_rgba(255,255,255,0.18),inset_-1px_-1px_3px_rgba(0,0,0,0.16)] " +
   "transition-all duration-200 px-5 py-2.5 whitespace-nowrap capitalize text-sm";
 
 // Legacy clay button tokens retained as comments for the disabled 1:1 section
@@ -244,7 +246,7 @@ export const LiveDiscoveryPage: React.FC = () => {
             />
           </div>
 
-          <div className="flex items-center gap-3 overflow-x-auto pb-4 sm:pb-0 custom-scrollbar px-1 pt-1">
+          <div className="flex items-center gap-3 overflow-x-auto pb-3 sm:pb-1 custom-scrollbar px-1 pt-1">
             {categories.map((cat) => (
               <button
                 key={cat}

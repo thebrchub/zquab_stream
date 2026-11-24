@@ -118,75 +118,75 @@ export default function CTAFooter() {
         {/* =========================================
             3. THE BOXED FOOTER SECTION
             ========================================= */}
-        <div className="relative w-full overflow-hidden rounded-[2.5rem] md:rounded-[3rem] bg-[var(--card)] border border-[var(--border-color)] shadow-xl shadow-black/5 dark:shadow-black/20 pt-16 px-8 sm:px-12 lg:px-16 flex flex-col backdrop-blur-xl mx-auto">
+        <div className="relative w-full overflow-hidden rounded-[2rem] md:rounded-[2.5rem] bg-[var(--card)] border border-[var(--border-color)] shadow-xl shadow-black/5 dark:shadow-black/20 pt-10 lg:pt-12 px-8 sm:px-10 lg:px-14 flex flex-col backdrop-blur-xl mx-auto">
           
-          <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center lg:items-start gap-12 mb-8">
+          <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center lg:items-start gap-8 lg:gap-10 mb-6 lg:mb-5">
             
             <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
-              <Link to="/" aria-label="Home" className="flex items-center gap-3 mb-5 group">
+              <Link to="/" aria-label="Home" className="flex items-center gap-3 mb-4 group">
                 <img 
                   src="/logo1.webp" 
                   width="84"
                   height="84"
                   alt="zQuab Logo" 
-                  className="h-20 w-auto object-contain group-hover:scale-105 transition-transform duration-300" 
+                  className="h-16 lg:h-[4.5rem] w-auto object-contain group-hover:scale-105 transition-transform duration-300" 
                 />
-                <span className="font-bold text-4xl tracking-tight text-[var(--text-main)]">
+                <span className="font-bold text-3xl lg:text-[2.15rem] tracking-tight text-[var(--text-main)]">
                   zQuab
                 </span>
               </Link>
-              <p className="text-[var(--text-muted)] text-sm max-w-xs mb-6 leading-relaxed">
+              <p className="text-[var(--text-muted)] text-sm max-w-xs mb-5 leading-relaxed">
                 Connect with random people worldwide in milliseconds. Pure, unfiltered conversation. No signup required.
               </p>
 
               {/* Social Links Section */}
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-3 mb-5">
                 <a 
                   href="https://www.instagram.com/zquab.app?igsh=a3BrNnFyZHJ5Yjkx" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="p-2.5 bg-[var(--background)] border border-[var(--border-color)] rounded-full hover:border-[#E1306C]/30 hover:bg-[#E1306C]/10 transition-all active:scale-95 flex items-center justify-center"
+                  className="p-2 bg-[var(--background)] border border-[var(--border-color)] rounded-full hover:border-[#E1306C]/30 hover:bg-[#E1306C]/10 transition-all active:scale-95 flex items-center justify-center"
                   aria-label="Instagram"
                 >
                   <img 
                     src="/insta.svg" 
                     alt="Instagram" 
-                    className="w-7 h-7 object-contain opacity-80 hover:opacity-100 transition-opacity" 
+                    className="w-6 h-6 object-contain opacity-80 hover:opacity-100 transition-opacity" 
                   />
                 </a>
                 <a 
                   href="https://x.com/zquabapp" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="p-2.5 bg-[var(--background)] border border-[var(--border-color)] rounded-full hover:border-gray-500/30 hover:bg-[var(--text-main)]/5 transition-all active:scale-95 flex items-center justify-center"
+                  className="p-2 bg-[var(--background)] border border-[var(--border-color)] rounded-full hover:border-gray-500/30 hover:bg-[var(--text-main)]/5 transition-all active:scale-95 flex items-center justify-center"
                   aria-label="X (formerly Twitter)"
                 >
                   <img 
                     src={theme === 'dark' ? '/x-w.svg' : '/x.svg'} 
                     alt="X" 
-                    className="w-7 h-7 object-contain opacity-80 hover:opacity-100 transition-opacity" 
+                    className="w-6 h-6 object-contain opacity-80 hover:opacity-100 transition-opacity" 
                   />
                 </a>
                 <a 
                   href="https://www.reddit.com/r/zQuabChat/" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="p-2.5 bg-[var(--background)] border border-[var(--border-color)] rounded-full hover:border-[#FF4500]/30 hover:bg-[#FF4500]/10 transition-all active:scale-95 flex items-center justify-center"
+                  className="p-2 bg-[var(--background)] border border-[var(--border-color)] rounded-full hover:border-[#FF4500]/30 hover:bg-[#FF4500]/10 transition-all active:scale-95 flex items-center justify-center"
                   aria-label="Reddit"
                 >
                   <img 
                     src="/red.svg" 
                     alt="Reddit" 
-                    className="w-7 h-7 object-contain opacity-80 hover:opacity-100 transition-opacity" 
+                    className="w-6 h-6 object-contain opacity-80 hover:opacity-100 transition-opacity" 
                   />
                 </a>
               </div>
-              <p className="text-xs text-[var(--text-muted)]/60 font-bold uppercase tracking-widest">
+              <p className="text-[11px] lg:text-xs text-[var(--text-muted)]/60 font-bold uppercase tracking-widest">
                 &copy; {currentYear} zQuab. All rights reserved.
               </p>
             </div>
 
-            <div className="flex flex-wrap justify-center lg:justify-end gap-x-8 gap-y-4 text-sm font-bold tracking-wide uppercase text-[var(--text-muted)]">
+            <div className="flex flex-wrap justify-center lg:justify-end gap-x-7 gap-y-3 text-xs lg:text-sm font-bold tracking-wide uppercase text-[var(--text-muted)]">
               <Link to="/about" aria-label="About"className="hover:text-[#3B82F6] transition-colors">About</Link>
               <Link to="/safety" aria-label="User Safety" className="hover:text-[#3B82F6] transition-colors">Safety</Link>
               <Link to="/privacy" aria-label="Privacy Policy" className="hover:text-[#3B82F6] transition-colors">Privacy</Link>
@@ -196,8 +196,8 @@ export default function CTAFooter() {
             
           </div>
 
-          <div className="w-full flex justify-center pointer-events-none select-none translate-y-[22%]">
-            <span className="text-[22vw] font-black leading-none tracking-tighter text-[var(--text-main)] opacity-[0.03] dark:opacity-[0.02]">
+          <div className="h-28 lg:h-36 w-full flex justify-center items-end overflow-hidden pointer-events-none select-none">
+            <span className="translate-y-[20%] text-[clamp(8rem,17vw,15rem)] font-black leading-[0.72] tracking-tighter text-[var(--text-main)] opacity-[0.055] dark:opacity-[0.045]">
               zQuab
             </span>
           </div>
