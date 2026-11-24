@@ -11,3 +11,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// The API host (set in vite.config.ts; '' = same origin through the dev proxy).
+declare const __ZQ_API_HOST__: string;

@@ -302,7 +302,7 @@ export const LiveDiscoveryPage: React.FC = () => {
                         </div>
 
                         <div className="absolute top-4 left-4 z-20 bg-red-500 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-lg flex items-center gap-1.5 uppercase tracking-widest shadow-md">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span> LIVE
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span> {stream.is_paused ? 'PAUSED' : 'LIVE'}
                         </div>
 
                         {stream.is_premium && (

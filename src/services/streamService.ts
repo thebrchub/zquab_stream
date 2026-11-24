@@ -53,6 +53,15 @@ export interface CreatorStream {
 export interface CreatorStreamsResponse {
   ingest_url: string;
   streams: CreatorStream[];
+  // Only on the first page of ended streams: totals over ALL the creator's ended streams.
+  summary?: CreatorStreamsSummary;
+}
+
+export interface CreatorStreamsSummary {
+  count: number;
+  avg_peak: number | null;
+  avg_unique: number | null; // null when no stream has a unique count (older streams)
+  total_earned: number;
 }
 
 export interface LiveStream {
@@ -76,6 +85,8 @@ export interface UpcomingStream extends LiveStream {
 export interface StreamCard extends LiveStream {
   status: 'live' | 'upcoming';
   scheduled_at?: string;
+  // Live, but the streamer's video is gone (they may reconnect; ended automatically otherwise).
+  is_paused?: boolean;
 }
 
 export interface StreamsPage extends DirectoryPage {

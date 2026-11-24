@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { apiClient } from '../api/client';
+import { apiClient, publicGet } from '../api/client';
 import { useAuth } from './AuthContext';
 import { wsEvents } from './WebSocketContext';
 import type { PurchaseCompletedEvent } from '../types/wallet';
+import { formatCoins } from '../utils/coins';
 
 // How long to wait for the webhook's "purchase_completed" push before refetching the wallet once.
 const PURCHASE_PUSH_TIMEOUT_MS = 30000;
@@ -62,7 +63,9 @@ export interface GiftItem {
 interface WalletContextType {
   balanceCoins: number;
   packages: CoinPackage[];
-  gifts: GiftItem[]; // 🚀 ADDED
+  gifts: GiftItem[];
+  // Loads the gift list once per gifts version (call when the gift drawer opens).
+  ensureGifts: () => void;
   isPurchaseModalOpen: boolean;
   isProcessingPayment: boolean;
   isLoadingPackages: boolean;
@@ -76,27 +79,30 @@ interface WalletContextType {
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, bootstrap, refreshSession } = useAuth();
   const userId = user?.user_id;
   const isGuest = user?.is_guest;
-  const [balanceCoins, setBalanceCoins] = useState<number>(0);
+  const [balanceCoins, setBalanceCoins] = useState<number>(() => Number(bootstrap?.wallet?.balance_coins || 0));
   const [packages, setPackages] = useState<CoinPackage[]>([]);
-  const [gifts, setGifts] = useState<GiftItem[]>([]); // 🚀 ADDED
+  const [gifts, setGifts] = useState<GiftItem[]>([]);
   const [isLoadingPackages, setIsLoadingPackages] = useState(false);
   const [hasLoadedPackages, setHasLoadedPackages] = useState(false);
   
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
+  // The balance comes with the bootstrap (taken again whenever it reloads), then from WebSocket events.
+  const [seenBootstrap, setSeenBootstrap] = useState(bootstrap);
+  if (seenBootstrap !== bootstrap) {
+    setSeenBootstrap(bootstrap);
+    setBalanceCoins(bootstrap ? Number(bootstrap.wallet?.balance_coins || 0) : 0);
+  }
+
+  // Reloads the bootstrap, which carries the balance.
   const refreshBalance = useCallback(async () => {
     if (!userId || isGuest) return;
-    try {
-      const res = await apiClient.get('/wallet');
-      setBalanceCoins(res.data.balance_coins);
-    } catch (error) {
-      console.error("Failed to fetch wallet balance:", error);
-    }
-  }, [userId, isGuest]);
+    await refreshSession();
+  }, [userId, isGuest, refreshSession]);
 
   const fetchPackages = useCallback(async () => {
     if (!userId || isGuest || isLoadingPackages || hasLoadedPackages) return;
@@ -112,20 +118,20 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [userId, isGuest, isLoadingPackages, hasLoadedPackages]);
 
-  // 🚀 ADDED: Fetch the live gift catalog
-  const fetchGifts = useCallback(async () => {
-    try {
-      const res = await apiClient.get('/gifts');
-      setGifts(res.data);
-    } catch (error) {
-      console.error("Failed to fetch gifts:", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshBalance();
-    fetchGifts(); 
-  }, [refreshBalance, fetchGifts]);
+  // The gift list is the same for everyone and cached at the edge per gifts
+  // version (a new version after every admin edit).
+  const giftsVer = bootstrap?.gifts_ver ?? '';
+  const loadedGiftsVerRef = useRef<string | null>(null);
+  const ensureGifts = useCallback(() => {
+    if (loadedGiftsVerRef.current === giftsVer) return;
+    loadedGiftsVerRef.current = giftsVer;
+    publicGet<GiftItem[]>(giftsVer ? `/gifts?v=${encodeURIComponent(giftsVer)}` : '/gifts')
+      .then((list) => setGifts(list || []))
+      .catch((error) => {
+        loadedGiftsVerRef.current = null;
+        console.error("Failed to fetch gifts:", error);
+      });
+  }, [giftsVer]);
 
   const openPurchaseModal = () => {
     setIsPurchaseModalOpen(true);
@@ -177,7 +183,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         amount: orderData.amount, 
         currency: orderData.currency,
         name: "zQuab",
-        description: `${orderData.coins} zCoins`,
+        description: formatCoins(orderData.coins),
         order_id: orderData.razorpay_order_id,
         theme: {
           color: "#3B82F6"
@@ -223,7 +229,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <WalletContext.Provider value={{
       balanceCoins,
       packages,
-      gifts, // 🚀 ADDED
+      gifts,
+      ensureGifts,
       isPurchaseModalOpen,
       isProcessingPayment,
       isLoadingPackages,

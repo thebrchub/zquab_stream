@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { BarChart2, Settings, TrendingUp, Loader2, DollarSign, ArrowRight, Play, Copy, Radio, X, Clock3, RefreshCw, AlertTriangle, History, Eye, Users } from 'lucide-react';
 import { creatorService, type CreatorEarnings } from '../../services/creatorService';
-import { streamService, type CreatorStream, type StreamStatus } from '../../services/streamService';
+import { streamService, type CreatorStream, type CreatorStreamsSummary, type StreamStatus } from '../../services/streamService';
 import { GoLiveModal } from '../../components/studio/GoLiveModal'; 
 import { wsEvents } from '../../context/WebSocketContext';
-import PaginationLoader from '../../components/PaginationLoader';
+import { coinUnit, formatCoins } from '../../utils/coins';
 
 const TIMELINE_DAYS = 30;
-const PAST_STREAMS_PAGE = 20;
+const PAST_STREAMS_PAGE = 5;
 
 const STATUS_LABELS: Record<StreamStatus, string> = {
   scheduled: 'Scheduled',
@@ -82,8 +82,35 @@ export const CreatorDashboardPage: React.FC = () => {
     fetchEarnings();
   }, []);
 
+  // How long a stream waits for the creator to reconnect if their video drops
+  // (seconds); copied into every new stream. null until loaded.
+  const [pauseTimeout, setPauseTimeout] = useState<number | null>(null);
+  const [isSavingPauseTimeout, setIsSavingPauseTimeout] = useState(false);
+  useEffect(() => {
+    creatorService.getMyApplication()
+      .then((app) => setPauseTimeout(app?.pause_timeout ?? 600))
+      .catch(() => setPauseTimeout(600));
+  }, []);
+
+  const changePauseTimeout = async (next: number) => {
+    const before = pauseTimeout;
+    setPauseTimeout(next);
+    setIsSavingPauseTimeout(true);
+    try {
+      await creatorService.updateSettings({ pause_timeout: next });
+    } catch (err) {
+      console.error('Failed to save pause timeout', err);
+      setPauseTimeout(before);
+      setStreamNotice('Could not save the setting. Please try again.');
+    } finally {
+      setIsSavingPauseTimeout(false);
+    }
+  };
+
   // Past streams load page by page as the creator scrolls.
   const [pastStreams, setPastStreams] = useState<CreatorStream[]>([]);
+  // Totals over all ended streams; comes with the first page of ended streams.
+  const [pastSummary, setPastSummary] = useState<CreatorStreamsSummary | null>(null);
   const [pastHasMore, setPastHasMore] = useState(true);
   const [isLoadingPast, setIsLoadingPast] = useState(false);
   const [pastStatus, setPastStatus] = useState<PastStatus>('ended');
@@ -104,6 +131,7 @@ export const CreatorDashboardPage: React.FC = () => {
       const page = data.streams || [];
       pastOffsetRef.current = offset + page.length;
       setPastStreams((prev) => (reset ? page : [...prev, ...page]));
+      if (reset) setPastSummary(data.summary ?? null);
       setPastHasMore(page.length === PAST_STREAMS_PAGE);
     } catch (err) {
       if (requestId !== pastRequestRef.current) return;
@@ -161,7 +189,9 @@ export const CreatorDashboardPage: React.FC = () => {
     }
 
     if (message.type === 'stream_auto_ended') {
-      setStreamNotice('Your stream was ended because it reached its planned end time.');
+      setStreamNotice(payload.reason === 'publisher_gone'
+        ? 'Your stream was ended because your video stayed disconnected for too long.'
+        : 'Your stream was ended because it reached its planned end time.');
       fetchStreams();
       void loadPastStreams(true);
     }
@@ -174,7 +204,7 @@ export const CreatorDashboardPage: React.FC = () => {
 
     if (message.type === 'stream_earnings') {
       const earnings = Number(payload.earnings_coins || payload.earningsCoins || 0);
-      if (earnings > 0) setStreamNotice(`You earned ${earnings.toLocaleString()} zCoins from your stream.`);
+      if (earnings > 0) setStreamNotice(`You earned ${formatCoins(earnings)} from your stream.`);
     }
   }), []);
 
@@ -258,20 +288,8 @@ export const CreatorDashboardPage: React.FC = () => {
   }, [earnings]);
 
   const maxDailyEarning = Math.max(1, ...timeline.map((d) => d.coins));
+  const timelineTotal = timeline.reduce((sum, d) => sum + d.coins, 0);
   const hasTimelineData = timeline.some((d) => d.coins > 0);
-
-  // Summary over the latest streams loaded (up to one page).
-  const pastSummary = useMemo(() => {
-    const recent = pastStreams.slice(0, PAST_STREAMS_PAGE);
-    const withUnique = recent.filter((s) => s.unique_viewer_count !== null && s.unique_viewer_count !== undefined);
-    const avg = (nums: number[]) => (nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null);
-    return {
-      count: recent.length,
-      avgPeak: avg(recent.map((s) => s.peak_viewer_count)),
-      avgUnique: avg(withUnique.map((s) => s.unique_viewer_count as number)),
-      totalEarned: recent.reduce((sum, s) => sum + (s.total_earnings_coins || 0), 0),
-    };
-  }, [pastStreams]);
 
   // Prevent rendering the dashboard momentarily before redirect
   if (user?.approval_status !== 'approved') return null;
@@ -470,9 +488,9 @@ export const CreatorDashboardPage: React.FC = () => {
                   <div className="pt-6">
                     <div className="flex items-baseline gap-2">
                       <span className="text-5xl font-light tracking-tighter text-zinc-900 dark:text-white">
-                        {timeline.reduce((sum, d) => sum + d.coins, 0).toLocaleString()}
+                        {timelineTotal.toLocaleString()}
                       </span>
-                      <span className="text-lg text-zinc-500 font-medium">zCoins</span>
+                      <span className="text-lg text-zinc-500 font-medium">{coinUnit(timelineTotal)}</span>
                     </div>
                   </div>
                 )}
@@ -509,7 +527,7 @@ export const CreatorDashboardPage: React.FC = () => {
                             {/* Tooltip */}
                             <div className="absolute -top-12 scale-0 group-hover:scale-100 transition-transform bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white px-2.5 py-1.5 rounded shadow-lg whitespace-nowrap z-10 pointer-events-none text-center">
                               <div className="text-[10px] text-zinc-500">{dayData.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</div>
-                              <span className="font-semibold">{dayData.coins.toLocaleString()}</span> zCoins
+                              <span className="font-semibold">{dayData.coins.toLocaleString()}</span> {coinUnit(dayData.coins)}
                             </div>
                           </div>
                         );
@@ -547,22 +565,22 @@ export const CreatorDashboardPage: React.FC = () => {
                   </div>
                 </div>
 
-                {pastStatus === 'ended' && pastStreams.length > 0 && (
+                {pastStatus === 'ended' && pastSummary && pastSummary.count > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
                     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Avg peak viewers</div>
-                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.avgPeak ?? '—'}</div>
+                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.avg_peak ?? '—'}</div>
                       <div className="text-[11px] text-zinc-500 mt-1">Most people watching at the same time.</div>
                     </div>
                     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Avg unique viewers</div>
-                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.avgUnique ?? '—'}</div>
+                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.avg_unique ?? '—'}</div>
                       <div className="text-[11px] text-zinc-500 mt-1">How many different people joined.</div>
                     </div>
                     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Total earned</div>
-                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.totalEarned.toLocaleString()}</div>
-                      <div className="text-[11px] text-zinc-500 mt-1">zCoins from your last {pastSummary.count} stream{pastSummary.count === 1 ? '' : 's'}.</div>
+                      <div className="text-2xl font-light text-zinc-900 dark:text-white mt-1">{pastSummary.total_earned.toLocaleString()}</div>
+                      <div className="text-[11px] text-zinc-500 mt-1">{coinUnit(pastSummary.total_earned)} from {pastSummary.count === 1 ? 'your 1 past stream' : `all ${pastSummary.count.toLocaleString()} of your past streams`}.</div>
                     </div>
                   </div>
                 )}
@@ -585,7 +603,7 @@ export const CreatorDashboardPage: React.FC = () => {
                             </div>
                           </div>
                           {stream.status === 'ended' ? (
-                            <div className="shrink-0 text-sm font-medium text-zinc-900 dark:text-white">{(stream.total_earnings_coins || 0).toLocaleString()} <span className="text-xs text-zinc-500">zCoins</span></div>
+                            <div className="shrink-0 text-sm font-medium text-zinc-900 dark:text-white">{(stream.total_earnings_coins || 0).toLocaleString()} <span className="text-xs text-zinc-500">{coinUnit(stream.total_earnings_coins || 0)}</span></div>
                           ) : (
                             <span className="shrink-0 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">{STATUS_LABELS[stream.status] ?? stream.status}</span>
                           )}
@@ -604,13 +622,26 @@ export const CreatorDashboardPage: React.FC = () => {
                     ))}
                   </div>
                 )}
-                <PaginationLoader onLoadMore={loadMorePastStreams} hasMore={pastHasMore} isLoading={isLoadingPast} />
+                {pastHasMore && pastStreams.length === 0 && isLoadingPast && (
+                  <div className="w-full py-6 flex justify-center items-center">
+                    <Loader2 className="w-6 h-6 text-[#3B82F6] animate-spin" />
+                  </div>
+                )}
+                {pastHasMore && pastStreams.length > 0 && (
+                  <button
+                    onClick={loadMorePastStreams}
+                    disabled={isLoadingPast}
+                    className="w-full mt-4 flex items-center justify-center gap-2 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors disabled:opacity-60"
+                  >
+                    {isLoadingPast ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Show more'}
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Right Column: Breakdown */}
             <div className="lg:col-span-1 flex flex-col gap-6">
-              <div className="bg-white dark:bg-[#0a0a0a] border border-zinc-200 dark:border-zinc-800/80 p-8 rounded-2xl h-full shadow-sm">
+              <div className="bg-white dark:bg-[#0a0a0a] border border-zinc-200 dark:border-zinc-800/80 p-8 rounded-2xl shadow-sm">
                 <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-8">
                   Revenue Ledger
                 </h3>
@@ -658,6 +689,29 @@ export const CreatorDashboardPage: React.FC = () => {
                   View Full Ledger
                   <ArrowRight className="w-4 h-4" />
                 </button>
+              </div>
+
+              <div className="bg-white dark:bg-[#0a0a0a] border border-zinc-200 dark:border-zinc-800/80 p-8 rounded-2xl shadow-sm">
+                <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-4">
+                  Stream Settings
+                </h3>
+                <label htmlFor="pause-timeout" className="block text-sm font-medium text-zinc-900 dark:text-zinc-200">
+                  If my video drops, end the stream after
+                </label>
+                <div className="text-xs text-zinc-500 mt-1 mb-3">Viewers see "Paused" meanwhile. Applies to streams you create from now on.</div>
+                <select
+                  id="pause-timeout"
+                  value={pauseTimeout ?? ''}
+                  disabled={pauseTimeout === null || isSavingPauseTimeout}
+                  onChange={(e) => void changePauseTimeout(Number(e.target.value))}
+                  className="w-full bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 focus:border-blue-500 rounded-lg py-2.5 px-4 text-sm text-zinc-900 dark:text-white outline-none transition-colors"
+                >
+                  {pauseTimeout === null && <option value="">Loading…</option>}
+                  <option value={300}>5 minutes</option>
+                  <option value={600}>10 minutes</option>
+                  <option value={900}>15 minutes</option>
+                  <option value={1800}>30 minutes</option>
+                </select>
               </div>
             </div>
           </div>

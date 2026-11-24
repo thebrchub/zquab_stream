@@ -1,5 +1,6 @@
 import React from 'react';
 import { ExternalLink, Sparkles } from 'lucide-react';
+import { formatCoins } from '../utils/coins';
 
 interface SponsoredChatDropProps {
   brandName: string;
@@ -37,7 +38,7 @@ export const SponsoredChatDrop: React.FC<SponsoredChatDropProps> = ({
           {/* Reward Badge */}
           <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg shadow-[inset_1px_1px_2px_rgba(0,0,0,0.3)]">
             <Sparkles className="w-3 h-3 text-amber-500" />
-            <span className="text-[10px] font-black text-amber-400">+{rewardCoins} zCoins</span>
+            <span className="text-[10px] font-black text-amber-400">+{formatCoins(rewardCoins)}</span>
           </div>
         </div>
 

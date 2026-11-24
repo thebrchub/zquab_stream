@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import { useAuth } from './AuthContext';
@@ -14,21 +14,15 @@ interface NotificationPrefsContextType {
 const NotificationPrefsContext = createContext<NotificationPrefsContextType | null>(null);
 
 export function NotificationPrefsProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const [prefs, setPrefs] = useState<Prefs>({});
-  const isRealUser = !!user && !user.is_guest;
+  const { bootstrap } = useAuth();
+  const [prefs, setPrefs] = useState<Prefs>(() => bootstrap?.notification_prefs || {});
 
-  useEffect(() => {
-    if (!isRealUser) {
-      setPrefs({});
-      return;
-    }
-    let isCurrent = true;
-    apiClient.get('/users/me/notification-preferences')
-      .then((res) => { if (isCurrent) setPrefs(res.data || {}); })
-      .catch(() => undefined);
-    return () => { isCurrent = false; };
-  }, [isRealUser, user?.user_id]);
+  // Loaded with the bootstrap (taken again whenever it reloads); the PATCH below returns the saved prefs.
+  const [seenBootstrap, setSeenBootstrap] = useState(bootstrap);
+  if (seenBootstrap !== bootstrap) {
+    setSeenBootstrap(bootstrap);
+    setPrefs(bootstrap?.notification_prefs || {});
+  }
 
   const setCreatorLiveAlerts = useCallback(async (enabled: boolean) => {
     const before = prefs;

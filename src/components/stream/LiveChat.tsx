@@ -85,7 +85,12 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const prevLastIdRef = useRef<string | null>(null);
-  const { gifts } = useWallet();
+  const { gifts, ensureGifts } = useWallet();
+
+  // The gift list loads the first time the drawer opens (then once per gifts version).
+  useEffect(() => {
+    if (showGiftDrawer) ensureGifts();
+  }, [showGiftDrawer, ensureGifts]);
 
   const scrollToBottom = () => {
     const el = scrollRef.current;

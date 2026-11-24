@@ -84,4 +84,6 @@ export interface StreamEnterErrorEvent {
   stream_id: string;
   code: StreamEnterErrorCode;
   message: string;
+  balance_coins?: number; // INSUFFICIENT_BALANCE: the viewer's balance, valid only when has_balance
+  has_balance?: boolean;
 }

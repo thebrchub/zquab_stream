@@ -248,6 +248,10 @@ export default function ChatPage() {
         navigate(`/chat/${dmRoomId}`);
       },
       onLocationDetected: (country) => setUserCountry(country),
+      getProfileCountry: () => {
+        const current = authRef.current.user;
+        return current && !current.is_guest ? current.country : undefined;
+      },
       onPartnerTyping: (isTyping) => setIsPartnerTyping(isTyping),
       onDisconnected: () => {
         if (isSkippingRef.current) return;

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usersApi } from '../api/users';
 import { friendsApi } from '../api/friends';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, type AuthUser } from '../context/AuthContext';
 import { useRooms } from '../context/RoomsContext';
 import { useWallet } from '../context/WalletContext'; 
 import UserCard from '../components/UserCard';
@@ -22,13 +22,14 @@ import { creatorService } from '../services/creatorService';
 import { LiveAlertsSetting } from '../components/stream/LiveAlertsSetting';
 import { createZAvatarURL, MAX_AVATAR_URL_LENGTH, MAX_USERNAME_LENGTH } from '../utils/avatar';
 import { useDebouncedSearch } from '../hooks/usePublicLists';
+import { formatCoins } from '../utils/coins';
 
 const GENDER_OPTIONS = ['Prefer not to say', 'Male', 'Female', 'Other'];
 type Tab = 'friends' | 'requests' | 'search' | 'blocked' | 'followers';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user: authUser, logout: logoutUser, refreshSession } = useAuth();
+  const { user: authUser, logout: logoutUser, updateUser } = useAuth();
   
   const { friendRequests, setFriendRequests } = useRooms();
   const { balanceCoins, openPurchaseModal } = useWallet();
@@ -93,14 +94,11 @@ export default function Profile() {
   const [followerCountError, setFollowerCountError] = useState<string | null>(null);
   const LIMIT = 15;
 
+  // The profile comes from the app's bootstrap (AuthContext): no request here.
+  // Loaded once per user; later saves update both this page and AuthContext.
+  const loadedProfileForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (authUser && !authUser.is_guest && authUser.user_id !== 'dev_mock_999') {
-      refreshSession().catch(console.error);
-    }
-  }, []);
-
-  useEffect(() => {
-    const fetchProfile = async () => {
+    const loadProfile = async () => {
       if (authUser?.is_guest) {
         setProfileLoading(false);
         return;
@@ -113,8 +111,10 @@ export default function Profile() {
         return;
       }
 
+      if (!authUser || loadedProfileForRef.current === authUser.user_id) return;
+      loadedProfileForRef.current = authUser.user_id;
       try {
-        const data = await usersApi.getMe();
+        const data: AuthUser & { age?: string } = authUser;
         setProfile(data);
         setUsername(data.username || '');
         setBio(data.bio || '');
@@ -147,7 +147,7 @@ export default function Profile() {
         setProfileLoading(false);
       }
     };
-    fetchProfile();
+    loadProfile();
   }, [authUser]);
 
   useEffect(() => {
@@ -259,6 +259,7 @@ export default function Profile() {
       const updated = await usersApi.updateMePartial(payload);
       
       setProfile({ ...updated, age, country, avatar_url: newAvatarUrl }); 
+      updateUser({ ...updated, country, avatar_url: newAvatarUrl });
       setCountry(country);
       if (updated.username) setHasExistingUsername(true);
       
@@ -295,7 +296,7 @@ export default function Profile() {
       const { avatar_url } = await creatorService.completeAvatar(object_key);
       setProfile((current: any) => ({ ...current, avatar_url }));
       setZAvatarRequested(false);
-      await refreshSession();
+      updateUser({ avatar_url });
     } catch (err: any) {
       setError(err.message || 'Failed to upload avatar.');
     } finally {
@@ -565,7 +566,7 @@ export default function Profile() {
                     className="inline-flex w-fit items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3.5 py-2 text-amber-300 transition-all hover:border-amber-400/40 hover:bg-amber-500/15 active:scale-[0.98] shadow-[4px_4px_10px_rgba(0,0,0,0.2),-1px_-1px_3px_rgba(255,255,255,0.02)] active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.3)]"
                   >
                     <span className="text-base drop-shadow-sm">🪙</span>
-                    <span className="text-sm font-black text-amber-700 drop-shadow-sm">{balanceCoins?.toLocaleString() || 0} zCoins</span>
+                    <span className="text-sm font-black text-amber-700 drop-shadow-sm">{formatCoins(balanceCoins || 0)}</span>
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-amber-950 shadow-inner"><Plus className="h-3 w-3" /></span>
                   </button>
 

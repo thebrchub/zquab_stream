@@ -12,11 +12,6 @@ export const friendsApi = {
     return res.data || [];
   },
   
-  getRequests: async (type: 'received' | 'sent' = 'received', limit: number = 10, offset: number = 0) => {
-    const res = await apiClient.get(`/friends/requests?type=${type}&limit=${limit}&offset=${offset}`);
-    return res.data;
-  },
-  
   sendRequest: async (username: string, premium: boolean = false) => {
     const res = await apiClient.post('/friends/request', { username, premium });
     return res.data;

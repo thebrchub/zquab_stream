@@ -255,7 +255,7 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
 
                 {isPremium && (
                   <div className="pt-4 border-t border-[var(--border-color)] animate-in slide-in-from-top-2 fade-in duration-200">
-                    <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 ml-1">Entry Price (zCoins)</label>
+                    <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 ml-1">Entry Price <span className="normal-case">(zCoins)</span></label>
                     <input 
                       type="number" 
                       min="10"

@@ -17,6 +17,7 @@ import {
   X, Users, Lock, Coins, LogIn
 } from 'lucide-react';
 import { StreamOverlayAd } from '../../components/stream/StreamOverlayAd';
+import { formatCoins } from '../../utils/coins';
 import { AnimatePresence } from 'framer-motion';
 
 interface LiveRoomPageProps {
@@ -269,12 +270,15 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
     wasPausedRef.current = isPaused;
   }, [isPaused, isStreamEnded, restartPlayer]);
 
-  // Keep retrying while reconnecting, in case the "resumed" event was missed.
+  // Keep retrying while the streamer is away, in case the "resumed" event was
+  // missed. A stall on its own (pieces arriving late) never restarts the
+  // player: hls.js keeps its buffer and plays on as soon as the next piece
+  // arrives, while a rebuilt player would start loading from scratch.
   useEffect(() => {
-    if (!isReconnecting) return;
+    if (streamMode === 'mock' || !isPaused || isStreamEnded) return;
     const timer = window.setInterval(() => void restartPlayer(), 10000);
     return () => window.clearInterval(timer);
-  }, [isReconnecting, restartPlayer]);
+  }, [streamMode, isPaused, isStreamEnded, restartPlayer]);
 
   useEffect(() => {
     if (isStreamEnded) setIsStalled(false);
@@ -414,7 +418,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Premium stream</h3>
               <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
-                Unlock for <strong className="text-white">{unlockPrice.toLocaleString()} zCoins</strong>. Your balance: <strong className="text-white">{balanceCoins.toLocaleString()}</strong>
+                Unlock for <strong className="text-white">{formatCoins(unlockPrice)}</strong>. Your balance: <strong className="text-white">{balanceCoins.toLocaleString()}</strong>
               </p>
               
               {needsCoins ? (
@@ -583,7 +587,7 @@ export const LiveRoomPage: React.FC<LiveRoomPageProps> = ({
                 onClick={() => setShowProfileOverlay(true)}
               >
                 <img src={creator.avatar_url} alt={creator.name} className="w-14 h-14 rounded-full object-cover border border-gray-600 shadow-md" />
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm">Live</div>
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm">{isPaused && !isStreamEnded ? 'Paused' : 'Live'}</div>
               </div>
               <div className="flex flex-col drop-shadow-md">
                 <h1 className="text-base lg:text-xl font-bold text-white leading-tight mb-0.5 line-clamp-1">{stream.title}</h1>
