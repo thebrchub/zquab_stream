@@ -18,6 +18,7 @@ interface LiveChatProps {
   onTopUpClick?: () => void;
   isGuest?: boolean;
   onLoginClick?: () => void;
+  onHeaderVisibilityChange?: (hidden: boolean) => void;
 }
 
 interface PinnedAd {
@@ -74,6 +75,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   onTopUpClick,
   isGuest = false,
   onLoginClick,
+  onHeaderVisibilityChange,
 }) => {
   const [inputText, setInputText] = useState<string>('');
   const [showGiftDrawer, setShowGiftDrawer] = useState<boolean>(false);
@@ -83,6 +85,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   const [muteTarget, setMuteTarget] = useState<{ userId: string; name: string } | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastScrollTopRef = useRef(0);
   const isNearBottomRef = useRef(true);
   const prevLastIdRef = useRef<string | null>(null);
   const { gifts, ensureGifts } = useWallet();
@@ -102,6 +105,20 @@ export const LiveChat: React.FC<LiveChatProps> = ({
   const handleScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
+
+    const currentScrollTop = el.scrollTop;
+    const delta = currentScrollTop - lastScrollTopRef.current;
+
+    if (currentScrollTop <= 16) {
+      onHeaderVisibilityChange?.(false);
+    } else if (delta > 8) {
+      onHeaderVisibilityChange?.(true);
+    } else if (delta < -8) {
+      onHeaderVisibilityChange?.(false);
+    }
+
+    lastScrollTopRef.current = currentScrollTop;
+
     isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
     if (isNearBottomRef.current) setHasNewBelow(false);
   };
