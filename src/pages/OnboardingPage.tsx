@@ -65,11 +65,20 @@ export default function OnboardingPage() {
 
     const debounceTimer = setTimeout(async () => {
       try {
-        await usersApi.checkUsername(username);
-        setUsernameStatus('available');
+        // 200 either way: the answer says whether it is taken.
+        const res = await usersApi.checkUsername(username);
+        if (res?.status === 'taken') {
+          setUsernameStatus('taken');
+          setUsernameError('This username is already taken.');
+        } else {
+          setUsernameStatus('available');
+        }
       } catch (error: any) {
-        setUsernameStatus('taken');
-        setUsernameError('This username is already taken.');
+        // Not an answer about the name (503: the server can't check right now).
+        setUsernameStatus('idle');
+        setUsernameError(error?.response?.status === 503
+          ? 'Could not check the username right now. Try again in a moment.'
+          : error?.response?.data?.error || 'Could not check this username.');
       }
     }, 500);
 
