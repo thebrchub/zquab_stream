@@ -5,6 +5,10 @@ import Hls from 'hls.js';
 const STALL_MS = 10000;
 // Shortest gap between two fresh-session restarts, so a down stream isn't hammered.
 const FRESH_SESSION_GAP_MS = 5000;
+// Picture frozen this long while the sound keeps playing (visible tab) → restart the picture.
+const FROZEN_PICTURE_MS = 2000;
+// Shortest gap between two picture restarts.
+const PICTURE_RESTART_GAP_MS = 5000;
 // Bunny path token, e.g. /bcdn_token=HS256-abc&token_path=%2F<pid>%2F&expires=1700000000/; segments inherit it from the playlist URL.
 const TOKEN_SEGMENT = /\/bcdn_token=[^/]*\//;
 
@@ -154,7 +158,52 @@ export const NativeStreamPlayer: React.FC<NativeStreamPlayerProps> = ({
       });
     }
 
+    // Frozen picture with sound still playing. Browsers stop decoding the
+    // picture of a video in a hidden tab and keep the sound; coming back,
+    // the picture sometimes never restarts. Every drawn frame is counted
+    // (requestVideoFrameCallback); if the playback time moves on a visible
+    // tab but no frame was drawn for FROZEN_PICTURE_MS, jump to the live
+    // edge: the seek restarts the picture from the next keyframe.
+    const restartPicture = () => {
+      const target = hls?.liveSyncPosition ?? (video.seekable.length > 0 ? video.seekable.end(video.seekable.length - 1) - 1 : null);
+      video.currentTime = target != null && Number.isFinite(target) ? target : video.currentTime;
+    };
+    const canCountFrames = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
+    let lastFrameAt = performance.now();
+    let lastRestartAt = 0;
+    let lastTime = video.currentTime;
+    let frameRequest = 0;
+    let sawFrame = false; // a sound-only stream never draws one: never "frozen"
+    const onFrame = () => {
+      sawFrame = true;
+      lastFrameAt = performance.now();
+      frameRequest = video.requestVideoFrameCallback(onFrame);
+    };
+    if (canCountFrames) frameRequest = video.requestVideoFrameCallback(onFrame);
+    const frozenCheck = window.setInterval(() => {
+      const now = performance.now();
+      const timeMoved = video.currentTime > lastTime;
+      lastTime = video.currentTime;
+      if (!canCountFrames || !sawFrame || document.hidden || video.paused || !timeMoved) {
+        lastFrameAt = now; // only a visible, playing video is expected to draw frames
+        return;
+      }
+      if (now - lastFrameAt > FROZEN_PICTURE_MS && now - lastRestartAt > PICTURE_RESTART_GAP_MS) {
+        lastRestartAt = now;
+        lastFrameAt = now;
+        restartPicture();
+      }
+    }, 1000);
+    // Without frame counting, restart the picture once on coming back instead.
+    const onVisible = () => {
+      if (!canCountFrames && !document.hidden && !video.paused) restartPicture();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
     return () => {
+      window.clearInterval(frozenCheck);
+      document.removeEventListener('visibilitychange', onVisible);
+      if (canCountFrames) video.cancelVideoFrameCallback(frameRequest);
       window.clearTimeout(freshSessionTimer);
       if (hls) hls.destroy();
     };
