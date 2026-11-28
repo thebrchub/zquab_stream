@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { publicGet } from './client';
 
 export interface Blog {
   id: number;
@@ -12,13 +12,10 @@ export interface Blog {
   content?: string; 
 }
 
+// Public reads (/public/v1/blogs): the same for everyone, cached by Cloudflare.
 export const blogsApi = {
-  getBlogs: async (limit: number = 9, offset: number = 0): Promise<Blog[]> => {
-    const response = await apiClient.get(`/blogs?limit=${limit}&offset=${offset}`);
-    return response.data;
-  },
-  getBlogBySlug: async (slug: string): Promise<Blog> => {
-    const response = await apiClient.get(`/blogs/${slug}`);
-    return response.data;
-  }
+  getBlogs: (limit: number = 9, offset: number = 0): Promise<Blog[]> =>
+    publicGet<Blog[]>(`/blogs?limit=${limit}&offset=${offset}`),
+  getBlogBySlug: (slug: string): Promise<Blog> =>
+    publicGet<Blog>(`/blogs/${encodeURIComponent(slug)}`),
 };

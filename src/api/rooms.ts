@@ -16,25 +16,7 @@ export const roomsApi = {
     return res.data;
   },
   
-  getRequests: async (cursor?: string, limit: number = 50) => {
-    const params = new URLSearchParams();
-    if (cursor) params.append('cursor', cursor);
-    params.append('limit', limit.toString());
-    
-    const res = await apiClient.get(`/rooms/requests?${params.toString()}`);
-    return res.data;
-  },
-  
-  acceptRequest: async (roomId: string) => {
-    const res = await apiClient.post(`/rooms/${roomId}/accept`);
-    return res.data;
-  },
-  
-  rejectRequest: async (roomId: string) => {
-    const res = await apiClient.post(`/rooms/${roomId}/reject`);
-    return res.data;
-  },
-  
+
   // cursor = "{createdAtUnixMillis}_{id}" to page before (compound, not a
   // plain id — see FRONTEND_API_GUIDE.md)
   getMessages: async (roomId: string, cursor?: string, limit: number = 50) => {
