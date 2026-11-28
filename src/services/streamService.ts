@@ -1,4 +1,5 @@
 import { apiClient, publicGet } from '../api/client';
+import { putWebp } from '../utils/webpImage';
 import { directoryParams, type DirectoryPage } from './creatorService';
 import { MOCK_STREAMS, MOCK_CREATORS } from '../constants/streamMockData';
 
@@ -20,6 +21,7 @@ export interface CreateStreamPayload {
   planned_end_at: string;
   is_premium: boolean;
   entry_price_coins: number;
+  has_banner?: boolean; // a banner will be uploaded right after (see uploadBanner)
 }
 
 export interface StreamCreationResponse {
@@ -27,6 +29,7 @@ export interface StreamCreationResponse {
   room_id: string;
   stream_key: string; // "<playback_id>?key=<secret>", goes in OBS's Stream Key box
   ingest_url: string;
+  banner_upload_url?: string; // one-time URL for the banner; missing when none could be made
 }
 
 export type StreamStatus = 'scheduled' | 'live' | 'ended' | 'cancelled' | 'expired';
@@ -48,6 +51,7 @@ export interface CreatorStream {
   peak_viewer_count: number;
   unique_viewer_count: number | null; // null for streams ended before this was counted
   total_earnings_coins: number;
+  banner_url?: string | null; // only while scheduled or live; deleted after the stream ends
 }
 
 export interface CreatorStreamsResponse {
@@ -75,6 +79,7 @@ export interface LiveStream {
   username: string;
   name: string;
   avatar_url: string;
+  banner_url?: string; // the creator's banner for this stream, when they added one
 }
 
 export interface UpcomingStream extends LiveStream {
@@ -111,6 +116,7 @@ export interface StreamMetadata {
   entry_price_coins: number;
   viewer_count: number;
   is_paused?: boolean;
+  banner_url?: string;
   creator: {
     username: string;
     name: string;
@@ -173,6 +179,17 @@ export const streamService = {
     }
     const res = await apiClient.post('/streams', payload);
     return res.data;
+  },
+
+  // Uploads a WebP banner to the one-time URL create-stream returned, then
+  // confirms it so it shows on the stream's cards.
+  async uploadBanner(streamId: string, uploadUrl: string, banner: Blob): Promise<void> {
+    if (isMockMode()) {
+      await delay(500);
+      return;
+    }
+    await putWebp(uploadUrl, banner);
+    await apiClient.post(`/streams/${streamId}/banner`);
   },
 
   async getMyStreams(status?: StreamStatus, limit?: number, offset?: number): Promise<CreatorStreamsResponse> {

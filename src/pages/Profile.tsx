@@ -21,6 +21,7 @@ import { CreatorApplicationModal } from '../components/studio/CreatorApplication
 import { creatorService } from '../services/creatorService';
 import { LiveAlertsSetting } from '../components/stream/LiveAlertsSetting';
 import { createZAvatarURL, MAX_AVATAR_URL_LENGTH, MAX_USERNAME_LENGTH } from '../utils/avatar';
+import { convertToWebp, putWebp, WEBP_MIME } from '../utils/webpImage';
 import { useDebouncedSearch } from '../hooks/usePublicLists';
 import { formatCoins } from '../utils/coins';
 
@@ -285,14 +286,9 @@ export default function Profile() {
     setIsUploadingAvatar(true);
     setError(null);
     try {
-      const { url, object_key } = await creatorService.presignAvatar(file.type);
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type },
-        body: file,
-      });
-      if (!response.ok) throw new Error('Failed to upload avatar.');
-
+      const webp = await convertToWebp(file, { maxWidth: 512, maxHeight: 512 });
+      const { url, object_key } = await creatorService.getAvatarUploadUrl(WEBP_MIME);
+      await putWebp(url, webp);
       const { avatar_url } = await creatorService.completeAvatar(object_key);
       setProfile((current: any) => ({ ...current, avatar_url }));
       setZAvatarRequested(false);

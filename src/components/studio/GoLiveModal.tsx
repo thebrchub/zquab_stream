@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { X, Video, Copy, RefreshCw, Check, Loader2, ShieldAlert, Lock, Play, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Video, Copy, RefreshCw, Check, Loader2, ShieldAlert, Lock, Play, CheckCircle2, ImagePlus } from 'lucide-react';
 import { streamService, type CreateStreamPayload, type StreamCreationResponse } from '../../services/streamService';
+import { convertToWebp } from '../../utils/webpImage';
 
 interface GoLiveModalProps {
   isOpen: boolean;
@@ -26,12 +27,42 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
   const [plannedEndAt, setPlannedEndAt] = useState(() => toDateTimeLocal(new Date(Date.now() + 60 * 60 * 1000)));
   const [isPremium, setIsPremium] = useState(false);
   const [price, setPrice] = useState(100);
+  const [banner, setBanner] = useState<Blob | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [isPreparingBanner, setIsPreparingBanner] = useState(false);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   // Step 2 OBS Setup State
   const [streamData, setStreamData] = useState<StreamCreationResponse | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [bannerNote, setBannerNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!banner) {
+      setBannerPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(banner);
+    setBannerPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [banner]);
 
   if (!isOpen) return null;
+
+  const handleBannerPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setIsPreparingBanner(true);
+    setError(null);
+    try {
+      setBanner(await convertToWebp(file, { maxWidth: 1280, maxHeight: 720 }));
+    } catch (err: any) {
+      setError(err.message || 'Could not use this image.');
+    } finally {
+      setIsPreparingBanner(false);
+    }
+  };
 
   const handleScheduledAtChange = (value: string) => {
     setScheduledAt(value);
@@ -68,10 +99,20 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
         planned_end_at: plannedEnd.toISOString(),
         is_premium: isPremium,
         entry_price_coins: isPremium ? price : 0,
+        has_banner: banner !== null,
       };
       if (scheduledStart) payload.scheduled_at = scheduledStart.toISOString();
 
       const data = await streamService.createStream(payload);
+      // The stream exists now; a banner that fails to upload never undoes it.
+      if (banner) {
+        try {
+          if (!data.banner_upload_url) throw new Error('no upload url');
+          await streamService.uploadBanner(data.stream_id, data.banner_upload_url, banner);
+        } catch {
+          setBannerNote('Your stream is ready, but the banner could not be uploaded.');
+        }
+      }
       setStreamData(data);
       setStep(2); 
       onStreamCreated?.();
@@ -113,6 +154,8 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
 		  setScheduledAt('');
 		  setPlannedEndAt(toDateTimeLocal(new Date(Date.now() + 60 * 60 * 1000)));
       setStreamData(null);
+      setBanner(null);
+      setBannerNote(null);
       setError(null);
     }, 200);
     onClose();
@@ -168,6 +211,36 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
                   placeholder="e.g., Late night ranked grind"
                   className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-[1.25rem] px-4 py-3.5 text-sm text-[var(--text-main)] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all shadow-sm"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-[var(--text-main)] ml-1">
+                  Banner <span className="font-medium text-[var(--text-muted)]">(optional)</span>
+                </label>
+                <input ref={bannerInputRef} type="file" accept="image/*" className="hidden" onChange={handleBannerPicked} />
+                {bannerPreview ? (
+                  <div className="relative aspect-video w-full overflow-hidden rounded-[1.25rem] border border-[var(--border-color)] bg-black">
+                    <img src={bannerPreview} alt="Banner preview" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setBanner(null)}
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                      title="Remove banner"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    disabled={isPreparingBanner}
+                    className="w-full py-6 bg-[var(--background)] border border-dashed border-[var(--border-color)] hover:border-[#3B82F6] rounded-[1.25rem] text-sm font-medium text-[var(--text-muted)] hover:text-[#3B82F6] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isPreparingBanner ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                    Add a banner image
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -281,6 +354,12 @@ export const GoLiveModal: React.FC<GoLiveModalProps> = ({ isOpen, onClose, onStr
           {/* STEP 2: OBS Setup Details */}
           {step === 2 && streamData && (
             <div className="flex flex-col gap-6 animate-in slide-in-from-right-4 duration-300">
+              {bannerNote && (
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-sm font-medium flex items-start gap-3">
+                  <ShieldAlert className="w-5 h-5 shrink-0" />
+                  <p>{bannerNote}</p>
+                </div>
+              )}
               
               <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-[1.25rem] text-amber-600 dark:text-amber-400 text-sm font-medium flex items-start gap-3 leading-relaxed shadow-inner">
                 <ShieldAlert className="w-5 h-5 shrink-0 text-amber-500 mt-0.5" />

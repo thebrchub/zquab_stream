@@ -303,8 +303,8 @@ export const creatorService = {
     return res.data;
   },
 
-  async presignAvatar(contentType: string): Promise<CreatorAvatarUpload> {
-  const res = await apiClient.post('/users/me/creator/avatar/presign', { content_type: contentType });
+  async getAvatarUploadUrl(contentType: string): Promise<CreatorAvatarUpload> {
+  const res = await apiClient.post('/users/me/creator/avatar/upload-url', { content_type: contentType });
   return res.data;
   },
 

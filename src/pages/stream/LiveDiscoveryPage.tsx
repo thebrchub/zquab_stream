@@ -295,7 +295,7 @@ export const LiveDiscoveryPage: React.FC = () => {
                         <div className="absolute inset-0 bg-gradient-to-br from-[#3B82F6]/20 to-black overflow-hidden">
                           <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-500 z-10" />
                           <img 
-                            src={stream.avatar_url || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop'} 
+                            src={stream.banner_url || stream.avatar_url || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop'} 
                             alt="Cover" 
                             className="w-full h-full object-cover opacity-60 group-hover:scale-105 group-hover:opacity-100 transition-all duration-700"
                           />
@@ -364,7 +364,7 @@ export const LiveDiscoveryPage: React.FC = () => {
                     >
                       <div className="relative aspect-video w-full bg-black overflow-hidden rounded-t-[1.9rem]">
                         <img
-                          src={stream.avatar_url || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop'}
+                          src={stream.banner_url || stream.avatar_url || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop'}
                           alt="Cover"
                           className="w-full h-full object-cover opacity-60 group-hover:scale-105 group-hover:opacity-100 transition-all duration-700"
                         />

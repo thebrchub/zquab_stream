@@ -22,6 +22,24 @@ const bootstrapPreload = (apiHost: string): Plugin => ({
   }],
 })
 
+// The .proto files are bundled as text and parsed in the browser: drop their
+// comments (and blank lines) so notes meant for developers aren't shipped.
+const stripProtoComments = (): Plugin => ({
+  name: 'zq-strip-proto-comments',
+  enforce: 'post',
+  transform(code, id) {
+    if (!id.endsWith('.proto?raw')) return null
+    const match = /^export default (".*");?\s*$/s.exec(code)
+    if (!match) return null
+    const stripped = (JSON.parse(match[1]) as string)
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\/\/.*$/, '').trimEnd())
+      .filter((line) => line.trim() !== '')
+      .join('\n')
+    return `export default ${JSON.stringify(stripped)}`
+  },
+})
+
 // https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => {
   const apiHost = apiHostFor(command, mode)
@@ -30,6 +48,7 @@ export default defineConfig(({ command, mode }) => {
       __ZQ_API_HOST__: JSON.stringify(apiHost),
     },
     plugins: [
+      stripProtoComments(),
       tailwindcss(),
       react(),
       bootstrapPreload(apiHost),
